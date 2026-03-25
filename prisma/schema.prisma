@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== ENUMS ====================
+
+enum Role {
+  ADMIN
+  SUBSCRIBER
+}
+
+enum PlanType {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  LIFETIME
+}
+
+enum PaymentMethod {
+  PIX
+  BOLETO
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum AIProvider {
+  GROK
+  DALLE
+  MIDJOURNEY
+  LEONARDO
+}
+
+// ==================== MODELS ====================
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Subscriber {
+  id           String   @id @default(cuid())
+  cpfOrCnpj    String   @unique
+  name         String
+  email        String   @unique
+  password     String
+  avatar       String?
+  phone        String?
+  street       String?
+  number       String?
+  neighborhood String?
+  city         String?
+  state        String?
+  country      String   @default("Brasil")
+  asaasCustomerId String? @unique
+
+  planId    String?
+  plan      Plan?    @relation(fields: [planId], references: [id])
+
+  payments  Payment[]
+  models    SubscriberModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscribers")
+}
+
+model Plan {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  benefits         String[]
+  type             PlanType
+  price            Float
+  promotionalPrice Float?
+  isActive         Boolean  @default(true)
+
+  subscribers Subscriber[]
+  payments    Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plans")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  amount          Float
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  asaasPaymentId  String?       @unique
+  asaasInvoiceUrl String?
+
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model SiteMetrics {
+  id             String   @id @default(cuid())
+  clicks         Int      @default(0)
+  views          Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  pageViews      Int      @default(0)
+  bounceRate     Float    @default(0)
+  date           DateTime @unique @default(now())
+  createdAt      DateTime @default(now())
+
+  @@map("site_metrics")
+}
+
+model AIModel {
+  id       String     @id @default(cuid())
+  name     String
+  provider AIProvider
+  apiKey   String
+  baseUrl  String?
+  isActive Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_models")
+}
+
+model SubscriberModel {
+  id         String @id @default(cuid())
+  name       String
+  thumbnail  String?
+  canvasData Json
+
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriber_models")
+}
+
+model Template {
+  id         String   @id @default(cuid())
+  name       String
+  category   String
+  thumbnail  String?
+  background String?
+  width      Int
+  height     Int
+  colors     String[]
+  fonts      String[]
+  canvasData Json
+  isPublic   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("templates")
+}
