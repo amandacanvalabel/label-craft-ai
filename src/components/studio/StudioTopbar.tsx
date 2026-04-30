@@ -14,11 +14,14 @@ interface StudioTopbarProps {
   projectName: string;
   onProjectNameChange: (name: string) => void;
   saved: boolean;
+  saving?: boolean;
   onSave: () => void;
   onExport: () => void;
+  advanceLabel?: string;
+  onAdvance?: () => void;
 }
 
-const StudioTopbar = ({ projectName, onProjectNameChange, saved, onSave, onExport }: StudioTopbarProps) => (
+const StudioTopbar = ({ projectName, onProjectNameChange, saved, saving, onSave, onExport, advanceLabel, onAdvance }: StudioTopbarProps) => (
   <div className="h-12 bg-white dark:bg-[#12121a] border-b border-border/40 dark:border-white/8 flex items-center justify-between px-4 shrink-0 z-20">
     {/* Left */}
     <div className="flex items-center gap-3">
@@ -44,7 +47,12 @@ const StudioTopbar = ({ projectName, onProjectNameChange, saved, onSave, onExpor
 
     {/* Center status */}
     <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-      {saved ? (
+      {saving ? (
+        <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Salvando...
+        </div>
+      ) : saved ? (
         <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-500">
           <HiOutlineCheckCircle className="w-3.5 h-3.5" />
           Salvo
@@ -61,18 +69,29 @@ const StudioTopbar = ({ projectName, onProjectNameChange, saved, onSave, onExpor
     <div className="flex items-center gap-2">
       <button
         onClick={onSave}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground bg-muted/50 dark:bg-white/5 hover:bg-muted dark:hover:bg-white/10 rounded-lg transition-all"
+        disabled={saving || saved}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground bg-muted/50 dark:bg-white/5 hover:bg-muted dark:hover:bg-white/10 rounded-lg transition-all disabled:opacity-40"
       >
-        <HiOutlineCloudArrowUp className="w-3.5 h-3.5" />
-        Salvar
+        <HiOutlineCloudArrowUp className={`w-3.5 h-3.5 ${saving ? "animate-pulse" : ""}`} />
+        {saving ? "Salvando..." : "Salvar"}
       </button>
-      <button
-        onClick={onExport}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-all shadow-sm shadow-primary/20"
-      >
-        <HiOutlineArrowDownTray className="w-3.5 h-3.5" />
-        Exportar
-      </button>
+      {advanceLabel && onAdvance ? (
+        <button
+          onClick={onAdvance}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-all shadow-sm shadow-primary/20"
+        >
+          {advanceLabel}
+          <HiOutlineArrowDownTray className="w-3.5 h-3.5 rotate-[-90deg]" />
+        </button>
+      ) : (
+        <button
+          onClick={onExport}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg transition-all shadow-sm shadow-primary/20"
+        >
+          <HiOutlineArrowDownTray className="w-3.5 h-3.5" />
+          Exportar
+        </button>
+      )}
     </div>
   </div>
 );

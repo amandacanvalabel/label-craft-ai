@@ -37,7 +37,10 @@ interface LeftPanelProps {
   onToggleLayerLock: (id: string) => void;
   onSelectLayer: (id: string) => void;
   selectedLayer: string | null;
+  activeTemplate: string | null;
   onApplyTemplate: (id: string) => void;
+  activeAssets: string[];
+  onToggleAsset: (id: string) => void;
 }
 
 const templates: Template[] = [
@@ -79,7 +82,10 @@ const LeftPanel = ({
   onToggleLayerLock,
   onSelectLayer,
   selectedLayer,
+  activeTemplate,
   onApplyTemplate,
+  activeAssets,
+  onToggleAsset,
 }: LeftPanelProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("templates");
   const [templateFilter, setTemplateFilter] = useState("Todos");
@@ -166,17 +172,25 @@ const LeftPanel = ({
                     ))}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {filteredTemplates.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => onApplyTemplate(t.id)}
-                        className="group p-3 rounded-xl bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border border-transparent hover:border-primary/20 transition-all text-center"
-                      >
-                        <div className="text-2xl mb-1.5">{t.img}</div>
-                        <p className="text-[10px] font-semibold text-foreground truncate">{t.name}</p>
-                        <p className="text-[8px] text-muted-foreground">{t.category}</p>
-                      </button>
-                    ))}
+                    {filteredTemplates.map((t) => {
+                      const isActive = activeTemplate === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => onApplyTemplate(t.id)}
+                          className={cn(
+                            "group p-3 rounded-xl border transition-all text-center",
+                            isActive
+                              ? "bg-primary/10 border-primary/40 ring-1 ring-primary/30"
+                              : "bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border-transparent hover:border-primary/20"
+                          )}
+                        >
+                          <div className="text-2xl mb-1.5">{t.img}</div>
+                          <p className={cn("text-[10px] font-semibold truncate", isActive ? "text-primary" : "text-foreground")}>{t.name}</p>
+                          <p className="text-[8px] text-muted-foreground">{t.category}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -234,17 +248,31 @@ const LeftPanel = ({
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <p className="text-[10px] text-muted-foreground mb-2">Arraste para o canvas ou clique para adicionar</p>
+                  <p className="text-[10px] text-muted-foreground mb-2">Clique para adicionar/remover do canvas</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {assets.map((a) => (
-                      <button
-                        key={a.id}
-                        className="group p-3 rounded-xl bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border border-transparent hover:border-primary/20 transition-all text-center"
-                      >
-                        <div className="text-xl mb-1">{a.img}</div>
-                        <p className="text-[9px] font-medium text-foreground">{a.name}</p>
-                      </button>
-                    ))}
+                    {assets.map((a) => {
+                      const isActive = activeAssets.includes(a.id);
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => onToggleAsset(a.id)}
+                          className={cn(
+                            "group p-3 rounded-xl border transition-all text-center relative",
+                            isActive
+                              ? "bg-primary/10 border-primary/40 ring-1 ring-primary/30"
+                              : "bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border-transparent hover:border-primary/20"
+                          )}
+                        >
+                          {isActive && (
+                            <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
+                              <span className="text-[7px] text-white font-bold">✓</span>
+                            </div>
+                          )}
+                          <div className="text-xl mb-1">{a.img}</div>
+                          <p className={cn("text-[9px] font-medium", isActive ? "text-primary" : "text-foreground")}>{a.name}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}

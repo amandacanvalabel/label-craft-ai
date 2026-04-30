@@ -15,6 +15,13 @@ import {
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
+interface NutritionRow {
+  name: string;
+  value: string;
+  unit: string;
+  vd: string;
+}
+
 interface RightPanelProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -29,9 +36,14 @@ interface RightPanelProps {
     expiry: string;
     registration: string;
     sac: string;
+    [key: string]: string;
   };
   onFieldChange: (field: string, value: string) => void;
   onGenerateWithAI: (prompt: string) => void;
+  nutritionData: NutritionRow[];
+  onNutritionChange: (data: NutritionRow[]) => void;
+  servingSize: string;
+  onServingSizeChange: (v: string) => void;
 }
 
 const tabs = [
@@ -53,18 +65,6 @@ const anvisaChecklist = [
   { label: "Registro/SAC", field: "registration" },
 ];
 
-const defaultNutrition = [
-  { name: "Valor energético", value: "85", unit: "kcal", vd: "4" },
-  { name: "Carboidratos", value: "21", unit: "g", vd: "7" },
-  { name: "Açúcares totais", value: "19", unit: "g", vd: "—" },
-  { name: "Açúcares adicionados", value: "12", unit: "g", vd: "24" },
-  { name: "Proteínas", value: "0,8", unit: "g", vd: "1" },
-  { name: "Gorduras totais", value: "0", unit: "g", vd: "0" },
-  { name: "Gordura saturada", value: "0", unit: "g", vd: "0" },
-  { name: "Gordura trans", value: "0", unit: "g", vd: "0" },
-  { name: "Fibra alimentar", value: "0,3", unit: "g", vd: "1" },
-  { name: "Sódio", value: "5", unit: "mg", vd: "0" },
-];
 
 const RightPanel = ({
   collapsed,
@@ -73,14 +73,16 @@ const RightPanel = ({
   productFields,
   onFieldChange,
   onGenerateWithAI,
+  nutritionData,
+  onNutritionChange,
+  servingSize,
+  onServingSizeChange,
 }: RightPanelProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("ai");
   const [prompt, setPrompt] = useState("");
   const [aiHistory, setAiHistory] = useState<{ role: "user" | "ai"; text: string }[]>([
     { role: "ai", text: "Olá! Sou seu assistente de criação de rótulos. Descreva o produto e eu gero o layout completo com tabela nutricional e informações ANVISA." },
   ]);
-  const [nutrition, setNutrition] = useState(defaultNutrition);
-  const [servingSize, setServingSize] = useState("200ml");
   const [generating, setGenerating] = useState(false);
 
   const handleSendPrompt = () => {
@@ -339,7 +341,7 @@ const RightPanel = ({
                     <label className="text-[10px] font-bold text-foreground">Porção</label>
                     <input
                       value={servingSize}
-                      onChange={(e) => setServingSize(e.target.value)}
+                      onChange={(e) => onServingSizeChange(e.target.value)}
                       className="w-full px-2.5 py-2 text-[11px] bg-muted/30 dark:bg-white/[0.03] border border-border/40 dark:border-white/8 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
@@ -351,15 +353,15 @@ const RightPanel = ({
                       <span className="text-center">Un</span>
                       <span className="text-center">%VD</span>
                     </div>
-                    {nutrition.map((item, i) => (
+                    {nutritionData.map((item, i) => (
                       <div key={item.name} className="grid grid-cols-[1fr_60px_40px_40px] gap-0 items-center px-2.5 py-1.5 border-t border-border/20 dark:border-white/5">
                         <span className="text-[10px] text-foreground font-medium truncate">{item.name}</span>
                         <input
                           value={item.value}
                           onChange={(e) => {
-                            const updated = [...nutrition];
+                            const updated = [...nutritionData];
                             updated[i] = { ...item, value: e.target.value };
-                            setNutrition(updated);
+                            onNutritionChange(updated);
                           }}
                           className="text-center text-[10px] bg-transparent border-none outline-none text-foreground font-semibold w-full"
                         />
@@ -367,9 +369,9 @@ const RightPanel = ({
                         <input
                           value={item.vd}
                           onChange={(e) => {
-                            const updated = [...nutrition];
+                            const updated = [...nutritionData];
                             updated[i] = { ...item, vd: e.target.value };
-                            setNutrition(updated);
+                            onNutritionChange(updated);
                           }}
                           className="text-center text-[10px] bg-transparent border-none outline-none text-muted-foreground w-full"
                         />

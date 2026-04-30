@@ -13,216 +13,300 @@ import {
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
-interface CanvasElement {
+interface Layer {
   id: string;
-  type: "text" | "image" | "shape" | "table";
-  label: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  content?: string;
+  name: string;
+  type: string;
+  visible: boolean;
+  locked: boolean;
+}
+
+interface NutritionRow {
+  name: string;
+  value: string;
+  unit: string;
+  vd: string;
 }
 
 interface CanvasAreaProps {
-  elements: CanvasElement[];
+  elements: unknown[];
   selectedElement: string | null;
   onSelectElement: (id: string | null) => void;
   labelPreview: {
     productName: string;
+    brandName?: string;
     category: string;
     img: string;
+    ingredients?: string;
+    allergens?: string;
+    weight?: string;
+    expiry?: string;
+    registration?: string;
+    sac?: string;
   };
+  layers: Layer[];
+  activeTemplate: string | null;
+  activeAssets: string[];
+  nutritionData: NutritionRow[];
+  servingSize: string;
 }
 
-const CanvasArea = ({ elements, selectedElement, onSelectElement, labelPreview }: CanvasAreaProps) => {
+// Template color schemes — inline styles to avoid Tailwind purge
+const TEMPLATE_STYLES: Record<string, {
+  imgFrom: string; imgTo: string;
+  accent: string; accentBg: string;
+  headerBg: string; nameStyle: React.CSSProperties;
+}> = {
+  t1: { imgFrom: "#fff7ed", imgTo: "#fef3c7", accent: "#c2410c", accentBg: "#fed7aa", headerBg: "#fff7ed", nameStyle: { fontWeight: 800 } },
+  t2: { imgFrom: "#fffbeb", imgTo: "#fefce8", accent: "#92400e", accentBg: "#fde68a", headerBg: "#fffbeb", nameStyle: { fontStyle: "italic", fontWeight: 700 } },
+  t3: { imgFrom: "#eff6ff", imgTo: "#e0e7ff", accent: "#1d4ed8", accentBg: "#bfdbfe", headerBg: "#eff6ff", nameStyle: { fontWeight: 900, textTransform: "uppercase", letterSpacing: "-0.5px" } },
+  t4: { imgFrom: "#fdf2f8", imgTo: "#fce7f3", accent: "#9d174d", accentBg: "#fbcfe8", headerBg: "#fdf2f8", nameStyle: { fontWeight: 600 } },
+  t5: { imgFrom: "#f5f5f4", imgTo: "#e7e5e4", accent: "#44403c", accentBg: "#d6d3d1", headerBg: "#f5f5f4", nameStyle: { fontWeight: 700 } },
+  t6: { imgFrom: "#ecfeff", imgTo: "#e0f2fe", accent: "#0e7490", accentBg: "#a5f3fc", headerBg: "#ecfeff", nameStyle: { fontWeight: 700 } },
+  t7: { imgFrom: "#f0fdf4", imgTo: "#ecfccb", accent: "#166534", accentBg: "#bbf7d0", headerBg: "#f0fdf4", nameStyle: { fontWeight: 700 } },
+  t8: { imgFrom: "#faf5ff", imgTo: "#f3e8ff", accent: "#6b21a8", accentBg: "#e9d5ff", headerBg: "#faf5ff", nameStyle: { fontWeight: 600 } },
+  t9: { imgFrom: "#fff1f2", imgTo: "#fce7f3", accent: "#9f1239", accentBg: "#fecdd3", headerBg: "#fff1f2", nameStyle: { fontWeight: 700, fontStyle: "italic" } },
+};
+
+const DEFAULT_STYLE = {
+  imgFrom: "#eff6ff", imgTo: "#f5f3ff",
+  accent: "#4f46e5", accentBg: "#c7d2fe",
+  headerBg: "#f9fafb", nameStyle: { fontWeight: 800 } as React.CSSProperties,
+};
+
+const ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
+  a1: { emoji: "🌿", short: "Orgânico" },
+  a2: { emoji: "✅", short: "SIF" },
+  a3: { emoji: "🏛️", short: "ANVISA" },
+  a4: { emoji: "🌱", short: "Vegano" },
+  a5: { emoji: "🚫", short: "Sem Glúten" },
+  a6: { emoji: "🥛", short: "Sem Lactose" },
+  a7: { emoji: "♻️", short: "Reciclável" },
+  a8: { emoji: "📊", short: "Cód. Barras" },
+};
+
+const CanvasArea = ({
+  selectedElement,
+  onSelectElement,
+  labelPreview,
+  layers,
+  activeTemplate,
+  activeAssets,
+  nutritionData,
+  servingSize,
+}: CanvasAreaProps) => {
   const [zoom, setZoom] = useState(100);
   const [showGrid, setShowGrid] = useState(true);
   const [tool, setTool] = useState<"select" | "hand">("select");
 
+  const style = (activeTemplate && TEMPLATE_STYLES[activeTemplate]) || DEFAULT_STYLE;
+
+  const isVisible = (id: string) => layers.find((l) => l.id === id)?.visible !== false;
+  const isLocked = (id: string) => layers.find((l) => l.id === id)?.locked === true;
+
+  const handleClick = (id: string, e: React.MouseEvent) => {
+    if (isLocked(id)) return;
+    e.stopPropagation();
+    onSelectElement(id);
+  };
+
+  const ringCls = (id: string) =>
+    cn(
+      "p-2 rounded-lg transition-all",
+      isLocked(id) && "cursor-not-allowed opacity-70",
+      !isLocked(id) && "cursor-pointer",
+      selectedElement === id
+        ? "ring-2 ring-primary ring-offset-1"
+        : !isLocked(id) && "hover:bg-black/[0.03]"
+    );
+
+  // Top 3 nutrition rows for compact preview
+  const previewNutrition = nutritionData.slice(0, 5);
+
   return (
     <div className="flex-1 flex flex-col bg-[#e8ecf1] dark:bg-[#0d0d14] overflow-hidden relative">
-      {/* Canvas */}
       <div className="flex-1 flex items-center justify-center overflow-auto p-8">
         <div
+          id="label-canvas"
           className={cn(
-            "relative bg-white dark:bg-[#fafafa] rounded-lg shadow-2xl transition-transform origin-center",
+            "relative bg-white rounded-lg shadow-2xl transition-transform origin-center overflow-hidden",
             showGrid && "bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:20px_20px]"
           )}
-          style={{
-            width: 400,
-            height: 560,
-            transform: `scale(${zoom / 100})`,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onSelectElement(null);
-          }}
+          style={{ width: 400, height: 560, transform: `scale(${zoom / 100})` }}
+          onClick={(e) => { if (e.target === e.currentTarget) onSelectElement(null); }}
         >
-          {/* Label preview content */}
-          <div className="absolute inset-0 p-6 flex flex-col text-[#1a1a1a]">
-            {/* Top: Product image area */}
-            <div className="flex-1 flex items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-violet-50 mb-4 relative overflow-hidden">
-              <span className="text-7xl">{labelPreview.img || "📋"}</span>
-              <div className="absolute top-3 right-3 text-[8px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-                {labelPreview.category || "Produto"}
-              </div>
-            </div>
+          <div className="absolute inset-0 p-5 flex flex-col text-[#1a1a1a]">
 
-            {/* Product Name */}
-            <div
-              className={cn(
-                "p-2 rounded-lg cursor-pointer transition-all mb-2",
-                selectedElement === "product-name" ? "ring-2 ring-primary ring-offset-1" : "hover:bg-blue-50/50"
+            {/* ── Image area (layer: product-image) ── */}
+            {isVisible("product-image") && (
+              <div
+                className={cn(ringCls("product-image"), "flex-1 flex items-center justify-center rounded-xl mb-3 relative overflow-hidden !p-0")}
+                style={{ background: `linear-gradient(135deg, ${style.imgFrom}, ${style.imgTo})` }}
+                onClick={(e) => handleClick("product-image", e)}
+              >
+                <span className="text-7xl">{labelPreview.img || "📋"}</span>
+
+                {/* Category badge */}
+                <div
+                  className="absolute top-2.5 right-2.5 text-[7px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ color: style.accent, backgroundColor: style.accentBg }}
+                >
+                  {labelPreview.category || "Produto"}
+                </div>
+
+                {/* Asset badges — bottom-left */}
+                {activeAssets.length > 0 && (
+                  <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+                    {activeAssets.map((id) => {
+                      const badge = ASSET_BADGES[id];
+                      if (!badge) return null;
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[6px] font-bold bg-white/80 backdrop-blur-sm shadow-sm"
+                          style={{ color: style.accent }}
+                        >
+                          <span>{badge.emoji}</span>
+                          <span>{badge.short}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {isLocked("product-image") && (
+                  <div className="absolute top-2.5 left-2.5 text-[7px] text-amber-500 bg-white/70 px-1.5 py-0.5 rounded-full">🔒</div>
+                )}
+              </div>
+            )}
+
+            {/* ── Product name (layer: product-name) ── */}
+            {isVisible("product-name") && (
+              <div className={cn(ringCls("product-name"), "mb-1.5")} onClick={(e) => handleClick("product-name", e)}>
+                <h2 className="text-[18px] leading-tight text-[#1a1a1a]" style={style.nameStyle}>
+                  {labelPreview.productName || "Nome do Produto"}
+                </h2>
+                {labelPreview.brandName && (
+                  <p className="text-[9px] font-medium mt-0.5" style={{ color: style.accent }}>{labelPreview.brandName}</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Info blocks ── */}
+            <div className="space-y-1.5">
+
+              {/* Ingredients (layer: ingredients) */}
+              {isVisible("ingredients") && (
+                <div className={ringCls("ingredients")} onClick={(e) => handleClick("ingredients", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Ingredientes</p>
+                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                    {labelPreview.ingredients || "Ingredientes não informados."}
+                  </p>
+                </div>
               )}
-              onClick={(e) => { e.stopPropagation(); onSelectElement("product-name"); }}
-            >
-              <h2 className="text-xl font-extrabold text-[#1a1a1a] leading-tight">
-                {labelPreview.productName || "Nome do Produto"}
-              </h2>
-            </div>
 
-            {/* Info blocks */}
-            <div className="space-y-2">
-              {/* Ingredients */}
-              <div
-                className={cn(
-                  "p-2 rounded-lg cursor-pointer transition-all",
-                  selectedElement === "ingredients" ? "ring-2 ring-primary ring-offset-1" : "hover:bg-blue-50/50"
-                )}
-                onClick={(e) => { e.stopPropagation(); onSelectElement("ingredients"); }}
-              >
-                <p className="text-[7px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Ingredientes</p>
-                <p className="text-[8px] text-gray-600 leading-relaxed">
-                  Água, açúcar, suco concentrado, ácido cítrico, corante natural de betacaroteno, aromatizante natural.
-                </p>
-              </div>
-
-              {/* Nutritional table */}
-              <div
-                className={cn(
-                  "p-2 rounded-lg cursor-pointer transition-all",
-                  selectedElement === "nutritional" ? "ring-2 ring-primary ring-offset-1" : "hover:bg-blue-50/50"
-                )}
-                onClick={(e) => { e.stopPropagation(); onSelectElement("nutritional"); }}
-              >
-                <p className="text-[7px] font-bold uppercase tracking-wider text-gray-400 mb-1">Informação Nutricional</p>
-                <div className="border border-gray-200 rounded-md overflow-hidden">
-                  <table className="w-full text-[7px]">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left px-1.5 py-0.5 font-bold text-gray-700">Porção 200ml</th>
-                        <th className="text-right px-1.5 py-0.5 font-bold text-gray-500">%VD*</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["Valor energético", "85 kcal", "4%"],
-                        ["Carboidratos", "21g", "7%"],
-                        ["Açúcares totais", "19g", "—"],
-                        ["Proteínas", "0,8g", "1%"],
-                        ["Sódio", "5mg", "0%"],
-                      ].map(([name, val, vd]) => (
-                        <tr key={name} className="border-t border-gray-100">
-                          <td className="px-1.5 py-0.5 text-gray-600">{name} <span className="font-semibold text-gray-800">{val}</span></td>
-                          <td className="text-right px-1.5 py-0.5 text-gray-400">{vd}</td>
+              {/* Nutritional table (layer: nutritional) */}
+              {isVisible("nutritional") && (
+                <div className={ringCls("nutritional")} onClick={(e) => handleClick("nutritional", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-1">Informação Nutricional</p>
+                  <div className="border border-gray-200 rounded overflow-hidden">
+                    <table className="w-full text-[6px]">
+                      <thead>
+                        <tr style={{ backgroundColor: style.headerBg }}>
+                          <th className="text-left px-1.5 py-0.5 font-bold text-gray-700">Porção {servingSize}</th>
+                          <th className="text-right px-1.5 py-0.5 font-bold text-gray-500">%VD*</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* ANVISA info */}
-              <div
-                className={cn(
-                  "p-2 rounded-lg cursor-pointer transition-all",
-                  selectedElement === "anvisa" ? "ring-2 ring-primary ring-offset-1" : "hover:bg-blue-50/50"
-                )}
-                onClick={(e) => { e.stopPropagation(); onSelectElement("anvisa"); }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[7px] font-bold text-gray-400">PESO LÍQ: 1L</p>
-                    <p className="text-[7px] text-gray-400">Validade: 12 meses</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[6px] text-gray-400">Reg. MS: 1.2345.6789</p>
-                    <p className="text-[6px] text-gray-400">SAC: 0800 123 456</p>
+                      </thead>
+                      <tbody>
+                        {previewNutrition.map((row) => (
+                          <tr key={row.name} className="border-t border-gray-100">
+                            <td className="px-1.5 py-0.5 text-gray-600">
+                              {row.name} <span className="font-semibold text-gray-800">{row.value}{row.unit}</span>
+                            </td>
+                            <td className="text-right px-1.5 py-0.5 text-gray-400">{row.vd}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* ANVISA info (layer: anvisa) */}
+              {isVisible("anvisa") && (
+                <div className={ringCls("anvisa")} onClick={(e) => handleClick("anvisa", e)}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[6px] font-bold text-gray-400">PESO LÍQ: {labelPreview.weight || "—"}</p>
+                      <p className="text-[6px] text-gray-400">Validade: {labelPreview.expiry || "—"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[5px] text-gray-400">Reg.: {labelPreview.registration || "—"}</p>
+                      <p className="text-[5px] text-gray-400">SAC: {labelPreview.sac || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Allergens bar */}
-            <div className="mt-auto pt-2">
-              <div className="bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                <p className="text-[7px] font-bold text-amber-700">
-                  ⚠️ ALÉRGICOS: CONTÉM DERIVADOS DE LARANJA. PODE CONTER TRAÇOS DE LEITE.
-                </p>
+            {/* ── Allergens bar (layer: allergens) ── */}
+            {isVisible("allergens") && (
+              <div className="mt-auto pt-1.5">
+                <div
+                  className={cn(ringCls("allergens"), "!p-1.5 rounded-md border")}
+                  style={{ backgroundColor: "#fffbeb", borderColor: "#fde68a" }}
+                  onClick={(e) => handleClick("allergens", e)}
+                >
+                  <p className="text-[6px] font-bold text-amber-700">
+                    ⚠️ ALÉRGICOS: {labelPreview.allergens || "Verificar embalagem."}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
           </div>
         </div>
       </div>
 
       {/* Bottom toolbar */}
       <div className="h-10 bg-white dark:bg-[#12121a] border-t border-border/40 dark:border-white/8 flex items-center justify-between px-4 shrink-0">
-        {/* Left: tools */}
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setTool("select")}
-            className={cn("w-7 h-7 rounded-md flex items-center justify-center text-xs transition-all", tool === "select" ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5")}
-            title="Selecionar"
-          >
-            <HiOutlineCursorArrowRays className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setTool("hand")}
-            className={cn("w-7 h-7 rounded-md flex items-center justify-center text-xs transition-all", tool === "hand" ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5")}
-            title="Mover"
-          >
-            <HiOutlineHandRaised className="w-3.5 h-3.5" />
-          </button>
+          {(["select", "hand"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTool(t)}
+              className={cn("w-7 h-7 rounded-md flex items-center justify-center transition-all", tool === t ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5")}
+            >
+              {t === "select" ? <HiOutlineCursorArrowRays className="w-3.5 h-3.5" /> : <HiOutlineHandRaised className="w-3.5 h-3.5" />}
+            </button>
+          ))}
         </div>
 
-        {/* Center: zoom */}
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setZoom(Math.max(25, zoom - 25))}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all"
-          >
+          <button onClick={() => setZoom(Math.max(25, zoom - 25))} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
             <HiOutlineMagnifyingGlassMinus className="w-3.5 h-3.5" />
           </button>
           <span className="text-[11px] font-bold text-foreground w-10 text-center">{zoom}%</span>
-          <button
-            onClick={() => setZoom(Math.min(200, zoom + 25))}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all"
-          >
+          <button onClick={() => setZoom(Math.min(200, zoom + 25))} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
             <HiOutlineMagnifyingGlassPlus className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => setZoom(100)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all"
-            title="Resetar zoom"
-          >
+          <button onClick={() => setZoom(100)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
             <HiOutlineViewfinderCircle className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Right: grid, undo/redo */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => setShowGrid(!showGrid)}
             className={cn("w-7 h-7 rounded-md flex items-center justify-center transition-all", showGrid ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5")}
-            title="Grade"
           >
             <HiOutlineSquares2X2 className="w-3.5 h-3.5" />
           </button>
           <div className="w-px h-4 bg-border/40 dark:bg-white/10 mx-1" />
-          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all" title="Desfazer">
+          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
             <HiOutlineArrowUturnLeft className="w-3.5 h-3.5" />
           </button>
-          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all" title="Refazer">
+          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
             <HiOutlineArrowUturnRight className="w-3.5 h-3.5" />
           </button>
         </div>

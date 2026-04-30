@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,20 +9,26 @@ import {
   HiOutlineTrash,
   HiOutlineEye,
   HiOutlineMagnifyingGlass,
-  HiOutlineFunnel,
   HiOutlineSquares2X2,
   HiOutlineListBullet,
-  HiOutlineCalendarDays,
-  HiOutlineDocumentText,
   HiOutlineSparkles,
   HiOutlinePhoto,
   HiOutlineClipboardDocument,
+  HiOutlineArrowPath,
 } from "react-icons/hi2";
 import PageHeader from "@/components/admin/PageHeader";
 import Badge from "@/components/admin/Badge";
 import Modal from "@/components/admin/Modal";
 import FormField, { Input, Select, Textarea, Button } from "@/components/admin/FormField";
 import { cn } from "@/lib/utils";
+
+interface CanvasData {
+  category: string;
+  status: "approved" | "pending" | "draft";
+  description: string;
+  img: string;
+  aiModel: string;
+}
 
 interface LabelModel {
   id: string;
@@ -38,16 +43,21 @@ interface LabelModel {
   aiModel: string;
 }
 
-const initialModels: LabelModel[] = [
-  { id: "1", code: "RTL-001", name: "Suco de Laranja Natural", category: "Bebidas", status: "approved", createdAt: "2026-03-20", updatedAt: "2026-03-22", description: "Rótulo para suco de laranja 100% natural, 1L. Inclui tabela nutricional e informações ANVISA.", img: "🍊", aiModel: "Grok Vision" },
-  { id: "2", code: "RTL-002", name: "Mel Orgânico Silvestre", category: "Alimentos", status: "approved", createdAt: "2026-03-18", updatedAt: "2026-03-20", description: "Rótulo para mel orgânico silvestre 500g com selo SIF e tabela nutricional.", img: "🍯", aiModel: "DALL·E 3" },
-  { id: "3", code: "RTL-003", name: "Proteína Whey Isolada", category: "Suplementos", status: "pending", createdAt: "2026-03-15", updatedAt: "2026-03-15", description: "Rótulo suplemento alimentar proteína isolada whey 900g sabor chocolate.", img: "💪", aiModel: "Grok Vision" },
-  { id: "4", code: "RTL-004", name: "Creme Hidratante Facial", category: "Cosméticos", status: "approved", createdAt: "2026-03-12", updatedAt: "2026-03-14", description: "Rótulo cosmético para creme hidratante facial FPS 30, 50ml.", img: "🧴", aiModel: "Leonardo AI" },
-  { id: "5", code: "RTL-005", name: "Café Premium Torrado", category: "Bebidas", status: "approved", createdAt: "2026-03-10", updatedAt: "2026-03-11", description: "Rótulo café especial torrado e moído 250g, região Cerrado Mineiro.", img: "☕", aiModel: "Grok Vision" },
-  { id: "6", code: "RTL-006", name: "Granola Artesanal Mix", category: "Alimentos", status: "draft", createdAt: "2026-03-08", updatedAt: "2026-03-08", description: "Rascunho rótulo granola artesanal com castanhas, frutas secas e mel.", img: "🥣", aiModel: "DALL·E 3" },
-  { id: "7", code: "RTL-007", name: "Sabonete Líquido Lavanda", category: "Cosméticos", status: "approved", createdAt: "2026-03-05", updatedAt: "2026-03-07", description: "Rótulo para sabonete líquido com essência de lavanda 300ml.", img: "🫧", aiModel: "Leonardo AI" },
-  { id: "8", code: "RTL-008", name: "Água Mineral Premium", category: "Bebidas", status: "approved", createdAt: "2026-03-01", updatedAt: "2026-03-02", description: "Rótulo água mineral natural sem gás 500ml, fonte Serra da Mantiqueira.", img: "💧", aiModel: "Grok Vision" },
-];
+function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: string; updatedAt: string }, index: number): LabelModel {
+  const data = (m.canvasData ?? {}) as Partial<CanvasData>;
+  return {
+    id: m.id,
+    code: `RTL-${String(index + 1).padStart(3, "0")}`,
+    name: m.name,
+    category: data.category ?? "Outros",
+    status: data.status ?? "draft",
+    createdAt: m.createdAt.split("T")[0],
+    updatedAt: m.updatedAt.split("T")[0],
+    description: data.description ?? "",
+    img: data.img ?? "📋",
+    aiModel: data.aiModel ?? "—",
+  };
+}
 
 const statusMap = {
   approved: { label: "Aprovado", variant: "success" as const },
@@ -55,10 +65,21 @@ const statusMap = {
   draft: { label: "Rascunho", variant: "default" as const },
 };
 
-const categories = ["Todos", "Bebidas", "Alimentos", "Suplementos", "Cosméticos"];
+const categories = ["Todos", "Bebidas", "Alimentos", "Suplementos", "Cosméticos", "Higiene Pessoal", "Limpeza", "Outros"];
+
+const categoryEmoji: Record<string, string> = {
+  Bebidas: "🍊",
+  Alimentos: "🥗",
+  Suplementos: "💪",
+  Cosméticos: "🧴",
+  "Higiene Pessoal": "🫧",
+  Limpeza: "🧹",
+};
 
 export default function ModelosSalvosPage() {
-  const [models, setModels] = useState(initialModels);
+  const router = useRouter();
+  const [models, setModels] = useState<LabelModel[]>([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("Todos");
@@ -67,6 +88,23 @@ export default function ModelosSalvosPage() {
   const [editing, setEditing] = useState<LabelModel | null>(null);
   const [form, setForm] = useState<Partial<LabelModel>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const fetchModels = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/models");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setModels(data.map((m: Parameters<typeof toLabel>[0], i: number) => toLabel(m, i)));
+    } catch {
+      // silently fail, keep empty list
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchModels(); }, [fetchModels]);
 
   const filtered = models.filter((m) => {
     const matchSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.code.toLowerCase().includes(search.toLowerCase());
@@ -80,8 +118,6 @@ export default function ModelosSalvosPage() {
     setModalOpen(true);
   };
 
-  const router = useRouter();
-
   const openEdit = (model: LabelModel) => {
     setEditing(model);
     setForm({ ...model });
@@ -92,32 +128,50 @@ export default function ModelosSalvosPage() {
     router.push(`/dashboard/estudio-ia?id=${model.id}`);
   };
 
-  const handleSave = () => {
-    if (editing) {
-      setModels(models.map((m) => m.id === editing.id ? { ...m, ...form, updatedAt: new Date().toISOString().split("T")[0] } as LabelModel : m));
-    } else {
-      const newModel: LabelModel = {
-        id: String(models.length + 1),
-        code: `RTL-${String(models.length + 1).padStart(3, "0")}`,
-        name: form.name || "",
-        category: form.category || "Bebidas",
-        status: "draft",
-        createdAt: new Date().toISOString().split("T")[0],
-        updatedAt: new Date().toISOString().split("T")[0],
-        description: form.description || "",
-        img: "📋",
-        aiModel: "Grok Vision",
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const category = form.category ?? "Bebidas";
+      const canvasData: CanvasData = {
+        category,
+        status: form.status ?? "draft",
+        description: form.description ?? "",
+        img: categoryEmoji[category] ?? "📋",
+        aiModel: editing?.aiModel ?? "—",
       };
-      setModels([newModel, ...models]);
+
+      if (editing) {
+        await fetch(`/api/models/${editing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: form.name, canvasData }),
+        });
+      } else {
+        await fetch("/api/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: form.name, canvasData }),
+        });
+      }
+
+      await fetchModels();
+      setModalOpen(false);
+    } finally {
+      setSaving(false);
     }
-    setModalOpen(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/models/${id}`, { method: "DELETE" });
+    setModels((prev) => prev.filter((m) => m.id !== id));
+    setDeleteConfirm(null);
   };
 
   return (
     <div>
       <PageHeader
         title="Modelos Salvos"
-        subtitle={`${models.length} rótulos na sua galeria`}
+        subtitle={loading ? "Carregando..." : `${models.length} rótulo${models.length !== 1 ? "s" : ""} na sua galeria`}
         actions={
           <Button variant="primary" size="sm" onClick={openCreate}>
             <HiOutlinePlusCircle className="w-4 h-4" />
@@ -143,13 +197,13 @@ export default function ModelosSalvosPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-white dark:bg-[#12121a] border border-border/50 dark:border-white/10 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-white dark:bg-[#12121a] border border-border/50 dark:border-white/10 rounded-xl p-1 overflow-x-auto max-w-[340px]">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
                 className={cn(
-                  "px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all",
+                  "px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all whitespace-nowrap",
                   categoryFilter === cat
                     ? "bg-primary text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/5"
@@ -167,11 +221,34 @@ export default function ModelosSalvosPage() {
               <HiOutlineListBullet className="w-4 h-4" />
             </button>
           </div>
+          <button
+            onClick={fetchModels}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white dark:bg-[#12121a] border border-border/50 dark:border-white/10 text-muted-foreground hover:text-foreground transition-all"
+            title="Recarregar"
+          >
+            <HiOutlineArrowPath className={cn("w-4 h-4", loading && "animate-spin")} />
+          </button>
         </div>
       </motion.div>
 
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 overflow-hidden animate-pulse">
+              <div className="h-40 bg-muted/40 dark:bg-white/5" />
+              <div className="p-4 space-y-2">
+                <div className="h-3 w-16 bg-muted/60 dark:bg-white/8 rounded" />
+                <div className="h-4 w-3/4 bg-muted/60 dark:bg-white/8 rounded" />
+                <div className="h-3 w-full bg-muted/40 dark:bg-white/5 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Grid View */}
-      {view === "grid" ? (
+      {!loading && view === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           <AnimatePresence mode="popLayout">
             {filtered.map((model, i) => {
@@ -186,7 +263,6 @@ export default function ModelosSalvosPage() {
                   transition={{ duration: 0.3, delay: i * 0.04 }}
                   layout
                 >
-                  {/* Image area */}
                   <div className="h-40 bg-gradient-to-br from-muted/50 to-muted/30 dark:from-white/[0.03] dark:to-white/[0.01] flex items-center justify-center relative">
                     <span className="text-5xl">{model.img}</span>
                     <div className="absolute top-3 left-3">
@@ -204,15 +280,13 @@ export default function ModelosSalvosPage() {
                       </button>
                     </div>
                   </div>
-
-                  {/* Content */}
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">{model.code}</span>
                       <span className="text-[10px] text-muted-foreground">{model.category}</span>
                     </div>
                     <h3 className="text-sm font-bold text-foreground truncate">{model.name}</h3>
-                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{model.description}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{model.description || "Sem descrição"}</p>
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30 dark:border-white/5">
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                         <HiOutlineSparkles className="w-3 h-3" />
@@ -231,8 +305,10 @@ export default function ModelosSalvosPage() {
             })}
           </AnimatePresence>
         </div>
-      ) : (
-        /* List View */
+      )}
+
+      {/* List View */}
+      {!loading && view === "list" && (
         <div className="space-y-2.5">
           <AnimatePresence mode="popLayout">
             {filtered.map((model, i) => {
@@ -276,22 +352,20 @@ export default function ModelosSalvosPage() {
         </div>
       )}
 
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <HiOutlinePhoto className="w-12 h-12 text-muted-foreground/50 mb-3" />
-          <p className="text-sm font-semibold text-muted-foreground">Nenhum modelo encontrado</p>
-          <p className="text-[11px] text-muted-foreground mt-1">Tente ajustar os filtros ou crie um novo modelo</p>
+          <p className="text-sm font-semibold text-muted-foreground">
+            {models.length === 0 ? "Nenhum rótulo criado ainda" : "Nenhum modelo encontrado"}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {models.length === 0 ? "Clique em \"Novo Modelo\" ou crie um no Estúdio IA" : "Tente ajustar os filtros"}
+          </p>
         </div>
       )}
 
       {/* Detail Modal */}
-      <Modal
-        isOpen={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.name || ""}
-        subtitle={selected?.code}
-        size="md"
-      >
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected?.name || ""} subtitle={selected?.code} size="md">
         {selected && (
           <div className="space-y-5">
             <div className="h-48 bg-gradient-to-br from-muted/50 to-muted/30 dark:from-white/[0.03] dark:to-white/[0.01] rounded-xl flex items-center justify-center">
@@ -302,13 +376,16 @@ export default function ModelosSalvosPage() {
               <Badge variant="info">{selected.category}</Badge>
               <Badge variant="default">{selected.aiModel}</Badge>
             </div>
-            <p className="text-sm text-foreground leading-relaxed">{selected.description}</p>
+            <p className="text-sm text-foreground leading-relaxed">{selected.description || "Sem descrição"}</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-muted/30 dark:bg-white/[0.03] rounded-xl p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Código</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-sm font-bold text-foreground font-mono">{selected.code}</p>
-                  <button className="text-muted-foreground hover:text-primary transition-colors">
+                  <button
+                    onClick={() => navigator.clipboard.writeText(selected.code)}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
                     <HiOutlineClipboardDocument className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -340,7 +417,9 @@ export default function ModelosSalvosPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={handleSave}>{editing ? "Salvar" : "Criar"}</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              {saving ? "Salvando..." : editing ? "Salvar" : "Criar"}
+            </Button>
           </>
         }
       >
@@ -354,6 +433,9 @@ export default function ModelosSalvosPage() {
               <option value="Alimentos">Alimentos</option>
               <option value="Suplementos">Suplementos</option>
               <option value="Cosméticos">Cosméticos</option>
+              <option value="Higiene Pessoal">Higiene Pessoal</option>
+              <option value="Limpeza">Limpeza</option>
+              <option value="Outros">Outros</option>
             </Select>
           </FormField>
           <FormField label="Descrição">
@@ -372,7 +454,7 @@ export default function ModelosSalvosPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={() => { setModels(models.filter((m) => m.id !== deleteConfirm)); setDeleteConfirm(null); }}>
+            <Button variant="danger" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>
               <HiOutlineTrash className="w-4 h-4" />Excluir
             </Button>
           </>
