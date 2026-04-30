@@ -41,6 +41,10 @@ interface CanvasAreaProps {
   layers: Layer[];
   activeTemplate: string | null;
   activeAssets: string[];
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 // Template color schemes — inline styles to avoid Tailwind purge
@@ -84,6 +88,10 @@ const CanvasArea = ({
   layers,
   activeTemplate,
   activeAssets,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: CanvasAreaProps) => {
   const [zoom, setZoom] = useState(100);
   const [showGrid, setShowGrid] = useState(true);
@@ -141,19 +149,19 @@ const CanvasArea = ({
                   {labelPreview.category || "Produto"}
                 </div>
 
-                {/* Asset badges — bottom-left */}
+                {/* Asset badges — bottom strip */}
                 {activeAssets.length > 0 && (
-                  <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+                  <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1.5">
                     {activeAssets.map((id) => {
                       const badge = ASSET_BADGES[id];
                       if (!badge) return null;
                       return (
                         <div
                           key={id}
-                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[6px] font-bold bg-white/80 backdrop-blur-sm shadow-sm"
+                          className="flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold bg-white shadow-sm border border-white/60"
                           style={{ color: style.accent }}
                         >
-                          <span>{badge.emoji}</span>
+                          <span style={{ fontSize: 13, lineHeight: 1 }}>{badge.emoji}</span>
                           <span>{badge.short}</span>
                         </div>
                       );
@@ -271,10 +279,20 @@ const CanvasArea = ({
             <HiOutlineSquares2X2 className="w-3.5 h-3.5" />
           </button>
           <div className="w-px h-4 bg-border/40 dark:bg-white/10 mx-1" />
-          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Desfazer (Ctrl+Z)"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all disabled:opacity-30"
+          >
             <HiOutlineArrowUturnLeft className="w-3.5 h-3.5" />
           </button>
-          <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all">
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Refazer (Ctrl+Y)"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 transition-all disabled:opacity-30"
+          >
             <HiOutlineArrowUturnRight className="w-3.5 h-3.5" />
           </button>
         </div>

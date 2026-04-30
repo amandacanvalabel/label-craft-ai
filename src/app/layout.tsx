@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import Script from "next/script";
 import { getSiteSettings } from "@/lib/site-settings";
 import "./globals.css";
+
+const GA_ID = "G-W7WFJ9XER5";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -68,6 +71,14 @@ const RootLayout = async ({ children }: Readonly<{ children: React.ReactNode }>)
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
         <Toaster position="top-right" richColors />
+        {/* Google Analytics */}
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_ID}');
+        `}</Script>
       </body>
     </html>
   );

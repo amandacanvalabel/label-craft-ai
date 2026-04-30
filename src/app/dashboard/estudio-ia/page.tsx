@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import StudioTopbar from "@/components/studio/StudioTopbar";
 import StudioStepper from "@/components/studio/StudioStepper";
@@ -58,6 +58,70 @@ export default function EstudioIAPage() {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeAssets, setActiveAssets] = useState<string[]>([]);
 
+  // ── Undo / Redo ──
+  type Snapshot = {
+    productFields: typeof defaultFields;
+    layers: typeof defaultLayers;
+    activeTemplate: string | null;
+    activeAssets: string[];
+  };
+  const MAX_HISTORY = 30;
+  const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
+
+  // refs for use inside callbacks without stale closures
+  const snapshotRef = useRef<Snapshot>({ productFields: defaultFields, layers: defaultLayers, activeTemplate: null, activeAssets: [] });
+  useEffect(() => {
+    snapshotRef.current = { productFields, layers, activeTemplate, activeAssets };
+  }, [productFields, layers, activeTemplate, activeAssets]);
+
+  const pushSnapshot = useCallback(() => {
+    const snap = { ...snapshotRef.current };
+    setUndoStack(prev => [...prev.slice(-(MAX_HISTORY - 1)), snap]);
+    setRedoStack([]);
+  }, []);
+
+  const applySnapshot = useCallback((snap: Snapshot) => {
+    setProductFields(snap.productFields);
+    setLayers(snap.layers);
+    setActiveTemplate(snap.activeTemplate);
+    setActiveAssets(snap.activeAssets);
+    setSaved(false);
+  }, []);
+
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const current = { ...snapshotRef.current };
+      const target = prev[prev.length - 1];
+      setRedoStack(r => [...r.slice(-19), current]);
+      applySnapshot(target);
+      return prev.slice(0, -1);
+    });
+  }, [applySnapshot]);
+
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const current = { ...snapshotRef.current };
+      const target = prev[prev.length - 1];
+      setUndoStack(u => [...u.slice(-19), current]);
+      applySnapshot(target);
+      return prev.slice(0, -1);
+    });
+  }, [applySnapshot]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
+
   // Load existing model when editId is present
   useEffect(() => {
     if (!editId) return;
@@ -83,7 +147,7 @@ export default function EstudioIAPage() {
           setLayers(loadedLayers.filter((layer) => allowedLayerIds.has(layer.id)));
         }
         if (cd.activeTemplate) setActiveTemplate(cd.activeTemplate as string);
-        if (cd.activeAssets) setActiveAssets(cd.activeAssets as string[]);
+        if (Array.isArray(cd.activeAssets)) setActiveAssets(cd.activeAssets as string[]);
         setCurrentStep(3);
         setSaved(true);
       })
@@ -203,12 +267,15 @@ export default function EstudioIAPage() {
   };
 
   const handleToggleLayerVisibility = (id: string) => {
+    pushSnapshot();
     setLayers((prev) => prev.map((l) => l.id === id ? { ...l, visible: !l.visible } : l));
     setSaved(false);
   };
 
   const handleToggleLayerLock = (id: string) => {
+    pushSnapshot();
     setLayers((prev) => prev.map((l) => l.id === id ? { ...l, locked: !l.locked } : l));
+    setSaved(false);
   };
 
   const labelImg = categoryEmoji[productFields.category] ?? "📋";
@@ -260,9 +327,10 @@ export default function EstudioIAPage() {
               onSelectLayer={(id) => { setSelectedLayer(id); setSelectedElement(id); }}
               selectedLayer={selectedLayer}
               activeTemplate={activeTemplate}
-              onApplyTemplate={(id) => { setActiveTemplate(id); setSaved(false); }}
+              onApplyTemplate={(id) => { pushSnapshot(); setActiveTemplate(id); setSaved(false); }}
               activeAssets={activeAssets}
               onToggleAsset={(id) => {
+                pushSnapshot();
                 setActiveAssets((prev) =>
                   prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
                 );
@@ -289,6 +357,10 @@ export default function EstudioIAPage() {
               layers={layers}
               activeTemplate={activeTemplate}
               activeAssets={activeAssets}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={undoStack.length > 0}
+              canRedo={redoStack.length > 0}
             />
             <RightPanel
               collapsed={rightCollapsed}
@@ -326,51 +398,78 @@ export default function EstudioIAPage() {
         layers={layers}
         activeAssets={activeAssets}
         labelImg={labelImg}
+        activeTemplate={activeTemplate}
       />
     </div>
   );
 }
+
+const EXPORT_TEMPLATE_STYLES: Record<string, { imgFrom: string; imgTo: string; accent: string; accentBg: string }> = {
+  t1: { imgFrom: "#fff7ed", imgTo: "#fef3c7", accent: "#c2410c", accentBg: "#fed7aa" },
+  t2: { imgFrom: "#fffbeb", imgTo: "#fefce8", accent: "#92400e", accentBg: "#fde68a" },
+  t3: { imgFrom: "#eff6ff", imgTo: "#e0e7ff", accent: "#1d4ed8", accentBg: "#bfdbfe" },
+  t4: { imgFrom: "#fdf2f8", imgTo: "#fce7f3", accent: "#9d174d", accentBg: "#fbcfe8" },
+  t5: { imgFrom: "#f5f5f4", imgTo: "#e7e5e4", accent: "#44403c", accentBg: "#d6d3d1" },
+  t6: { imgFrom: "#ecfeff", imgTo: "#e0f2fe", accent: "#0e7490", accentBg: "#a5f3fc" },
+  t7: { imgFrom: "#f0fdf4", imgTo: "#ecfccb", accent: "#166534", accentBg: "#bbf7d0" },
+  t8: { imgFrom: "#faf5ff", imgTo: "#f3e8ff", accent: "#6b21a8", accentBg: "#e9d5ff" },
+  t9: { imgFrom: "#fff1f2", imgTo: "#fce7f3", accent: "#9f1239", accentBg: "#fecdd3" },
+};
+const EXPORT_DEFAULT_STYLE = { imgFrom: "#eff6ff", imgTo: "#f5f3ff", accent: "#4f46e5", accentBg: "#c7d2fe" };
+
+const EXPORT_ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
+  a1: { emoji: "🌿", short: "Natural" },
+  a2: { emoji: "✅", short: "Dermato" },
+  a3: { emoji: "🏛️", short: "ANVISA" },
+  a4: { emoji: "🌱", short: "Vegano" },
+  a5: { emoji: "🚫", short: "S/ Parabenos" },
+  a6: { emoji: "✨", short: "Cruelty-free" },
+  a7: { emoji: "♻️", short: "Reciclável" },
+  a8: { emoji: "📊", short: "Cód. Barras" },
+};
 
 function ExportLabelCanvas({
   fields,
   layers,
   activeAssets,
   labelImg,
+  activeTemplate,
 }: {
   fields: typeof defaultFields;
   layers: typeof defaultLayers;
   activeAssets: string[];
   labelImg: string;
+  activeTemplate: string | null;
 }) {
   const isVisible = (id: string) => layers.find((layer) => layer.id === id)?.visible !== false;
-  const badges: Record<string, string> = {
-    a1: "Natural",
-    a2: "Dermato",
-    a3: "ANVISA",
-    a4: "Vegano",
-    a5: "Sem Parabenos",
-    a6: "Cruelty-free",
-    a7: "Reciclável",
-    a8: "Código Barras",
-  };
+  const style = (activeTemplate && EXPORT_TEMPLATE_STYLES[activeTemplate]) || EXPORT_DEFAULT_STYLE;
 
   return (
     <div className="fixed left-[-10000px] top-0 pointer-events-none opacity-0" aria-hidden="true">
       <div id="label-canvas-export" className="relative bg-white rounded-lg overflow-hidden" style={{ width: 400, height: 560 }}>
         <div className="absolute inset-0 p-5 flex flex-col text-[#1a1a1a]">
           {isVisible("product-image") && (
-            <div className="flex-1 flex items-center justify-center rounded-xl mb-3 relative overflow-hidden bg-gradient-to-br from-cyan-50 to-violet-50">
+            <div className="flex-1 flex items-center justify-center rounded-xl mb-3 relative overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${style.imgFrom}, ${style.imgTo})` }}>
               <span className="text-7xl">{labelImg}</span>
-              <div className="absolute top-2.5 right-2.5 text-[7px] font-bold px-2 py-0.5 rounded-full text-cyan-700 bg-cyan-100">
+              <div className="absolute top-2.5 right-2.5 text-[7px] font-bold px-2 py-0.5 rounded-full"
+                style={{ color: style.accent, backgroundColor: style.accentBg }}>
                 Cosméticos
               </div>
               {activeAssets.length > 0 && (
-                <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
-                  {activeAssets.map((id) => badges[id]).filter(Boolean).map((label) => (
-                    <span key={label} className="px-1.5 py-0.5 rounded-full text-[6px] font-bold bg-white/85 text-cyan-700 shadow-sm">
-                      {label}
-                    </span>
-                  ))}
+                <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1.5">
+                  {activeAssets.map((id) => {
+                    const badge = EXPORT_ASSET_BADGES[id];
+                    if (!badge) return null;
+                    return (
+                      <div key={id}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-bold bg-white shadow-sm"
+                        style={{ color: style.accent }}>
+                        <span style={{ fontSize: 10 }}>{badge.emoji}</span>
+                        <span>{badge.short}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -381,7 +480,7 @@ function ExportLabelCanvas({
               <h2 className="text-[18px] leading-tight text-[#1a1a1a] font-extrabold">
                 {fields.productName || "Nome do Produto"}
               </h2>
-              {fields.brandName && <p className="text-[9px] font-medium mt-0.5 text-cyan-700">{fields.brandName}</p>}
+              {fields.brandName && <p className="text-[9px] font-medium mt-0.5" style={{ color: style.accent }}>{fields.brandName}</p>}
             </div>
           )}
 

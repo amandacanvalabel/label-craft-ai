@@ -68,6 +68,9 @@ const tabs = [
   { key: "assets", label: "Assets", icon: HiOutlinePhoto },
 ] as const;
 
+// re-export asset count for parent use
+export { assets as STUDIO_ASSETS };
+
 type TabKey = (typeof tabs)[number]["key"];
 
 const LeftPanel = ({
@@ -127,7 +130,7 @@ const LeftPanel = ({
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all",
+                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all relative",
                   activeTab === tab.key
                     ? "bg-primary text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/5"
@@ -135,6 +138,14 @@ const LeftPanel = ({
               >
                 <tab.icon className="w-3 h-3" />
                 {tab.label}
+                {tab.key === "assets" && activeAssets.length > 0 && (
+                  <span className={cn(
+                    "ml-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-bold leading-none",
+                    activeTab === "assets" ? "bg-white/30 text-white" : "bg-primary text-white"
+                  )}>
+                    {activeAssets.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
