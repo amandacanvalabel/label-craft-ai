@@ -137,8 +137,8 @@ export default function EstudioIAPage() {
   }, [saving, modelId, projectName, buildCanvasData]);
 
   const handleExport = useCallback(async (format: string, _channel: string, resolution: string) => {
-    const el = document.getElementById("label-canvas");
-    if (!el) return;
+    const el = document.getElementById("label-canvas-export") || document.getElementById("label-canvas");
+    if (!el) throw new Error("Canvas de exportação não encontrado.");
 
     const originalTransform = el.style.transform;
     el.style.transform = "none";
@@ -320,6 +320,116 @@ export default function EstudioIAPage() {
             onSaveToGallery={handleSave}
           />
         )}
+      </div>
+      <ExportLabelCanvas
+        fields={productFields}
+        layers={layers}
+        activeAssets={activeAssets}
+        labelImg={labelImg}
+      />
+    </div>
+  );
+}
+
+function ExportLabelCanvas({
+  fields,
+  layers,
+  activeAssets,
+  labelImg,
+}: {
+  fields: typeof defaultFields;
+  layers: typeof defaultLayers;
+  activeAssets: string[];
+  labelImg: string;
+}) {
+  const isVisible = (id: string) => layers.find((layer) => layer.id === id)?.visible !== false;
+  const badges: Record<string, string> = {
+    a1: "Natural",
+    a2: "Dermato",
+    a3: "ANVISA",
+    a4: "Vegano",
+    a5: "Sem Parabenos",
+    a6: "Cruelty-free",
+    a7: "Reciclável",
+    a8: "Código Barras",
+  };
+
+  return (
+    <div className="fixed left-[-10000px] top-0 pointer-events-none opacity-0" aria-hidden="true">
+      <div id="label-canvas-export" className="relative bg-white rounded-lg overflow-hidden" style={{ width: 400, height: 560 }}>
+        <div className="absolute inset-0 p-5 flex flex-col text-[#1a1a1a]">
+          {isVisible("product-image") && (
+            <div className="flex-1 flex items-center justify-center rounded-xl mb-3 relative overflow-hidden bg-gradient-to-br from-cyan-50 to-violet-50">
+              <span className="text-7xl">{labelImg}</span>
+              <div className="absolute top-2.5 right-2.5 text-[7px] font-bold px-2 py-0.5 rounded-full text-cyan-700 bg-cyan-100">
+                Cosméticos
+              </div>
+              {activeAssets.length > 0 && (
+                <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+                  {activeAssets.map((id) => badges[id]).filter(Boolean).map((label) => (
+                    <span key={label} className="px-1.5 py-0.5 rounded-full text-[6px] font-bold bg-white/85 text-cyan-700 shadow-sm">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isVisible("product-name") && (
+            <div className="p-2 rounded-lg mb-1.5">
+              <h2 className="text-[18px] leading-tight text-[#1a1a1a] font-extrabold">
+                {fields.productName || "Nome do Produto"}
+              </h2>
+              {fields.brandName && <p className="text-[9px] font-medium mt-0.5 text-cyan-700">{fields.brandName}</p>}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            {isVisible("ingredients") && (
+              <div className="p-2 rounded-lg">
+                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição</p>
+                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                  {fields.ingredients || "Composição não informada."}
+                </p>
+              </div>
+            )}
+
+            {isVisible("directions") && (
+              <div className="p-2 rounded-lg">
+                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Modo de uso</p>
+                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                  {fields.directions || "Modo de uso não informado."}
+                </p>
+              </div>
+            )}
+
+            {isVisible("anvisa") && (
+              <div className="p-2 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[6px] font-bold text-gray-400">CONTEÚDO: {fields.weight || "—"}</p>
+                    <p className="text-[6px] text-gray-400">Validade: {fields.expiry || "—"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[5px] text-gray-400">ANVISA: {fields.registration || "—"}</p>
+                    <p className="text-[5px] text-gray-400">SAC: {fields.sac || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {isVisible("warnings") && (
+            <div className="mt-auto pt-1.5">
+              <div className="p-1.5 rounded-md border bg-amber-50 border-amber-200">
+                <p className="text-[6px] font-bold text-amber-700">
+                  ATENÇÃO: {fields.warnings || "Uso externo. Manter fora do alcance de crianças."}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
