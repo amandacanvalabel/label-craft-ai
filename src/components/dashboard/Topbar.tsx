@@ -191,6 +191,7 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
   const [isDark, setIsDark] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentLang, setCurrentLang] = useState("pt-BR");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -204,6 +205,15 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
       document.documentElement.classList.remove("dark");
     }
   }, []);
+
+  // Load avatar for subscribers
+  useEffect(() => {
+    if (user.role !== "SUBSCRIBER") return;
+    fetch("/api/subscriber/profile")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.avatar) setAvatarUrl(data.avatar); })
+      .catch(() => {});
+  }, [user.role]);
 
   const toggle = useCallback(
     (name: string) => setOpenDropdown((prev) => (prev === name ? null : name)),
@@ -388,8 +398,14 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
                 : "hover:bg-muted/60 dark:hover:bg-white/5"
             )}
           >
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">{initials}</span>
+            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full gradient-primary flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">{initials}</span>
+                </div>
+              )}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-semibold text-foreground leading-tight">
@@ -409,8 +425,14 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
             {/* Profile header */}
             <div className="p-4 border-b border-border/40 dark:border-white/8">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/20">
-                  <span className="text-white font-bold">{initials}</span>
+                <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md shadow-primary/20 shrink-0">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full gradient-primary flex items-center justify-center">
+                      <span className="text-white font-bold">{initials}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-foreground">{user.name}</p>
