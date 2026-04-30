@@ -22,13 +22,14 @@ type BillingPeriod = "monthly" | "annual";
 type PaymentMethod = "pix" | "card" | "boleto" | null;
 type ModalStep = "method" | "userdata" | "processing" | "payment" | "success";
 
-interface PlanData {
+interface DBPlan {
+  id: string;
   name: string;
-  description: string;
-  monthly: number;
-  annual: number;
-  popular: boolean;
-  features: string[];
+  description: string | null;
+  price: number;
+  promotionalPrice: number | null;
+  type: string;
+  benefits: string[];
 }
 
 interface UserFormData {
@@ -68,55 +69,6 @@ interface CheckoutResult {
   };
 }
 
-const plans: PlanData[] = [
-  {
-    name: "Starter",
-    description: "Para quem está começando",
-    monthly: 49.9,
-    annual: 39.9,
-    popular: false,
-    features: [
-      "5 rótulos por mês",
-      "Templates básicos",
-      "Exportação em PDF",
-      "Validação ANVISA básica",
-      "Suporte por email",
-    ],
-  },
-  {
-    name: "Profissional",
-    description: "Para pequenas empresas",
-    monthly: 99.9,
-    annual: 79.9,
-    popular: true,
-    features: [
-      "Rótulos ilimitados",
-      "Todos os templates",
-      "Exportação HD (300 DPI)",
-      "Validação ANVISA completa",
-      "Geração com IA",
-      "Editor avançado",
-      "Suporte prioritário",
-    ],
-  },
-  {
-    name: "Enterprise",
-    description: "Para indústrias e grandes volumes",
-    monthly: 249.9,
-    annual: 199.9,
-    popular: false,
-    features: [
-      "Tudo do Profissional",
-      "API de integração",
-      "Modelos de IA exclusivos",
-      "Multi-usuários",
-      "Gerente de conta dedicado",
-      "SLA garantido",
-      "White label",
-    ],
-  },
-];
-
 const paymentMethods = [
   {
     id: "pix" as PaymentMethod,
@@ -144,10 +96,26 @@ const paymentMethods = [
   },
 ];
 
+const PlanCardSkeleton = () => (
+  <div className="rounded-[1.5rem] p-7 neo-card animate-pulse space-y-4">
+    <div className="h-5 w-28 bg-muted rounded-full" />
+    <div className="h-3 w-40 bg-muted rounded-full" />
+    <div className="h-10 w-24 bg-muted rounded-full mt-4" />
+    <div className="space-y-2 mt-6">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="h-3 bg-muted rounded-full" style={{ width: `${70 + i * 5}%` }} />
+      ))}
+    </div>
+    <div className="h-12 bg-muted rounded-xl mt-4" />
+  </div>
+);
+
 const Planos = () => {
   const router = useRouter();
   const [billing, setBilling] = useState<BillingPeriod>("annual");
-  const [selectedPlan, setSelectedPlan] = useState<PlanData | null>(null);
+  const [plans, setPlans] = useState<DBPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<DBPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [step, setStep] = useState<ModalStep>("method");
   const [error, setError] = useState("");
@@ -175,8 +143,22 @@ const Planos = () => {
     addressNumber: "",
   });
 
-  const getPrice = (plan: PlanData) =>
-    billing === "annual" ? plan.annual : plan.monthly;
+  useEffect(() => {
+    fetch("/api/plans")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: DBPlan[]) => setPlans(data))
+      .catch(() => {})
+      .finally(() => setPlansLoading(false));
+  }, []);
+
+  const hasDiscount = plans.some(
+    (p) => p.promotionalPrice !== null && p.promotionalPrice < p.price
+  );
+
+  const getPrice = (plan: DBPlan) =>
+    billing === "annual" && plan.promotionalPrice !== null
+      ? plan.promotionalPrice
+      : plan.price;
 
   const resetModal = useCallback(() => {
     setSelectedPlan(null);
@@ -361,119 +343,140 @@ const Planos = () => {
                 )}
               >
                 Anual
-                <span className="absolute -top-3 -right-3 text-[10px] font-bold text-white bg-emerald-500 rounded-full px-2 py-0.5">
-                  -20%
-                </span>
+                {hasDiscount && (
+                  <span className="absolute -top-3 -right-3 text-[10px] font-bold text-white bg-emerald-500 rounded-full px-2 py-0.5">
+                    -20%
+                  </span>
+                )}
               </button>
             </div>
           </motion.div>
 
           {/* Plans Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-5 items-center max-w-[960px] mx-auto">
-            {plans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className={cn(
-                  "relative transition-all duration-300",
-                  plan.popular
-                    ? "rounded-[2rem] p-9 neo-card shadow-2xl ring-2 ring-primary/20 z-10 md:scale-105 md:-my-4"
-                    : "rounded-[1.5rem] p-7 neo-card neo-card-hover"
-                )}
-              >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="inline-flex items-center gap-1.5 gradient-primary text-white text-xs font-bold px-5 py-2 rounded-full shadow-lg shadow-primary/30">
-                      <HiOutlineStar className="w-3.5 h-3.5" />
-                      Mais popular
-                    </span>
-                  </div>
-                )}
+            {plansLoading ? (
+              [...Array(3)].map((_, i) => <PlanCardSkeleton key={i} />)
+            ) : plans.length === 0 ? (
+              <div className="col-span-3 text-center py-16 text-muted-foreground">
+                <p className="text-sm">Nenhum plano disponível no momento.</p>
+              </div>
+            ) : (
+              plans.map((plan, i) => {
+                const isPopular = plans.length >= 2 && i === Math.floor((plans.length - 1) / 2);
+                const annualSavings =
+                  billing === "annual" &&
+                  plan.promotionalPrice !== null &&
+                  plan.promotionalPrice < plan.price
+                    ? ((plan.price - plan.promotionalPrice) * 12).toFixed(0)
+                    : null;
 
-                {/* Glow for popular */}
-                {plan.popular && (
-                  <div className="absolute -inset-1 -z-10 gradient-primary opacity-[0.06] blur-2xl rounded-[2rem]" />
-                )}
-
-                <div className="mb-5">
-                  <h3
+                return (
+                  <motion.div
+                    key={plan.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
                     className={cn(
-                      "font-bold text-foreground",
-                      plan.popular ? "text-2xl" : "text-xl"
+                      "relative transition-all duration-300",
+                      isPopular
+                        ? "rounded-[2rem] p-9 neo-card shadow-2xl ring-2 ring-primary/20 z-10 md:scale-105 md:-my-4"
+                        : "rounded-[1.5rem] p-7 neo-card neo-card-hover"
                     )}
                   >
-                    {plan.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {plan.description}
-                  </p>
-                </div>
+                    {/* Popular Badge */}
+                    {isPopular && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                        <span className="inline-flex items-center gap-1.5 gradient-primary text-white text-xs font-bold px-5 py-2 rounded-full shadow-lg shadow-primary/30">
+                          <HiOutlineStar className="w-3.5 h-3.5" />
+                          Mais popular
+                        </span>
+                      </div>
+                    )}
 
-                {/* Price */}
-                <div className="mb-7">
-                  <div className="flex items-end gap-1">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      R$
-                    </span>
-                    <span
+                    {/* Glow for popular */}
+                    {isPopular && (
+                      <div className="absolute -inset-1 -z-10 gradient-primary opacity-[0.06] blur-2xl rounded-[2rem]" />
+                    )}
+
+                    <div className="mb-5">
+                      <h3
+                        className={cn(
+                          "font-bold text-foreground",
+                          isPopular ? "text-2xl" : "text-xl"
+                        )}
+                      >
+                        {plan.name}
+                      </h3>
+                      {plan.description && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {plan.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-7">
+                      <div className="flex items-end gap-1">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          R$
+                        </span>
+                        <span
+                          className={cn(
+                            "font-extrabold text-foreground leading-none",
+                            isPopular ? "text-5xl" : "text-4xl"
+                          )}
+                        >
+                          {getPrice(plan).toFixed(0)}
+                        </span>
+                        <span className="text-sm text-muted-foreground mb-1">
+                          /mês
+                        </span>
+                      </div>
+                      {annualSavings && (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          Cobrado anualmente •{" "}
+                          <span className="text-emerald-500 font-semibold">
+                            Economia de R$ {annualSavings}/ano
+                          </span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* CTA */}
+                    <button
+                      onClick={() => {
+                        setSelectedPlan(plan);
+                        setPaymentMethod(null);
+                        setStep("method");
+                        setError("");
+                      }}
                       className={cn(
-                        "font-extrabold text-foreground leading-none",
-                        plan.popular ? "text-5xl" : "text-4xl"
+                        "w-full font-semibold text-sm transition-all duration-300 cursor-pointer",
+                        isPopular
+                          ? "gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 py-4 rounded-2xl"
+                          : "bg-foreground/5 text-foreground hover:bg-foreground/10 border border-border py-3.5 rounded-xl"
                       )}
                     >
-                      {getPrice(plan).toFixed(0)}
-                    </span>
-                    <span className="text-sm text-muted-foreground mb-1">
-                      /mês
-                    </span>
-                  </div>
-                  {billing === "annual" && (
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      Cobrado anualmente •{" "}
-                      <span className="text-emerald-500 font-semibold">
-                        Economia de R${" "}
-                        {((plan.monthly - plan.annual) * 12).toFixed(0)}/ano
-                      </span>
-                    </p>
-                  )}
-                </div>
+                      Assinar agora
+                    </button>
 
-                {/* CTA */}
-                <button
-                  onClick={() => {
-                    setSelectedPlan(plan);
-                    setPaymentMethod(null);
-                    setStep("method");
-                    setError("");
-                  }}
-                  className={cn(
-                    "w-full font-semibold text-sm transition-all duration-300 cursor-pointer",
-                    plan.popular
-                      ? "gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 py-4 rounded-2xl"
-                      : "bg-foreground/5 text-foreground hover:bg-foreground/10 border border-border py-3.5 rounded-xl"
-                  )}
-                >
-                  Assinar agora
-                </button>
-
-                {/* Features */}
-                <ul className={cn("space-y-3", plan.popular ? "mt-9" : "mt-7")}>
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="flex items-center gap-3 text-sm text-muted-foreground"
-                    >
-                      <HiOutlineCheck className="w-4 h-4 text-primary shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-            ))}
+                    {/* Features */}
+                    <ul className={cn("space-y-3", isPopular ? "mt-9" : "mt-7")}>
+                      {plan.benefits.map((feature) => (
+                        <li
+                          key={feature}
+                          className="flex items-center gap-3 text-sm text-muted-foreground"
+                        >
+                          <HiOutlineCheck className="w-4 h-4 text-primary shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </div>
       </section>

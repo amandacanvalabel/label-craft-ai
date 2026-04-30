@@ -34,40 +34,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mapear plano e preço
-    const planMap: Record<string, { monthly: number; annual: number }> = {
-      Starter: { monthly: 49.9, annual: 39.9 },
-      Profissional: { monthly: 99.9, annual: 79.9 },
-      Enterprise: { monthly: 249.9, annual: 199.9 },
-    };
-
-    const planPricing = planMap[planName];
-    if (!planPricing) {
-      return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
-    }
-
-    const price =
-      billingPeriod === "annual" ? planPricing.annual : planPricing.monthly;
-
-    // Buscar ou criar plano no DB
-    let plan = await prisma.plan.findFirst({
+    // Buscar plano no DB
+    const plan = await prisma.plan.findFirst({
       where: { name: planName, isActive: true },
     });
 
     if (!plan) {
-      plan = await prisma.plan.create({
-        data: {
-          name: planName,
-          description: `Plano ${planName}`,
-          type: billingPeriod === "annual" ? "ANNUAL" : "MONTHLY",
-          price,
-          benefits: planMap[planName]
-            ? Object.keys(planMap)
-            : [],
-          isActive: true,
-        },
-      });
+      return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
     }
+
+    const price =
+      billingPeriod === "annual" && plan.promotionalPrice != null
+        ? plan.promotionalPrice
+        : plan.price;
 
     // Verificar se subscriber já existe
     let subscriber = await prisma.subscriber.findUnique({

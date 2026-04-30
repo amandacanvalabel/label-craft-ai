@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   HiOutlineCalendarDays,
@@ -239,11 +240,12 @@ export default function MeuPlanoPage() {
                 <div className="text-center py-4">
                   <p className="text-white font-bold text-lg">Nenhum plano ativo</p>
                   <p className="text-white/60 text-sm mt-1">Escolha um plano para começar</p>
-                  <Button variant="secondary" size="sm" className="!bg-white/15 !border-white/20 !text-white hover:!bg-white/25 mt-4"
-                    onClick={() => setActiveTab("plans")}>
-                    <HiOutlineArrowUpCircle className="w-4 h-4" />
-                    Ver Planos
-                  </Button>
+                  <Link href="/#planos">
+                    <Button variant="secondary" size="sm" className="!bg-white/15 !border-white/20 !text-white hover:!bg-white/25 mt-4">
+                      <HiOutlineArrowUpCircle className="w-4 h-4" />
+                      Ver Planos
+                    </Button>
+                  </Link>
                 </div>
               )}
             </div>
@@ -399,10 +401,12 @@ export default function MeuPlanoPage() {
                       Plano Atual
                     </Button>
                   ) : (
-                    <Button variant="primary" size="md" className="w-full justify-center">
-                      <HiOutlineArrowUpCircle className="w-4 h-4" />
-                      {cp ? (plan.price > cp.price ? "Fazer Upgrade" : "Mudar Plano") : "Assinar"}
-                    </Button>
+                    <Link href="/#planos" className="block">
+                      <Button variant="primary" size="md" className="w-full justify-center">
+                        <HiOutlineArrowUpCircle className="w-4 h-4" />
+                        {cp ? (plan.price > cp.price ? "Fazer Upgrade" : "Mudar Plano") : "Assinar"}
+                      </Button>
+                    </Link>
                   )}
                 </motion.div>
               );
