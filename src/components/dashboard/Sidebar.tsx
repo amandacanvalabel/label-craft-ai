@@ -17,6 +17,7 @@ import {
   HiOutlineRectangleGroup,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface SidebarItem {
   label: string;
@@ -50,6 +51,7 @@ interface SidebarProps {
 
 const Sidebar = ({ role, expanded, onExpandedChange }: SidebarProps) => {
   const pathname = usePathname();
+  const siteSettings = useSiteSettings();
   const items = role === "ADMIN" ? adminItems : subscriberItems;
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -64,9 +66,16 @@ const Sidebar = ({ role, expanded, onExpandedChange }: SidebarProps) => {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-border/40 dark:border-white/8 shrink-0">
         <Link href={role === "ADMIN" ? "/admin" : "/dashboard"} className="flex items-center gap-3 overflow-hidden">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
-            <span className="text-white font-bold text-sm">CL</span>
-          </div>
+          {siteSettings.logoHeaderUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={siteSettings.logoHeaderUrl} alt={siteSettings.siteName} className="w-10 h-10 rounded-xl object-contain shadow-md shadow-primary/20 shrink-0" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
+              <span className="text-white font-bold text-sm">
+                {siteSettings.siteName.slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
           <AnimatePresence>
             {expanded && (
               <motion.span
@@ -76,7 +85,7 @@ const Sidebar = ({ role, expanded, onExpandedChange }: SidebarProps) => {
                 exit={{ opacity: 0, x: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                Canva<span className="gradient-text">Label</span>
+                {siteSettings.siteName}
               </motion.span>
             )}
           </AnimatePresence>

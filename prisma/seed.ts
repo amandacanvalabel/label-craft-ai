@@ -30,6 +30,16 @@ async function main() {
     },
   });
 
+  await prisma.siteSettings.upsert({
+    where: { id: "site" },
+    update: {},
+    create: {
+      id: "site",
+      siteName: "CanvaLabel",
+      siteTagline: "Crie rótulos profissionais com IA",
+    },
+  });
+
   console.log("✅ Seed executado com sucesso!");
   console.log("  Admin:", admin.email);
   console.log("  Assinante:", subscriber.email);

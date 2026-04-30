@@ -56,6 +56,30 @@ model Admin {
   @@map("admins")
 }
 
+model SiteSettings {
+  id                String   @id @default("site")
+  siteName          String   @default("CanvaLabel")
+  siteTagline       String   @default("Crie rótulos profissionais com IA")
+  logoHeaderUrl     String?
+  logoFooterUrl     String?
+  faviconUrl        String?
+  openGraphImageUrl String?
+  metaTitle         String   @default("CanvaLabel — Crie rótulos profissionais com IA")
+  metaDescription   String   @default("Plataforma inteligente para criação de rótulos e etiquetas em conformidade com a ANVISA. Geração com IA, editor visual e exportação para gráficas.")
+  canonicalUrl      String   @default("https://canvalabel.com.br")
+  keywords          String[] @default(["rótulos", "etiquetas", "ANVISA", "IA", "inteligência artificial", "editor visual"])
+  maintenanceMode   Boolean  @default(false)
+  twoFactorEnabled  Boolean  @default(false)
+  sessionTimeoutDays Int     @default(7)
+  defaultTheme      String   @default("system")
+  primaryColor      String   @default("#2563eb")
+  accentColor       String   @default("#0ea5e9")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
 model Subscriber {
   id           String   @id @default(cuid())
   cpfOrCnpj    String   @unique

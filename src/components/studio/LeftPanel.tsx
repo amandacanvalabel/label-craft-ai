@@ -10,7 +10,6 @@ import {
   HiOutlineEye,
   HiOutlineEyeSlash,
   HiOutlineLockClosed,
-  HiOutlineTrash,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
@@ -44,24 +43,21 @@ interface LeftPanelProps {
 }
 
 const templates: Template[] = [
-  { id: "t1", name: "Suco Natural", category: "Bebidas", img: "🍊" },
-  { id: "t2", name: "Mel Artesanal", category: "Alimentos", img: "🍯" },
-  { id: "t3", name: "Proteína Whey", category: "Suplementos", img: "💪" },
   { id: "t4", name: "Creme Facial", category: "Cosméticos", img: "🧴" },
-  { id: "t5", name: "Café Especial", category: "Bebidas", img: "☕" },
-  { id: "t6", name: "Água Mineral", category: "Bebidas", img: "💧" },
-  { id: "t7", name: "Granola Mix", category: "Alimentos", img: "🥣" },
   { id: "t8", name: "Sabonete", category: "Cosméticos", img: "🫧" },
-  { id: "t9", name: "Vinho Tinto", category: "Bebidas", img: "🍷" },
+  { id: "t1", name: "Sérum Premium", category: "Cosméticos", img: "💧" },
+  { id: "t2", name: "Shampoo", category: "Cosméticos", img: "🧴" },
+  { id: "t3", name: "Perfume", category: "Cosméticos", img: "✨" },
+  { id: "t5", name: "Protetor Solar", category: "Cosméticos", img: "☀️" },
 ];
 
 const assets = [
-  { id: "a1", name: "Selo Orgânico", img: "🌿" },
-  { id: "a2", name: "Selo SIF", img: "✅" },
+  { id: "a1", name: "Natural", img: "🌿" },
+  { id: "a2", name: "Dermatologicamente Testado", img: "✅" },
   { id: "a3", name: "Selo ANVISA", img: "🏛️" },
   { id: "a4", name: "Selo Vegano", img: "🌱" },
-  { id: "a5", name: "Sem Glúten", img: "🚫" },
-  { id: "a6", name: "Sem Lactose", img: "🥛" },
+  { id: "a5", name: "Sem Parabenos", img: "🚫" },
+  { id: "a6", name: "Cruelty-free", img: "✨" },
   { id: "a7", name: "Reciclável", img: "♻️" },
   { id: "a8", name: "Código Barras", img: "📊" },
 ];
@@ -89,7 +85,7 @@ const LeftPanel = ({
 }: LeftPanelProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("templates");
   const [templateFilter, setTemplateFilter] = useState("Todos");
-  const templateCategories = ["Todos", "Bebidas", "Alimentos", "Suplementos", "Cosméticos"];
+  const templateCategories = ["Todos", "Cosméticos"];
 
   const filteredTemplates = templateFilter === "Todos"
     ? templates

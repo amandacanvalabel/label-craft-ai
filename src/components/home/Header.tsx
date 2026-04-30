@@ -19,6 +19,7 @@ import {
   HiOutlineChevronDown,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface SessionUser {
   id: string;
@@ -71,12 +72,14 @@ function fmtDate(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
 }
 
+const renderTime = Date.now();
+
 function PlanSection({ planInfo, visible }: { planInfo: PlanInfo | null; visible: boolean }) {
   const [barWidth, setBarWidth] = useState(0);
 
   const hasPlan = !!planInfo;
   const isLifetime = hasPlan && (planInfo.planType === "LIFETIME" || !planInfo.expiresAt);
-  const now = Date.now();
+  const now = renderTime;
   const start = planInfo?.activatedAt ? new Date(planInfo.activatedAt).getTime() : now;
   const end = planInfo?.expiresAt ? new Date(planInfo.expiresAt).getTime() : now;
   const total = end - start || 1;
@@ -102,8 +105,8 @@ function PlanSection({ planInfo, visible }: { planInfo: PlanInfo | null; visible
     : "text-emerald-500";
 
   useEffect(() => {
-    if (!visible) { setBarWidth(0); return; }
-    const t = setTimeout(() => setBarWidth(hasPlan ? (isLifetime ? 100 : pct) : 0), 80);
+    const target = visible && hasPlan ? (isLifetime ? 100 : pct) : 0;
+    const t = setTimeout(() => setBarWidth(target), 80);
     return () => clearTimeout(t);
   }, [visible, pct, isLifetime, hasPlan]);
 
@@ -173,6 +176,7 @@ function PlanSection({ planInfo, visible }: { planInfo: PlanInfo | null; visible
 
 const Header = () => {
   const router = useRouter();
+  const siteSettings = useSiteSettings();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -233,11 +237,18 @@ const Header = () => {
       <div className="max-w-[1440px] mx-auto px-6 h-18 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-            <span className="text-white font-bold text-sm">CL</span>
-          </div>
+          {siteSettings.logoHeaderUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={siteSettings.logoHeaderUrl} alt={siteSettings.siteName} className="w-8 h-8 rounded-lg object-contain" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {siteSettings.siteName.slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
           <span className="text-lg font-bold tracking-tight text-foreground">
-            Canva<span className="gradient-text">Label</span>
+            {siteSettings.siteName}
           </span>
         </Link>
 

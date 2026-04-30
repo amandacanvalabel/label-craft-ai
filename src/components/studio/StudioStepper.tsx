@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const STEPS = [
   { id: 1, label: "Briefing", sub: "Dados básicos" },
-  { id: 2, label: "Dados Obrigatórios", sub: "Regulatório ANVISA" },
+  { id: 2, label: "Dados Obrigatórios", sub: "Cosmético ANVISA" },
   { id: 3, label: "Design", sub: "Canvas & IA" },
   { id: 4, label: "Revisão", sub: "Checklist" },
   { id: 5, label: "Exportar", sub: "Arte final" },

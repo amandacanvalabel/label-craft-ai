@@ -21,13 +21,6 @@ interface Layer {
   locked: boolean;
 }
 
-interface NutritionRow {
-  name: string;
-  value: string;
-  unit: string;
-  vd: string;
-}
-
 interface CanvasAreaProps {
   elements: unknown[];
   selectedElement: string | null;
@@ -38,7 +31,8 @@ interface CanvasAreaProps {
     category: string;
     img: string;
     ingredients?: string;
-    allergens?: string;
+    warnings?: string;
+    directions?: string;
     weight?: string;
     expiry?: string;
     registration?: string;
@@ -47,8 +41,6 @@ interface CanvasAreaProps {
   layers: Layer[];
   activeTemplate: string | null;
   activeAssets: string[];
-  nutritionData: NutritionRow[];
-  servingSize: string;
 }
 
 // Template color schemes — inline styles to avoid Tailwind purge
@@ -75,12 +67,12 @@ const DEFAULT_STYLE = {
 };
 
 const ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
-  a1: { emoji: "🌿", short: "Orgânico" },
-  a2: { emoji: "✅", short: "SIF" },
+  a1: { emoji: "🌿", short: "Natural" },
+  a2: { emoji: "✅", short: "Dermato" },
   a3: { emoji: "🏛️", short: "ANVISA" },
   a4: { emoji: "🌱", short: "Vegano" },
-  a5: { emoji: "🚫", short: "Sem Glúten" },
-  a6: { emoji: "🥛", short: "Sem Lactose" },
+  a5: { emoji: "🚫", short: "Sem Parabenos" },
+  a6: { emoji: "✨", short: "Cruelty-free" },
   a7: { emoji: "♻️", short: "Reciclável" },
   a8: { emoji: "📊", short: "Cód. Barras" },
 };
@@ -92,8 +84,6 @@ const CanvasArea = ({
   layers,
   activeTemplate,
   activeAssets,
-  nutritionData,
-  servingSize,
 }: CanvasAreaProps) => {
   const [zoom, setZoom] = useState(100);
   const [showGrid, setShowGrid] = useState(true);
@@ -119,9 +109,6 @@ const CanvasArea = ({
         ? "ring-2 ring-primary ring-offset-1"
         : !isLocked(id) && "hover:bg-black/[0.03]"
     );
-
-  // Top 3 nutrition rows for compact preview
-  const previewNutrition = nutritionData.slice(0, 5);
 
   return (
     <div className="flex-1 flex flex-col bg-[#e8ecf1] dark:bg-[#0d0d14] overflow-hidden relative">
@@ -198,37 +185,19 @@ const CanvasArea = ({
               {/* Ingredients (layer: ingredients) */}
               {isVisible("ingredients") && (
                 <div className={ringCls("ingredients")} onClick={(e) => handleClick("ingredients", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Ingredientes</p>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição</p>
                   <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                    {labelPreview.ingredients || "Ingredientes não informados."}
+                    {labelPreview.ingredients || "Composição não informada."}
                   </p>
                 </div>
               )}
 
-              {/* Nutritional table (layer: nutritional) */}
-              {isVisible("nutritional") && (
-                <div className={ringCls("nutritional")} onClick={(e) => handleClick("nutritional", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-1">Informação Nutricional</p>
-                  <div className="border border-gray-200 rounded overflow-hidden">
-                    <table className="w-full text-[6px]">
-                      <thead>
-                        <tr style={{ backgroundColor: style.headerBg }}>
-                          <th className="text-left px-1.5 py-0.5 font-bold text-gray-700">Porção {servingSize}</th>
-                          <th className="text-right px-1.5 py-0.5 font-bold text-gray-500">%VD*</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {previewNutrition.map((row) => (
-                          <tr key={row.name} className="border-t border-gray-100">
-                            <td className="px-1.5 py-0.5 text-gray-600">
-                              {row.name} <span className="font-semibold text-gray-800">{row.value}{row.unit}</span>
-                            </td>
-                            <td className="text-right px-1.5 py-0.5 text-gray-400">{row.vd}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {isVisible("directions") && (
+                <div className={ringCls("directions")} onClick={(e) => handleClick("directions", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Modo de uso</p>
+                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                    {labelPreview.directions || "Modo de uso não informado."}
+                  </p>
                 </div>
               )}
 
@@ -241,7 +210,7 @@ const CanvasArea = ({
                       <p className="text-[6px] text-gray-400">Validade: {labelPreview.expiry || "—"}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[5px] text-gray-400">Reg.: {labelPreview.registration || "—"}</p>
+                      <p className="text-[5px] text-gray-400">ANVISA: {labelPreview.registration || "—"}</p>
                       <p className="text-[5px] text-gray-400">SAC: {labelPreview.sac || "—"}</p>
                     </div>
                   </div>
@@ -249,16 +218,15 @@ const CanvasArea = ({
               )}
             </div>
 
-            {/* ── Allergens bar (layer: allergens) ── */}
-            {isVisible("allergens") && (
+            {isVisible("warnings") && (
               <div className="mt-auto pt-1.5">
                 <div
-                  className={cn(ringCls("allergens"), "!p-1.5 rounded-md border")}
+                  className={cn(ringCls("warnings"), "!p-1.5 rounded-md border")}
                   style={{ backgroundColor: "#fffbeb", borderColor: "#fde68a" }}
-                  onClick={(e) => handleClick("allergens", e)}
+                  onClick={(e) => handleClick("warnings", e)}
                 >
                   <p className="text-[6px] font-bold text-amber-700">
-                    ⚠️ ALÉRGICOS: {labelPreview.allergens || "Verificar embalagem."}
+                    ATENÇÃO: {labelPreview.warnings || "Uso externo. Manter fora do alcance de crianças."}
                   </p>
                 </div>
               </div>

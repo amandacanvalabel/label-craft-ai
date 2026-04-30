@@ -233,7 +233,7 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
   useEffect(() => {
     const stored = localStorage.getItem("theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldBeDark = stored === "dark" || (!stored && prefersDark);
+    const shouldBeDark = stored === "dark" || (stored === "system" && prefersDark) || (!stored && prefersDark);
     setIsDark(shouldBeDark);
     if (shouldBeDark) {
       document.documentElement.classList.add("dark");

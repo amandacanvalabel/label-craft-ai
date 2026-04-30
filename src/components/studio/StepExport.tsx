@@ -7,7 +7,6 @@ import {
   HiOutlineArrowDownTray,
   HiOutlinePhoto,
   HiOutlineBookOpen,
-  HiOutlineCodeBracketSquare,
   HiOutlineArchiveBox,
   HiOutlineCheckCircle,
 } from "react-icons/hi2";
@@ -25,7 +24,8 @@ interface StepExportProps {
 const formats = [
   { id: "pdf", label: "PDF", desc: "Ideal para impressão", Icon: HiOutlineBookOpen },
   { id: "png", label: "PNG", desc: "Alta qualidade digital", Icon: HiOutlinePhoto },
-  { id: "svg", label: "SVG", desc: "Vetorial escalável", Icon: HiOutlineCodeBracketSquare },
+  { id: "jpg", label: "JPG", desc: "Arquivo leve", Icon: HiOutlinePhoto },
+  { id: "webp", label: "WebP", desc: "Web e e-commerce", Icon: HiOutlinePhoto },
 ];
 
 const channels = [
@@ -108,7 +108,7 @@ export default function StepExport({ labelImg, productName, brandName, onPrev, o
             {/* Format */}
             <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 p-5">
               <p className="text-[11px] font-bold text-foreground uppercase tracking-wider mb-3">Formato</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {formats.map(({ id, label, desc, Icon }) => (
                   <button
                     key={id}

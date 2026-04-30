@@ -22,7 +22,8 @@ interface ProductFields {
   registration: string;
   sac: string;
   ingredients: string;
-  allergens: string;
+  warnings: string;
+  directions: string;
   expiry: string;
   [key: string]: string;
 }
@@ -39,12 +40,12 @@ type ApprovalStatus = "pending" | "review" | "approved";
 const checklist = [
   { id: "productName", label: "Nome do produto presente e legível" },
   { id: "brandName", label: "Marca identificada" },
-  { id: "weight", label: "Peso/volume declarado" },
-  { id: "ingredients", label: "Lista de ingredientes em ordem decrescente" },
-  { id: "allergens", label: "Declaração de alérgenos em destaque" },
-  { id: "nutrition", label: "Tabela nutricional presente" },
+  { id: "weight", label: "Conteúdo líquido declarado" },
+  { id: "ingredients", label: "Composição/ingredientes presente" },
+  { id: "directions", label: "Modo de uso informado" },
+  { id: "warnings", label: "Advertências e restrições em destaque" },
   { id: "expiry", label: "Prazo de validade informado" },
-  { id: "registration", label: "Registro MS/SIF/MAPA" },
+  { id: "registration", label: "Processo ANVISA / autorização" },
   { id: "sac", label: "SAC do fabricante" },
 ];
 
@@ -59,7 +60,6 @@ export default function StepRevisao({ fields, labelImg, onNext, onPrev }: StepRe
   const [notes, setNotes] = useState("");
 
   const checkItem = (id: string) => {
-    if (id === "nutrition") return true; // filled in step 2
     return fields[id]?.trim().length > 0;
   };
 
@@ -107,7 +107,7 @@ export default function StepRevisao({ fields, labelImg, onNext, onPrev }: StepRe
           <div className="space-y-4">
             <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[11px] font-bold text-foreground uppercase tracking-wider">Checklist ANVISA</p>
+                <p className="text-[11px] font-bold text-foreground uppercase tracking-wider">Checklist Cosmético</p>
                 <span className={cn(
                   "text-[11px] font-bold",
                   allPassed ? "text-emerald-500" : passedCount > checklist.length / 2 ? "text-amber-500" : "text-red-500"

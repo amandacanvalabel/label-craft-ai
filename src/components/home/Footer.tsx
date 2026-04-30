@@ -10,6 +10,7 @@ import {
   RiLinkedinLine,
   RiYoutubeLine,
 } from "react-icons/ri";
+import { getSiteSettings } from "@/lib/site-settings";
 
 const footerLinks = {
   produto: [
@@ -39,7 +40,9 @@ const socialLinks = [
   { icon: RiYoutubeLine, href: "#", label: "YouTube" },
 ];
 
-const Footer = () => {
+const Footer = async () => {
+  const settings = await getSiteSettings();
+
   return (
     <footer className="relative bg-foreground text-white pt-20 pb-8 overflow-hidden">
       {/* Top gradient line */}
@@ -50,16 +53,22 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                <span className="text-white font-bold text-sm">CL</span>
-              </div>
+              {settings.logoFooterUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoFooterUrl} alt={settings.siteName} className="w-8 h-8 rounded-lg object-contain" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">
+                    {settings.siteName.slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
+              )}
               <span className="text-lg font-bold tracking-tight">
-                CanvaLabel
+                {settings.siteName}
               </span>
             </Link>
             <p className="text-sm text-white/50 leading-relaxed mb-6">
-              A plataforma inteligente para criação de rótulos profissionais em
-              conformidade com a ANVISA.
+              {settings.siteTagline}
             </p>
             <div className="space-y-3 text-sm text-white/40">
               <div className="flex items-center gap-2">
@@ -122,7 +131,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-white/30">
-            © {new Date().getFullYear()} CanvaLabel. Todos os direitos
+            © {new Date().getFullYear()} {settings.siteName}. Todos os direitos
             reservados.
           </p>
 

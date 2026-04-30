@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ interface User {
 
 const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   const router = useRouter();
+  const siteSettings = useSiteSettings();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,12 +45,19 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     fetchUser();
   }, [router]);
 
+  useEffect(() => {
+    const stored = localStorage.getItem("theme") as "light" | "dark" | "system" | null;
+    const theme = stored || siteSettings.defaultTheme;
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && prefersDark));
+  }, [siteSettings.defaultTheme]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20 animate-pulse">
-            <span className="text-white font-bold text-sm">CL</span>
+            <span className="text-white font-bold text-sm">{siteSettings.siteName.slice(0, 2).toUpperCase()}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />

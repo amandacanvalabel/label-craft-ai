@@ -20,8 +20,8 @@ interface StepBriefingProps {
   onNext: () => void;
 }
 
-const categories = ["Alimentos", "Bebidas", "Suplementos", "Cosméticos", "Higiene Pessoal", "Limpeza", "Outros"];
-const packagings = ["Garrafa PET", "Garrafa Vidro", "Lata", "Caixa Cartonada", "Saco/Pouch", "Pote/Frasco", "Bisnaga", "Sachê", "Outro"];
+const categories = ["Cosméticos"];
+const packagings = ["Pote", "Frasco", "Bisnaga", "Pump", "Spray", "Roll-on", "Sachê", "Outro"];
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -64,7 +64,7 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
               className={inputCls}
               value={fields.productName}
               onChange={(e) => onChange("productName", e.target.value)}
-              placeholder="Ex: Suco de Laranja Natural"
+              placeholder="Ex: Creme Hidratante Facial"
             />
           </Field>
 
@@ -74,7 +74,7 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
                 className={inputCls}
                 value={fields.brandName}
                 onChange={(e) => onChange("brandName", e.target.value)}
-                placeholder="Ex: FrutaBoa"
+                placeholder="Ex: Dermaviva"
               />
             </Field>
             <Field label="Categoria" required>
@@ -95,7 +95,7 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
                 className={inputCls}
                 value={fields.weight}
                 onChange={(e) => onChange("weight", e.target.value)}
-                placeholder="Ex: 500g, 1L, 200ml"
+                placeholder="Ex: 50g, 120ml, 200ml"
               />
             </Field>
             <Field label="Tipo de Embalagem">
@@ -111,12 +111,12 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Registro MS / SIF / MAPA">
+            <Field label="Processo ANVISA / Autorização">
               <input
                 className={inputCls}
                 value={fields.registration}
                 onChange={(e) => onChange("registration", e.target.value)}
-                placeholder="Ex: 1.2345.6789"
+                placeholder="Ex: 25351.000000/2026-00"
               />
             </Field>
             <Field label="SAC">

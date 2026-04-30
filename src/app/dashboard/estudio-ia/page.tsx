@@ -11,49 +11,33 @@ import StepExport from "@/components/studio/StepExport";
 import LeftPanel from "@/components/studio/LeftPanel";
 import CanvasArea from "@/components/studio/CanvasArea";
 import RightPanel from "@/components/studio/RightPanel";
+import { toast } from "sonner";
 
 const defaultLayers = [
   { id: "product-image", name: "Imagem do Produto", type: "image", visible: true, locked: false },
   { id: "product-name", name: "Nome do Produto", type: "text", visible: true, locked: false },
-  { id: "ingredients", name: "Ingredientes", type: "text", visible: true, locked: false },
-  { id: "nutritional", name: "Tabela Nutricional", type: "table", visible: true, locked: false },
-  { id: "anvisa", name: "Informações ANVISA", type: "text", visible: true, locked: false },
-  { id: "allergens", name: "Alérgenos", type: "text", visible: true, locked: true },
-];
-
-const defaultNutrition = [
-  { name: "Valor energético", value: "0", unit: "kcal", vd: "0" },
-  { name: "Carboidratos", value: "0", unit: "g", vd: "0" },
-  { name: "Açúcares totais", value: "0", unit: "g", vd: "—" },
-  { name: "Açúcares adicionados", value: "0", unit: "g", vd: "0" },
-  { name: "Proteínas", value: "0", unit: "g", vd: "0" },
-  { name: "Gorduras totais", value: "0", unit: "g", vd: "0" },
-  { name: "Gordura saturada", value: "0", unit: "g", vd: "0" },
-  { name: "Gordura trans", value: "0", unit: "g", vd: "0" },
-  { name: "Fibra alimentar", value: "0", unit: "g", vd: "0" },
-  { name: "Sódio", value: "0", unit: "mg", vd: "0" },
+  { id: "ingredients", name: "Composição", type: "text", visible: true, locked: false },
+  { id: "directions", name: "Modo de Uso", type: "text", visible: true, locked: false },
+  { id: "warnings", name: "Advertências", type: "text", visible: true, locked: true },
+  { id: "anvisa", name: "Dados Regulatórios", type: "text", visible: true, locked: false },
 ];
 
 const defaultFields = {
   productName: "",
   brandName: "",
   weight: "",
-  category: "Bebidas",
+  category: "Cosméticos",
   packaging: "",
   ingredients: "",
-  allergens: "",
+  warnings: "",
+  directions: "",
   expiry: "",
   registration: "",
   sac: "",
 };
 
 const categoryEmoji: Record<string, string> = {
-  Bebidas: "🍊",
-  Alimentos: "🥗",
-  Suplementos: "💪",
   Cosméticos: "🧴",
-  "Higiene Pessoal": "🫧",
-  Limpeza: "🧹",
 };
 
 export default function EstudioIAPage() {
@@ -70,8 +54,6 @@ export default function EstudioIAPage() {
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [layers, setLayers] = useState(defaultLayers);
-  const [nutritionData, setNutritionData] = useState(defaultNutrition);
-  const [servingSize, setServingSize] = useState("200ml");
   const [productFields, setProductFields] = useState(defaultFields);
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeAssets, setActiveAssets] = useState<string[]>([]);
@@ -86,10 +68,20 @@ export default function EstudioIAPage() {
         const cd = (data.canvasData ?? {}) as Record<string, unknown>;
         setProjectName(data.name ?? `Rótulo #${editId.slice(0, 6)}`);
         setModelId(data.id);
-        if (cd.productFields) setProductFields(cd.productFields as typeof defaultFields);
-        if (cd.nutritionData) setNutritionData(cd.nutritionData as typeof defaultNutrition);
-        if (cd.servingSize) setServingSize(cd.servingSize as string);
-        if (cd.layers) setLayers(cd.layers as typeof defaultLayers);
+        if (cd.productFields) {
+          const loaded = cd.productFields as Record<string, string>;
+          setProductFields({
+            ...defaultFields,
+            ...loaded,
+            category: "Cosméticos",
+            warnings: loaded.warnings ?? "",
+          });
+        }
+        if (cd.layers) {
+          const loadedLayers = cd.layers as typeof defaultLayers;
+          const allowedLayerIds = new Set(defaultLayers.map((layer) => layer.id));
+          setLayers(loadedLayers.filter((layer) => allowedLayerIds.has(layer.id)));
+        }
         if (cd.activeTemplate) setActiveTemplate(cd.activeTemplate as string);
         if (cd.activeAssets) setActiveAssets(cd.activeAssets as string[]);
         setCurrentStep(3);
@@ -100,17 +92,15 @@ export default function EstudioIAPage() {
 
   const buildCanvasData = useCallback(() => ({
     productFields,
-    nutritionData,
-    servingSize,
     layers,
     activeTemplate,
     activeAssets,
-    category: productFields.category,
+    category: "Cosméticos",
     status: "draft" as const,
     description: productFields.productName,
     img: categoryEmoji[productFields.category] ?? "📋",
     aiModel: "Grok Vision",
-  }), [productFields, nutritionData, servingSize, layers, activeTemplate, activeAssets]);
+  }), [productFields, layers, activeTemplate, activeAssets]);
 
   const handleSave = useCallback(async () => {
     if (saving) return;
@@ -146,32 +136,61 @@ export default function EstudioIAPage() {
     }
   }, [saving, modelId, projectName, buildCanvasData]);
 
-  const handleExport = useCallback(async (format: string, _channel: string, _resolution: string) => {
+  const handleExport = useCallback(async (format: string, _channel: string, resolution: string) => {
     const el = document.getElementById("label-canvas");
     if (!el) return;
 
-    const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(el, {
-      scale: format === "pdf" ? 3 : 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
+    const originalTransform = el.style.transform;
+    el.style.transform = "none";
 
-    const filename = (projectName || "rotulo").replace(/\s+/g, "-").toLowerCase();
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const dpi = Number(resolution) || 300;
+      const scale = Math.max(1, dpi / 96);
+      const canvas = await html2canvas(el, {
+        scale,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
 
-    if (format === "pdf") {
-      const { jsPDF } = await import("jspdf");
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ unit: "px", format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-      pdf.save(`${filename}.pdf`);
-    } else {
+      const filename = (projectName || productFields.productName || "rotulo-cosmetico")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+
+      if (format === "pdf") {
+        const { jsPDF } = await import("jspdf");
+        const imgData = canvas.toDataURL("image/png");
+        const pdfWidth = 50;
+        const pdfHeight = 70;
+        const pdf = new jsPDF({ unit: "mm", format: [pdfWidth, pdfHeight], orientation: "portrait", compress: true });
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`${filename}.pdf`);
+        return;
+      }
+
+      const mime = format === "jpg" || format === "jpeg" ? "image/jpeg" : format === "webp" ? "image/webp" : "image/png";
+      const extension = format === "jpeg" ? "jpg" : format;
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, mime === "image/png" ? undefined : 0.95));
+      if (!blob) throw new Error("Não foi possível gerar o arquivo.");
+
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `${filename}.${format === "svg" ? "png" : format}`;
-      link.href = canvas.toDataURL("image/png");
+      link.download = `${filename}.${extension}`;
+      link.href = url;
       link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao exportar arte final");
+      throw error;
+    } finally {
+      el.style.transform = originalTransform;
     }
-  }, [projectName]);
+  }, [productFields.productName, projectName]);
 
   const handleFieldChange = (field: string, value: string) => {
     setProductFields((prev) => ({ ...prev, [field]: value }));
@@ -221,13 +240,10 @@ export default function EstudioIAPage() {
         {currentStep === 2 && (
           <StepDados
             ingredients={productFields.ingredients}
-            allergens={productFields.allergens}
+            warnings={productFields.warnings}
+            directions={productFields.directions}
             expiry={productFields.expiry}
-            nutritionData={nutritionData}
-            servingSize={servingSize}
             onFieldChange={handleFieldChange}
-            onNutritionChange={(d) => { setNutritionData(d); setSaved(false); }}
-            onServingSizeChange={(v) => { setServingSize(v); setSaved(false); }}
             onNext={() => setCurrentStep(3)}
             onPrev={() => setCurrentStep(1)}
           />
@@ -263,7 +279,8 @@ export default function EstudioIAPage() {
                 category: productFields.category,
                 img: labelImg,
                 ingredients: productFields.ingredients,
-                allergens: productFields.allergens,
+                warnings: productFields.warnings,
+                directions: productFields.directions,
                 weight: productFields.weight,
                 expiry: productFields.expiry,
                 registration: productFields.registration,
@@ -272,8 +289,6 @@ export default function EstudioIAPage() {
               layers={layers}
               activeTemplate={activeTemplate}
               activeAssets={activeAssets}
-              nutritionData={nutritionData}
-              servingSize={servingSize}
             />
             <RightPanel
               collapsed={rightCollapsed}
@@ -282,10 +297,6 @@ export default function EstudioIAPage() {
               productFields={productFields}
               onFieldChange={handleFieldChange}
               onGenerateWithAI={() => setSaved(false)}
-              nutritionData={nutritionData}
-              onNutritionChange={(d) => { setNutritionData(d); setSaved(false); }}
-              servingSize={servingSize}
-              onServingSizeChange={(v) => { setServingSize(v); setSaved(false); }}
             />
           </div>
         )}
