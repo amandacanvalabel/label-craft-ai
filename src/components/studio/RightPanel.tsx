@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiOutlineSparkles,
@@ -10,6 +10,8 @@ import {
   HiOutlinePaperAirplane,
   HiOutlineExclamationTriangle,
   HiOutlineCheckCircle,
+  HiOutlineCheck,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +55,29 @@ const cosmeticChecklist = [
   { label: "Processo ANVISA / SAC", field: "registration" },
 ];
 
+const FIELD_LABELS: Record<string, string> = {
+  productName: "Nome do produto",
+  brandName: "Marca",
+  weight: "Conteúdo",
+  ingredients: "Composição",
+  directions: "Modo de uso",
+  warnings: "Advertências",
+};
+
+const QUICK_PROMPTS = [
+  "creme hidratante facial 50g",
+  "shampoo cabelos oleosos 250ml",
+  "protetor solar FPS 50+ 120ml",
+  "sérum vitamina C 30ml",
+];
+
+interface Message {
+  role: "user" | "ai" | "error";
+  text: string;
+  fields?: Record<string, string>;
+  applied?: boolean;
+}
+
 const RightPanel = ({
   collapsed,
   onToggle,
@@ -63,28 +88,84 @@ const RightPanel = ({
 }: RightPanelProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("ai");
   const [prompt, setPrompt] = useState("");
-  const [aiHistory, setAiHistory] = useState<{ role: "user" | "ai"; text: string }[]>([
-    { role: "ai", text: "Descreva o cosmético e eu ajudo a montar o rótulo com composição, modo de uso, advertências e dados regulatórios." },
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "ai",
+      text: "Descreva o cosmético e eu gero a composição INCI, modo de uso e advertências ANVISA automaticamente.",
+    },
   ]);
   const [generating, setGenerating] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSendPrompt = () => {
-    if (!prompt.trim()) return;
-    const currentPrompt = prompt;
-    setAiHistory((prev) => [...prev, { role: "user", text: currentPrompt }]);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, generating]);
+
+  const handleSendPrompt = async (overridePrompt?: string) => {
+    const text = (overridePrompt ?? prompt).trim();
+    if (!text || generating) return;
+
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setPrompt("");
     setGenerating(true);
-    setTimeout(() => {
-      setAiHistory((prev) => [
+
+    try {
+      const res = await fetch("/api/ai/generate-label", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          currentFields: {
+            productName: productFields.productName,
+            brandName: productFields.brandName,
+            weight: productFields.weight,
+          },
+        }),
+      });
+
+      const data = await res.json() as { message?: string; fields?: Record<string, string>; error?: string };
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Erro ao gerar conteúdo");
+      }
+
+      const generatedFields = Object.fromEntries(
+        Object.entries(data.fields ?? {}).filter(([, v]) => v?.trim())
+      );
+
+      setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          text: `Rótulo cosmético preparado para "${currentPrompt}". Revise composição, modo de uso, advertências e dados ANVISA antes de exportar.`,
+          text: data.message ?? "Conteúdo gerado!",
+          fields: Object.keys(generatedFields).length > 0 ? generatedFields : undefined,
+          applied: false,
         },
       ]);
+
+      onGenerateWithAI(text);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "error",
+          text: err instanceof Error ? err.message : "Erro ao conectar com a IA. Tente novamente.",
+        },
+      ]);
+    } finally {
       setGenerating(false);
-      onGenerateWithAI(currentPrompt);
-    }, 900);
-    setPrompt("");
+    }
+  };
+
+  const handleApplyFields = (msgIndex: number) => {
+    const msg = messages[msgIndex];
+    if (!msg?.fields) return;
+    Object.entries(msg.fields).forEach(([key, value]) => {
+      if (value?.trim()) onFieldChange(key, value);
+    });
+    setMessages((prev) =>
+      prev.map((m, i) => (i === msgIndex ? { ...m, applied: true } : m))
+    );
   };
 
   const filledFields = cosmeticChecklist.filter((item) => productFields[item.field]?.trim().length > 0);
@@ -118,7 +199,8 @@ const RightPanel = ({
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-0.5 px-3 pt-3 pb-2 pl-10">
+          {/* Tab bar */}
+          <div className="flex items-center gap-0.5 px-3 pt-3 pb-2 pl-10 shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -136,8 +218,10 @@ const RightPanel = ({
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <div className="flex-1 overflow-hidden flex flex-col px-3 pb-3 min-h-0">
             <AnimatePresence mode="wait">
+
+              {/* ── AI TAB ── */}
               {activeTab === "ai" && (
                 <motion.div
                   key="ai"
@@ -145,34 +229,120 @@ const RightPanel = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ duration: 0.2 }}
-                  className="flex flex-col h-full"
+                  className="flex flex-col h-full min-h-0"
                 >
-                  <div className="mb-3 p-2.5 rounded-xl bg-muted/30 dark:bg-white/[0.02]">
+                  {/* ANVISA compliance bar */}
+                  <div className="mb-2.5 p-2.5 rounded-xl bg-muted/30 dark:bg-white/[0.02] shrink-0">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Checklist cosmético</span>
-                      <span className={cn("text-[10px] font-bold", compliancePct === 100 ? "text-emerald-500" : compliancePct > 50 ? "text-amber-500" : "text-red-500")}>{compliancePct}%</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Checklist ANVISA</span>
+                      <span className={cn(
+                        "text-[10px] font-bold",
+                        compliancePct === 100 ? "text-emerald-500" : compliancePct > 50 ? "text-amber-500" : "text-red-500"
+                      )}>
+                        {compliancePct}%
+                      </span>
                     </div>
                     <div className="h-1.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
-                      <div className={cn("h-full rounded-full transition-all", compliancePct === 100 ? "bg-emerald-500" : compliancePct > 50 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${compliancePct}%` }} />
+                      <motion.div
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          compliancePct === 100 ? "bg-emerald-500" : compliancePct > 50 ? "bg-amber-500" : "bg-red-500"
+                        )}
+                        animate={{ width: `${compliancePct}%` }}
+                        transition={{ duration: 0.5 }}
+                      />
                     </div>
+                    {compliancePct < 100 && (
+                      <p className="text-[9px] text-muted-foreground mt-1">
+                        {cosmeticChecklist.length - filledFields.length} campo(s) faltando para conformidade
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex-1 space-y-2.5 mb-3 max-h-[300px] overflow-y-auto">
-                    {aiHistory.map((msg, i) => (
-                      <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                  {/* Quick prompts (only show if no user messages yet) */}
+                  {messages.filter((m) => m.role === "user").length === 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2.5 shrink-0">
+                      {QUICK_PROMPTS.map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => handleSendPrompt(q)}
+                          disabled={generating}
+                          className="px-2.5 py-1 rounded-lg text-[9px] font-semibold bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 hover:bg-primary/15 transition-all disabled:opacity-50"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Chat messages */}
+                  <div className="flex-1 overflow-y-auto space-y-2.5 mb-2.5 min-h-0 pr-0.5">
+                    {messages.map((msg, i) => (
+                      <div key={i} className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start")}>
                         <div className={cn(
-                          "max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed",
+                          "max-w-[90%] px-3 py-2 rounded-xl text-[11px] leading-relaxed",
                           msg.role === "user"
                             ? "bg-primary text-white rounded-br-sm"
+                            : msg.role === "error"
+                            ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 rounded-bl-sm"
                             : "bg-muted/40 dark:bg-white/[0.04] text-foreground rounded-bl-sm"
                         )}>
+                          {msg.role === "error" && (
+                            <HiOutlineExclamationCircle className="w-3.5 h-3.5 inline mr-1 mb-0.5" />
+                          )}
                           {msg.text}
                         </div>
+
+                        {/* Generated fields preview */}
+                        {msg.role === "ai" && msg.fields && Object.keys(msg.fields).length > 0 && (
+                          <div className="max-w-[90%] mt-1.5 w-full">
+                            <div className="bg-emerald-50 dark:bg-emerald-500/8 border border-emerald-200/60 dark:border-emerald-500/20 rounded-xl p-2.5">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1.5">
+                                Campos gerados
+                              </p>
+                              <div className="space-y-1">
+                                {Object.entries(msg.fields).map(([key, value]) => (
+                                  <div key={key} className="flex items-start gap-1.5">
+                                    <HiOutlineCheck className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                                    <div className="min-w-0">
+                                      <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                        {FIELD_LABELS[key] ?? key}:{" "}
+                                      </span>
+                                      <span className="text-[9px] text-muted-foreground line-clamp-1">
+                                        {value}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => handleApplyFields(i)}
+                                disabled={msg.applied}
+                                className={cn(
+                                  "mt-2.5 w-full py-1.5 rounded-lg text-[10px] font-bold transition-all",
+                                  msg.applied
+                                    ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 cursor-default"
+                                    : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 cursor-pointer"
+                                )}
+                              >
+                                {msg.applied ? (
+                                  <span className="flex items-center justify-center gap-1">
+                                    <HiOutlineCheckCircle className="w-3.5 h-3.5" />
+                                    Aplicado ao rótulo
+                                  </span>
+                                ) : (
+                                  "Aplicar ao rótulo →"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
+
                     {generating && (
                       <div className="flex justify-start">
-                        <div className="bg-muted/40 dark:bg-white/[0.04] px-3 py-2 rounded-xl rounded-bl-sm">
+                        <div className="bg-muted/40 dark:bg-white/[0.04] px-3 py-2.5 rounded-xl rounded-bl-sm">
                           <div className="flex items-center gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -181,30 +351,42 @@ const RightPanel = ({
                         </div>
                       </div>
                     )}
+                    <div ref={chatEndRef} />
                   </div>
 
-                  <div className="mt-auto">
+                  {/* Input */}
+                  <div className="shrink-0">
                     <div className="flex items-end gap-2">
                       <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendPrompt(); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendPrompt();
+                          }
+                        }}
                         placeholder="Ex: creme facial hidratante 50g com ácido hialurônico"
                         className="flex-1 px-3 py-2.5 text-[11px] bg-muted/30 dark:bg-white/[0.03] border border-border/40 dark:border-white/8 rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                         rows={2}
+                        disabled={generating}
                       />
                       <button
-                        onClick={handleSendPrompt}
+                        onClick={() => handleSendPrompt()}
                         disabled={!prompt.trim() || generating}
                         className="w-9 h-9 rounded-xl bg-primary hover:bg-primary-dark text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-all shadow-sm shadow-primary/20"
                       >
                         <HiOutlinePaperAirplane className="w-4 h-4" />
                       </button>
                     </div>
+                    <p className="text-[9px] text-muted-foreground mt-1.5 text-center">
+                      Powered by GPT-4o mini · Shift+Enter para nova linha
+                    </p>
                   </div>
                 </motion.div>
               )}
 
+              {/* ── FIELDS TAB ── */}
               {activeTab === "fields" && (
                 <motion.div
                   key="fields"
@@ -212,7 +394,7 @@ const RightPanel = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ duration: 0.2 }}
-                  className="space-y-3"
+                  className="overflow-y-auto space-y-3 pr-0.5"
                 >
                   <p className="text-[10px] text-muted-foreground mb-1">Campos de cosmético</p>
 
@@ -251,7 +433,7 @@ const RightPanel = ({
                   ))}
 
                   {[
-                    { key: "ingredients", label: "Composição", placeholder: "Aqua, Glycerin, Parfum..." },
+                    { key: "ingredients", label: "Composição (INCI)", placeholder: "Aqua, Glycerin, Parfum..." },
                     { key: "directions", label: "Modo de Uso", placeholder: "Aplicar sobre a pele limpa..." },
                     { key: "warnings", label: "Advertências", placeholder: "Uso externo. Evite contato com os olhos..." },
                   ].map((f) => (
@@ -285,6 +467,7 @@ const RightPanel = ({
                 </motion.div>
               )}
 
+              {/* ── STYLE TAB ── */}
               {activeTab === "props" && (
                 <motion.div
                   key="props"
@@ -292,6 +475,7 @@ const RightPanel = ({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ duration: 0.2 }}
+                  className="overflow-y-auto"
                 >
                   {selectedElement ? (
                     <div className="space-y-4">
@@ -325,6 +509,7 @@ const RightPanel = ({
                   )}
                 </motion.div>
               )}
+
             </AnimatePresence>
           </div>
         </>
