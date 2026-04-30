@@ -17,6 +17,8 @@ import {
   HiOutlineCalendarDays,
   HiOutlineCreditCard,
   HiOutlineSparkles,
+  HiOutlineUserPlus,
+  HiOutlineBookmarkSquare,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -24,6 +26,34 @@ import { toast } from "sonner";
 interface TopbarProps {
   user: { name: string; email: string; role: string };
   sidebarExpanded: boolean;
+}
+
+interface Notif {
+  id: string;
+  type: "signup" | "payment" | "model";
+  title: string;
+  desc: string;
+  createdAt: string;
+}
+
+const LAST_READ_KEY = "cl_notifs_last_read";
+
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
+}
+
+function notifIcon(type: Notif["type"]) {
+  switch (type) {
+    case "signup":  return { icon: HiOutlineUserPlus,       color: "bg-blue-50 dark:bg-blue-500/15 text-blue-500" };
+    case "payment": return { icon: HiOutlineCreditCard,      color: "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-500" };
+    case "model":   return { icon: HiOutlineBookmarkSquare,  color: "bg-violet-50 dark:bg-violet-500/15 text-violet-500" };
+  }
 }
 
 // Dropdown wrapper
@@ -228,6 +258,8 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
   const [currentLang, setCurrentLang] = useState("pt-BR");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [notifications, setNotifications] = useState<Notif[]>([]);
+  const [lastRead, setLastRead] = useState<number>(0);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -253,6 +285,16 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
       })
       .catch(() => {});
   }, [user.role]);
+
+  // Load notifications + last-read timestamp from localStorage
+  useEffect(() => {
+    const stored = parseInt(localStorage.getItem(LAST_READ_KEY) ?? "0", 10);
+    setLastRead(stored);
+    fetch("/api/notifications")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Notif[]) => setNotifications(data))
+      .catch(() => {});
+  }, []);
 
   const toggle = useCallback(
     (name: string) => setOpenDropdown((prev) => (prev === name ? null : name)),
@@ -289,20 +331,21 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
     router.push("/login");
   };
 
-  const notifications = [
-    { id: 1, title: "Novo assinante", desc: "João Silva assinou o plano Profissional", time: "2min", unread: true },
-    { id: 2, title: "Pagamento confirmado", desc: "PIX de R$ 79,90 confirmado", time: "15min", unread: true },
-    { id: 3, title: "Relatório pronto", desc: "Relatório mensal de março disponível", time: "1h", unread: false },
-    { id: 4, title: "Modelo salvo", desc: "Rótulo 'Molho Artesanal' salvo com sucesso", time: "3h", unread: false },
-  ];
+  const unreadCount = notifications.filter(
+    (n) => new Date(n.createdAt).getTime() > lastRead
+  ).length;
+
+  function markAllRead() {
+    const now = Date.now();
+    setLastRead(now);
+    localStorage.setItem(LAST_READ_KEY, String(now));
+  }
 
   const languages = [
     { code: "pt-BR", label: "Português (BR)", flag: "🇧🇷" },
     { code: "en-US", label: "English (US)", flag: "🇺🇸" },
     { code: "es-ES", label: "Español", flag: "🇪🇸" },
   ];
-
-  const unreadCount = notifications.filter((n) => n.unread).length;
 
   const initials = user.name
     .split(" ")
@@ -329,49 +372,74 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
             badge={unreadCount}
             onClick={() => toggle("notifications")}
           />
-          <DropdownWrapper isOpen={openDropdown === "notifications"} onClose={close} width="w-96">
-            <div className="p-4 border-b border-border/40 dark:border-white/8">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">Notificações</h3>
-                <span className="text-[11px] font-semibold text-primary bg-primary/8 px-2 py-0.5 rounded-full">
-                  {unreadCount} novas
-                </span>
+          <DropdownWrapper
+            isOpen={openDropdown === "notifications"}
+            onClose={close}
+            width="w-96"
+          >
+            <div className="p-4 border-b border-border/40 dark:border-white/8 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-foreground">Notificações</h3>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <span className="text-[11px] font-semibold text-primary bg-primary/8 px-2 py-0.5 rounded-full">
+                    {unreadCount} {unreadCount === 1 ? "nova" : "novas"}
+                  </span>
+                )}
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllRead}
+                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    marcar lidas
+                  </button>
+                )}
               </div>
             </div>
             <div className="max-h-80 overflow-y-auto">
-              {notifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={cn(
-                    "flex gap-3 px-4 py-3.5 hover:bg-muted/40 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-border/20 dark:border-white/5 last:border-0",
-                    notif.unread && "bg-primary/[0.03] dark:bg-primary/[0.06]"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                      notif.unread ? "bg-primary" : "bg-transparent"
-                    )}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {notif.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                      {notif.desc}
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
-                    {notif.time}
-                  </span>
+              {notifications.length === 0 ? (
+                <div className="px-4 py-10 text-center text-xs text-muted-foreground">
+                  Nenhuma notificação ainda
                 </div>
-              ))}
+              ) : (
+                notifications.map((notif) => {
+                  const isUnread = new Date(notif.createdAt).getTime() > lastRead;
+                  const { icon: Icon, color } = notifIcon(notif.type);
+                  return (
+                    <div
+                      key={notif.id}
+                      className={cn(
+                        "flex gap-3 px-4 py-3.5 hover:bg-muted/40 dark:hover:bg-white/5 transition-colors border-b border-border/20 dark:border-white/5 last:border-0",
+                        isUnread && "bg-primary/[0.03] dark:bg-primary/[0.06]"
+                      )}
+                    >
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5", color)}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-foreground truncate">{notif.title}</p>
+                          {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.desc}</p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5 whitespace-nowrap">
+                        {timeAgo(notif.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
             </div>
-            <div className="p-3 border-t border-border/40 dark:border-white/8">
-              <button className="w-full text-center text-xs font-semibold text-primary hover:underline">
-                Ver todas as notificações
-              </button>
-            </div>
+            {notifications.length > 0 && (
+              <div className="p-3 border-t border-border/40 dark:border-white/8">
+                <button
+                  onClick={markAllRead}
+                  className="w-full text-center text-xs font-semibold text-primary hover:underline"
+                >
+                  Marcar todas como lidas
+                </button>
+              </div>
+            )}
           </DropdownWrapper>
         </div>
 
