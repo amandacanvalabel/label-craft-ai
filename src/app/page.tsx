@@ -5,10 +5,12 @@ import DemonstrationCentral from "@/components/home/DemonstrationCentral";
 import Planos from "@/components/home/Planos";
 import Avaliacoes from "@/components/home/Avaliacoes";
 import Footer from "@/components/home/Footer";
+import TrackPageView from "@/components/home/TrackPageView";
 
 const HomePage = () => {
   return (
     <>
+      <TrackPageView />
       <Header />
       <HeroHome />
       <BeneficiosCarrousel />

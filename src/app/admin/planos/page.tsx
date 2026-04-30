@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   HiOutlineRectangleGroup,
   HiOutlinePlus,
@@ -11,8 +11,11 @@ import {
   HiOutlineBanknotes,
   HiOutlineUsers,
   HiOutlineSparkles,
+  HiOutlineArrowPath,
+  HiOutlineExclamationTriangle,
 } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import PageHeader from "@/components/admin/PageHeader";
 import StatCard from "@/components/admin/StatCard";
 import Badge from "@/components/admin/Badge";
@@ -28,19 +31,22 @@ interface Plan {
   price: number;
   promotionalPrice: number | null;
   isActive: boolean;
-  subscribers: number;
-  revenue: string;
   benefits: string[];
+  subscriberCount: number;
+  totalRevenue: number;
 }
 
-const initialPlans: Plan[] = [
-  { id: "PLN-001", name: "Starter", description: "Ideal para quem está começando", type: "MONTHLY", price: 49.90, promotionalPrice: 39.90, isActive: true, subscribers: 420, revenue: "R$ 16.758", benefits: ["10 rótulos/mês", "2 modelos de IA", "Suporte por email", "Exportação PNG"] },
-  { id: "PLN-002", name: "Profissional", description: "Para profissionais e pequenas empresas", type: "MONTHLY", price: 99.90, promotionalPrice: 79.90, isActive: true, subscribers: 650, revenue: "R$ 51.935", benefits: ["50 rótulos/mês", "Todos os modelos de IA", "Suporte prioritário", "Exportação PNG/PDF/SVG", "Templates premium", "Conformidade ANVISA"] },
-  { id: "PLN-003", name: "Enterprise", description: "Para grandes operações e indústrias", type: "MONTHLY", price: 299.90, promotionalPrice: 249.90, isActive: true, subscribers: 178, revenue: "R$ 44.482", benefits: ["Rótulos ilimitados", "Todos os modelos de IA", "Suporte 24/7", "Todos os formatos", "API de integração", "White label", "Gerente de conta", "Conformidade ANVISA+"] },
-  { id: "PLN-004", name: "Trial", description: "Período de teste gratuito — 14 dias", type: "MONTHLY", price: 0, promotionalPrice: null, isActive: false, subscribers: 0, revenue: "R$ 0", benefits: ["5 rótulos", "1 modelo de IA", "Suporte por email"] },
-];
+interface DashData {
+  stats: {
+    activePlans: number;
+    subscriberTotal: number;
+    totalRevenue: number;
+    mostPopularName: string;
+  };
+  plans: Plan[];
+}
 
-const typeLabels: Record<string, string> = {
+const TYPE_LABELS: Record<string, string> = {
   MONTHLY: "Mensal",
   QUARTERLY: "Trimestral",
   SEMIANNUAL: "Semestral",
@@ -48,66 +54,156 @@ const typeLabels: Record<string, string> = {
   LIFETIME: "Vitalício",
 };
 
-const stats = [
-  { label: "Planos Ativos", value: "3", icon: HiOutlineRectangleGroup, iconColor: "text-blue-500 bg-blue-50 dark:bg-blue-500/15" },
-  { label: "Assinantes (Total)", value: "1.248", change: 12, icon: HiOutlineUsers, iconColor: "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/15" },
-  { label: "Receita (Planos)", value: "R$ 113.175", change: 8, icon: HiOutlineBanknotes, iconColor: "text-violet-500 bg-violet-50 dark:bg-violet-500/15" },
-  { label: "Plano Mais Popular", value: "Profissional", icon: HiOutlineSparkles, iconColor: "text-amber-500 bg-amber-50 dark:bg-amber-500/15" },
-];
+function fmtCurrency(val: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+}
 
-const emptyPlan = { id: "", name: "", description: "", type: "MONTHLY", price: 0, promotionalPrice: null as number | null, isActive: true, subscribers: 0, revenue: "R$ 0", benefits: [] as string[] };
+const emptyForm = {
+  name: "", description: "", type: "MONTHLY",
+  price: 0, promotionalPrice: null as number | null,
+  isActive: true, benefits: [] as string[],
+};
+
+const Skeleton = ({ className }: { className?: string }) => (
+  <div className={cn("rounded-2xl bg-muted/50 dark:bg-white/5 animate-pulse", className)} />
+);
 
 export default function PlanosPage() {
-  const [plans, setPlans] = useState(initialPlans);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Plan | null>(null);
-  const [form, setForm] = useState(emptyPlan);
-  const [benefitInput, setBenefitInput] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [data, setData] = useState<DashData | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm({ ...emptyPlan, id: `PLN-${String(plans.length + 1).padStart(3, "0")}` });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [benefitInput, setBenefitInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    fetch("/api/admin/plans")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  function openCreate() {
+    setEditingId(null);
+    setForm({ ...emptyForm });
+    setBenefitInput("");
     setModalOpen(true);
-  };
+  }
 
-  const openEdit = (plan: Plan) => {
-    setEditing(plan);
-    setForm({ ...plan });
+  function openEdit(plan: Plan) {
+    setEditingId(plan.id);
+    setForm({
+      name: plan.name,
+      description: plan.description,
+      type: plan.type,
+      price: plan.price,
+      promotionalPrice: plan.promotionalPrice,
+      isActive: plan.isActive,
+      benefits: [...plan.benefits],
+    });
+    setBenefitInput("");
     setModalOpen(true);
-  };
+  }
 
-  const handleSave = () => {
-    if (editing) {
-      setPlans(plans.map((p) => (p.id === editing.id ? { ...form } : p)));
-    } else {
-      setPlans([...plans, { ...form }]);
-    }
-    setModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    setPlans(plans.filter((p) => p.id !== id));
-    setDeleteConfirm(null);
-  };
-
-  const addBenefit = () => {
+  function addBenefit() {
     if (benefitInput.trim()) {
-      setForm({ ...form, benefits: [...form.benefits, benefitInput.trim()] });
+      setForm((f) => ({ ...f, benefits: [...f.benefits, benefitInput.trim()] }));
       setBenefitInput("");
     }
-  };
+  }
 
-  const removeBenefit = (i: number) => {
-    setForm({ ...form, benefits: form.benefits.filter((_, idx) => idx !== i) });
-  };
+  function removeBenefit(i: number) {
+    setForm((f) => ({ ...f, benefits: f.benefits.filter((_, idx) => idx !== i) }));
+  }
 
-  const filtered = plans.filter((p) => {
+  async function handleSave() {
+    if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    setSaving(true);
+    try {
+      const url = editingId ? `/api/admin/plans/${editingId}` : "/api/admin/plans";
+      const method = editingId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error ?? "Erro ao salvar");
+        return;
+      }
+      toast.success(editingId ? "Plano atualizado" : "Plano criado");
+      setModalOpen(false);
+      load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/plans/${deleteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error ?? "Erro ao excluir");
+        return;
+      }
+      toast.success("Plano excluído");
+      setDeleteId(null);
+      load();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const s = data?.stats;
+  const statCards = [
+    {
+      label: "Planos Ativos",
+      value: loading ? "…" : String(s?.activePlans ?? 0),
+      icon: HiOutlineRectangleGroup,
+      iconColor: "text-blue-500 bg-blue-50 dark:bg-blue-500/15",
+    },
+    {
+      label: "Assinantes (Total)",
+      value: loading ? "…" : String(s?.subscriberTotal ?? 0),
+      icon: HiOutlineUsers,
+      iconColor: "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/15",
+    },
+    {
+      label: "Receita (Total)",
+      value: loading ? "…" : fmtCurrency(s?.totalRevenue ?? 0),
+      icon: HiOutlineBanknotes,
+      iconColor: "text-violet-500 bg-violet-50 dark:bg-violet-500/15",
+    },
+    {
+      label: "Plano Mais Popular",
+      value: loading ? "…" : (s?.mostPopularName ?? "—"),
+      icon: HiOutlineSparkles,
+      iconColor: "text-amber-500 bg-amber-50 dark:bg-amber-500/15",
+    },
+  ];
+
+  const filtered = (data?.plans ?? []).filter((p) => {
     if (filter === "active") return p.isActive;
     if (filter === "inactive") return !p.isActive;
     return true;
   });
+
+  const deletingPlan = data?.plans.find((p) => p.id === deleteId);
 
   return (
     <div>
@@ -115,16 +211,21 @@ export default function PlanosPage() {
         title="Planos"
         subtitle="Gerencie os planos de assinatura da plataforma"
         actions={
-          <Button variant="primary" size="sm" onClick={openCreate}>
-            <HiOutlinePlus className="w-4 h-4" />
-            Novo Plano
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={load}>
+              <HiOutlineArrowPath className={cn("w-4 h-4", loading && "animate-spin")} />
+            </Button>
+            <Button variant="primary" size="sm" onClick={openCreate}>
+              <HiOutlinePlus className="w-4 h-4" />
+              Novo Plano
+            </Button>
+          </div>
         }
       />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        {stats.map((stat, i) => <StatCard key={stat.label} {...stat} delay={i * 0.08} />)}
+        {statCards.map((stat, i) => <StatCard key={stat.label} {...stat} delay={i * 0.08} />)}
       </div>
 
       {/* Filters */}
@@ -135,7 +236,9 @@ export default function PlanosPage() {
             onClick={() => setFilter(f)}
             className={cn(
               "px-4 py-2 text-xs font-bold rounded-xl transition-all",
-              filter === f ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-muted/50 dark:bg-white/5 text-muted-foreground hover:text-foreground"
+              filter === f
+                ? "bg-primary text-white shadow-md shadow-primary/20"
+                : "bg-muted/50 dark:bg-white/5 text-muted-foreground hover:text-foreground"
             )}
           >
             {f === "all" ? "Todos" : f === "active" ? "Ativos" : "Inativos"}
@@ -144,96 +247,118 @@ export default function PlanosPage() {
       </div>
 
       {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((plan, i) => (
-            <motion.div
-              key={plan.id}
-              className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 shadow-sm overflow-hidden group hover:shadow-md transition-shadow"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, delay: i * 0.05 }}
-              layout
-            >
-              {/* Header */}
-              <div className="p-5 pb-4 flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-extrabold text-foreground">{plan.name}</h3>
-                    <Badge variant={plan.isActive ? "success" : "default"} dot>{plan.isActive ? "Ativo" : "Inativo"}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(plan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all">
-                    <HiOutlinePencilSquare className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => setDeleteConfirm(plan.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all">
-                    <HiOutlineTrash className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div className="px-5 pb-4">
-                <div className="flex items-baseline gap-2">
-                  {plan.promotionalPrice !== null ? (
-                    <>
-                      <span className="text-3xl font-extrabold text-foreground">R$ {plan.promotionalPrice.toFixed(2)}</span>
-                      <span className="text-sm text-muted-foreground line-through">R$ {plan.price.toFixed(2)}</span>
-                    </>
-                  ) : (
-                    <span className="text-3xl font-extrabold text-foreground">{plan.price === 0 ? "Grátis" : `R$ ${plan.price.toFixed(2)}`}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground">/{typeLabels[plan.type]?.toLowerCase()}</span>
-                </div>
-              </div>
-
-              {/* Metrics */}
-              <div className="px-5 pb-4 grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 dark:bg-white/[0.03] rounded-xl p-3 text-center">
-                  <p className="text-lg font-extrabold text-foreground">{plan.subscribers}</p>
-                  <p className="text-[10px] text-muted-foreground">assinantes</p>
-                </div>
-                <div className="bg-muted/30 dark:bg-white/[0.03] rounded-xl p-3 text-center">
-                  <p className="text-lg font-extrabold text-foreground">{plan.revenue}</p>
-                  <p className="text-[10px] text-muted-foreground">receita/mês</p>
-                </div>
-              </div>
-
-              {/* Benefits */}
-              <div className="px-5 pb-5 border-t border-border/30 dark:border-white/5 pt-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Benefícios</p>
-                <div className="space-y-1.5">
-                  {plan.benefits.slice(0, 4).map((b) => (
-                    <div key={b} className="flex items-center gap-2 text-xs text-foreground">
-                      <HiOutlineCheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      {b}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-72" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-16">Nenhum plano encontrado</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((plan, i) => (
+              <motion.div
+                key={plan.id}
+                className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 shadow-sm overflow-hidden group hover:shadow-md transition-shadow"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                layout
+              >
+                {/* Header */}
+                <div className="p-5 pb-4 flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-extrabold text-foreground">{plan.name}</h3>
+                      <Badge variant={plan.isActive ? "success" : "default"} dot>
+                        {plan.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
                     </div>
-                  ))}
-                  {plan.benefits.length > 4 && (
-                    <p className="text-[10px] text-primary font-semibold ml-5">+{plan.benefits.length - 4} mais</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{plan.description || "Sem descrição"}</p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => openEdit(plan)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                    >
+                      <HiOutlinePencilSquare className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(plan.id)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all"
+                    >
+                      <HiOutlineTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="px-5 pb-4">
+                  <div className="flex items-baseline gap-2">
+                    {plan.promotionalPrice !== null ? (
+                      <>
+                        <span className="text-3xl font-extrabold text-foreground">{fmtCurrency(plan.promotionalPrice)}</span>
+                        <span className="text-sm text-muted-foreground line-through">{fmtCurrency(plan.price)}</span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-extrabold text-foreground">
+                        {plan.price === 0 ? "Grátis" : fmtCurrency(plan.price)}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">/{TYPE_LABELS[plan.type]?.toLowerCase()}</span>
+                  </div>
+                </div>
+
+                {/* Metrics */}
+                <div className="px-5 pb-4 grid grid-cols-2 gap-3">
+                  <div className="bg-muted/30 dark:bg-white/[0.03] rounded-xl p-3 text-center">
+                    <p className="text-lg font-extrabold text-foreground">{plan.subscriberCount}</p>
+                    <p className="text-[10px] text-muted-foreground">assinantes</p>
+                  </div>
+                  <div className="bg-muted/30 dark:bg-white/[0.03] rounded-xl p-3 text-center">
+                    <p className="text-lg font-extrabold text-foreground">{fmtCurrency(plan.totalRevenue)}</p>
+                    <p className="text-[10px] text-muted-foreground">receita total</p>
+                  </div>
+                </div>
+
+                {/* Benefits */}
+                <div className="px-5 pb-5 border-t border-border/30 dark:border-white/5 pt-4">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Benefícios</p>
+                  {plan.benefits.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">Nenhum benefício cadastrado</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {plan.benefits.slice(0, 4).map((b) => (
+                        <div key={b} className="flex items-center gap-2 text-xs text-foreground">
+                          <HiOutlineCheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          {b}
+                        </div>
+                      ))}
+                      {plan.benefits.length > 4 && (
+                        <p className="text-[10px] text-primary font-semibold ml-5">+{plan.benefits.length - 4} mais</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? "Editar Plano" : "Novo Plano"}
-        subtitle={editing ? `Editando ${editing.name}` : "Preencha os dados do novo plano"}
+        title={editingId ? "Editar Plano" : "Novo Plano"}
+        subtitle={editingId ? `Editando ${form.name}` : "Preencha os dados do novo plano"}
         size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={handleSave}>
-              {editing ? "Salvar Alterações" : "Criar Plano"}
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              {saving ? "Salvando…" : editingId ? "Salvar Alterações" : "Criar Plano"}
             </Button>
           </>
         }
@@ -241,33 +366,33 @@ export default function PlanosPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Nome do Plano" required>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Profissional" />
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ex: Profissional" />
             </FormField>
             <FormField label="Tipo">
-              <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              <Select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+                {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </FormField>
           </div>
 
           <FormField label="Descrição">
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descrição breve do plano" rows={2} />
+            <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descrição breve do plano" rows={2} />
           </FormField>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Preço (R$)" required>
-              <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+              <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value) }))} />
             </FormField>
             <FormField label="Preço Promocional (R$)" hint="Deixe 0 para sem promoção">
-              <Input type="number" step="0.01" value={form.promotionalPrice ?? 0} onChange={(e) => setForm({ ...form, promotionalPrice: Number(e.target.value) || null })} />
+              <Input type="number" step="0.01" min="0" value={form.promotionalPrice ?? 0} onChange={(e) => setForm((f) => ({ ...f, promotionalPrice: Number(e.target.value) || null }))} />
             </FormField>
           </div>
 
-          <FormField label="Ativo">
-            <Toggle checked={form.isActive} onChange={(v) => setForm({ ...form, isActive: v })} label={form.isActive ? "Plano ativo e visível" : "Plano inativo"} />
+          <FormField label="Status">
+            <Toggle checked={form.isActive} onChange={(v) => setForm((f) => ({ ...f, isActive: v }))} label={form.isActive ? "Plano ativo e visível" : "Plano inativo"} />
           </FormField>
 
-          <FormField label="Benefícios">
+          <FormField label="Benefícios" hint="Pressione Enter ou clique + para adicionar">
             <div className="flex gap-2">
               <Input
                 value={benefitInput}
@@ -297,24 +422,34 @@ export default function PlanosPage() {
 
       {/* Delete Confirm */}
       <Modal
-        isOpen={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
         title="Excluir Plano"
         subtitle="Esta ação não pode ser desfeita"
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>
+            <Button variant="secondary" onClick={() => setDeleteId(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={handleDelete} disabled={deleting}>
               <HiOutlineTrash className="w-4 h-4" />
-              Excluir
+              {deleting ? "Excluindo…" : "Excluir"}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-muted-foreground">
-          Tem certeza que deseja excluir este plano? Assinantes vinculados serão afetados.
-        </p>
+        <div className="space-y-3">
+          {deletingPlan && deletingPlan.subscriberCount > 0 && (
+            <div className="flex items-center gap-2.5 p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
+              <HiOutlineExclamationTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Este plano tem <strong>{deletingPlan.subscriberCount} assinante(s)</strong>. A exclusão será bloqueada.
+              </p>
+            </div>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Tem certeza que deseja excluir o plano <strong className="text-foreground">{deletingPlan?.name}</strong>?
+          </p>
+        </div>
       </Modal>
     </div>
   );

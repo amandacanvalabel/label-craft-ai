@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiOutlineBell,
@@ -103,57 +104,96 @@ const TopbarButton = ({
   </button>
 );
 
-// Subscriber plan info for profile dropdown
-const SubscriberPlanInfo = () => {
-  const activationDate = new Date("2025-11-15");
-  const expirationDate = new Date("2026-11-15");
-  const now = new Date();
-  const totalDays = Math.ceil(
-    (expirationDate.getTime() - activationDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  const usedDays = Math.ceil(
-    (now.getTime() - activationDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  const remainingDays = Math.max(0, totalDays - usedDays);
-  const progress = Math.min(100, Math.max(0, (usedDays / totalDays) * 100));
+interface PlanInfo {
+  planName: string;
+  planType: string;
+  activatedAt: string | null;
+  expiresAt: string | null;
+}
 
-  const formatDate = (d: Date) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+const PLAN_TYPE_LABEL: Record<string, string> = {
+  MONTHLY: "Mensal", QUARTERLY: "Trimestral", SEMIANNUAL: "Semestral",
+  ANNUAL: "Anual", LIFETIME: "Vitalício",
+};
+
+function fmtDate(iso: string) {
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
+const SubscriberPlanInfo = ({ planInfo }: { planInfo: PlanInfo | null }) => {
+  const [barWidth, setBarWidth] = useState(0);
+
+  const hasPlan = !!planInfo;
+  const isLifetime = hasPlan && (planInfo.planType === "LIFETIME" || !planInfo.expiresAt);
+  const now = Date.now();
+  const start = planInfo?.activatedAt ? new Date(planInfo.activatedAt).getTime() : now;
+  const end = planInfo?.expiresAt ? new Date(planInfo.expiresAt).getTime() : now;
+  const total = end - start || 1;
+  const pct = !hasPlan ? 0 : isLifetime ? 100 : Math.min(100, Math.max(0, Math.round(((now - start) / total) * 100)));
+  const daysLeft = (!hasPlan || isLifetime) ? null : Math.max(0, Math.ceil((end - now) / 86_400_000));
+
+  const barColor = !hasPlan ? "bg-muted" : pct >= 80 ? "bg-red-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500";
+
+  useEffect(() => {
+    const t = setTimeout(() => setBarWidth(hasPlan ? (isLifetime ? 100 : pct) : 0), 150);
+    return () => clearTimeout(t);
+  }, [hasPlan, isLifetime, pct]);
+
+  if (!hasPlan) {
+    return (
+      <div className="p-4 border-t border-border/40 dark:border-white/8">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold text-foreground">Plano</span>
+          <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Sem plano</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-muted dark:bg-white/8 mb-3" />
+        <Link
+          href="/dashboard/meu-plano"
+          className="block w-full text-center text-[11px] font-semibold text-primary bg-primary/8 hover:bg-primary/15 rounded-lg py-1.5 transition-colors"
+        >
+          Ver planos disponíveis →
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 border-t border-border/40 dark:border-white/8 space-y-3.5">
-      {/* Plan name */}
+    <div className="p-4 border-t border-border/40 dark:border-white/8 space-y-3">
+      {/* Plan name row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center">
             <HiOutlineSparkles className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
           </div>
-          <span className="text-xs font-bold text-foreground">Plano Profissional</span>
+          <span className="text-xs font-bold text-foreground">{planInfo.planName}</span>
         </div>
-        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded-full">
-          Ativo
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+          {PLAN_TYPE_LABEL[planInfo.planType] ?? planInfo.planType}
         </span>
       </div>
 
       {/* Progress bar */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Ciclo do plano</span>
-          <span className="text-[10px] font-bold text-foreground">{remainingDays} dias restantes</span>
+      {!isLifetime && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-muted-foreground font-medium">Ciclo do plano</span>
+            <span className="text-[10px] font-bold text-foreground">
+              {daysLeft === 0 ? "Expira hoje" : `${daysLeft}d restantes`}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted dark:bg-white/8 overflow-hidden">
+            <motion.div
+              className={cn("h-full rounded-full transition-all duration-700", barColor)}
+              initial={{ width: 0 }}
+              animate={{ width: `${barWidth}%` }}
+              transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.2 }}
+            />
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-[9px] text-muted-foreground">{pct}% utilizado</span>
+          </div>
         </div>
-        <div className="h-2 rounded-full bg-muted dark:bg-white/8 overflow-hidden">
-          <motion.div
-            className="h-full rounded-full progress-gradient"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.2 }}
-          />
-        </div>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[9px] text-muted-foreground">{Math.round(progress)}% utilizado</span>
-          <span className="text-[9px] text-muted-foreground">{totalDays} dias total</span>
-        </div>
-      </div>
+      )}
 
       {/* Dates */}
       <div className="grid grid-cols-2 gap-2">
@@ -162,23 +202,18 @@ const SubscriberPlanInfo = () => {
             <HiOutlineCalendarDays className="w-3 h-3 text-primary" />
             <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Ativação</span>
           </div>
-          <p className="text-[11px] font-bold text-foreground">{formatDate(activationDate)}</p>
+          <p className="text-[11px] font-bold text-foreground">
+            {planInfo.activatedAt ? fmtDate(planInfo.activatedAt) : "—"}
+          </p>
         </div>
         <div className="bg-muted/50 dark:bg-white/5 rounded-xl p-2.5">
           <div className="flex items-center gap-1.5 mb-1">
             <HiOutlineCalendarDays className="w-3 h-3 text-amber-500" />
             <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Expiração</span>
           </div>
-          <p className="text-[11px] font-bold text-foreground">{formatDate(expirationDate)}</p>
-        </div>
-      </div>
-
-      {/* Payment info */}
-      <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 rounded-xl p-2.5">
-        <HiOutlineCreditCard className="w-4 h-4 text-muted-foreground shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] text-muted-foreground">Próxima cobrança</p>
-          <p className="text-[11px] font-bold text-foreground">R$ 79,90 — 15 Nov 2026</p>
+          <p className="text-[11px] font-bold text-foreground">
+            {isLifetime ? "∞ Vitalício" : planInfo.expiresAt ? fmtDate(planInfo.expiresAt) : "—"}
+          </p>
         </div>
       </div>
     </div>
@@ -192,6 +227,7 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentLang, setCurrentLang] = useState("pt-BR");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -206,12 +242,15 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
     }
   }, []);
 
-  // Load avatar for subscribers
+  // Load avatar + plan info from /api/auth/me (single request)
   useEffect(() => {
     if (user.role !== "SUBSCRIBER") return;
-    fetch("/api/subscriber/profile")
+    fetch("/api/auth/me")
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.avatar) setAvatarUrl(data.avatar); })
+      .then((data) => {
+        if (data?.avatar) setAvatarUrl(data.avatar);
+        if (data?.planInfo) setPlanInfo(data.planInfo);
+      })
       .catch(() => {});
   }, [user.role]);
 
@@ -452,7 +491,7 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
             </div>
 
             {/* Subscriber plan info */}
-            {user.role === "SUBSCRIBER" && <SubscriberPlanInfo />}
+            {user.role === "SUBSCRIBER" && <SubscriberPlanInfo planInfo={planInfo} />}
 
             {/* Actions */}
             <div className="p-2">

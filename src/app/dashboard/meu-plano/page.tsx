@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  HiOutlineRectangleGroup,
   HiOutlineCalendarDays,
   HiOutlineCreditCard,
   HiOutlineCheckCircle,
@@ -15,85 +14,102 @@ import {
   HiOutlineCloudArrowUp,
   HiOutlineDocumentText,
   HiOutlineReceiptPercent,
+  HiOutlineExclamationCircle,
+  HiOutlineArrowTopRightOnSquare,
 } from "react-icons/hi2";
 import PageHeader from "@/components/admin/PageHeader";
 import Badge from "@/components/admin/Badge";
 import { Button } from "@/components/admin/FormField";
 import { cn } from "@/lib/utils";
 
-const currentPlan = {
-  name: "Profissional",
-  price: "R$ 79,90",
-  period: "mês",
-  activatedAt: "15 Jan 2026",
-  expiresAt: "15 Jan 2027",
-  method: "PIX",
-  status: "active" as const,
-  nextBilling: "15 Abr 2026",
+const PLAN_DURATION_DAYS: Record<string, number> = {
+  MONTHLY: 30, QUARTERLY: 90, SEMIANNUAL: 180, ANNUAL: 365, LIFETIME: 0,
 };
 
-const planFeatures = [
-  { label: "Rótulos por mês", value: "100", icon: HiOutlineDocumentText },
-  { label: "Gerações de IA", value: "200", icon: HiOutlineSparkles },
-  { label: "Armazenamento", value: "5 GB", icon: HiOutlineCloudArrowUp },
-  { label: "Modelos de IA", value: "3 ativos", icon: HiOutlineBolt },
-  { label: "Suporte", value: "Prioritário", icon: HiOutlineShieldCheck },
-  { label: "Exportar PDF/PNG", value: "Ilimitado", icon: HiOutlineReceiptPercent },
+const PLAN_TYPE_LABEL: Record<string, string> = {
+  MONTHLY: "mês", QUARTERLY: "trimestre", SEMIANNUAL: "semestre",
+  ANNUAL: "ano", LIFETIME: "vitalício",
+};
+
+const STATUS_BADGE: Record<string, { variant: "success" | "warning" | "error" | "default"; label: string }> = {
+  CONFIRMED: { variant: "success", label: "Pago" },
+  PENDING: { variant: "warning", label: "Pendente" },
+  CANCELLED: { variant: "error", label: "Cancelado" },
+  REFUNDED: { variant: "default", label: "Reembolsado" },
+};
+
+function fmtDate(iso: string) {
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
+function fmtCurrency(amount: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
+}
+
+interface CurrentPlan {
+  id: string; name: string; type: string; price: number;
+  promotionalPrice: number | null; benefits: string[];
+  activatedAt: string; expiresAt: string | null;
+  lastPaymentMethod: string | null;
+}
+
+interface AvailablePlan {
+  id: string; name: string; type: string; price: number;
+  promotionalPrice: number | null; benefits: string[]; description: string | null;
+}
+
+interface BillingEntry {
+  id: string; date: string; amount: number;
+  method: string; status: string; statusLabel: string; invoiceUrl: string | null;
+}
+
+interface PlanData {
+  currentPlan: CurrentPlan | null;
+  usage: { labelsCreated: number };
+  billingHistory: BillingEntry[];
+  availablePlans: AvailablePlan[];
+}
+
+const featureIcons = [
+  HiOutlineDocumentText, HiOutlineSparkles, HiOutlineCloudArrowUp,
+  HiOutlineBolt, HiOutlineShieldCheck, HiOutlineReceiptPercent,
 ];
 
-const usageLimits = [
-  { label: "Rótulos criados", used: 24, total: 100, color: "bg-blue-500" },
-  { label: "Gerações de IA", used: 48, total: 200, color: "bg-violet-500" },
-  { label: "Armazenamento", used: 1.2, total: 5, color: "bg-emerald-500", unit: "GB" },
-];
-
-const plans = [
-  {
-    name: "Starter",
-    price: "R$ 39,90",
-    desc: "Para quem está começando",
-    features: ["30 rótulos/mês", "50 gerações IA", "1 GB armazenamento", "1 modelo IA", "Suporte email"],
-    current: false,
-    popular: false,
-    color: "border-border/40 dark:border-white/8",
-  },
-  {
-    name: "Profissional",
-    price: "R$ 79,90",
-    desc: "Para negócios em crescimento",
-    features: ["100 rótulos/mês", "200 gerações IA", "5 GB armazenamento", "3 modelos IA", "Suporte prioritário", "Exportar PDF/PNG"],
-    current: true,
-    popular: true,
-    color: "border-primary/50 ring-2 ring-primary/20",
-  },
-  {
-    name: "Enterprise",
-    price: "R$ 199,90",
-    desc: "Para grandes operações",
-    features: ["Ilimitado rótulos", "Ilimitado gerações IA", "50 GB armazenamento", "Todos modelos IA", "Suporte 24/7 dedicado", "API personalizada", "White label"],
-    current: false,
-    popular: false,
-    color: "border-border/40 dark:border-white/8",
-  },
-];
-
-const billingHistory = [
-  { id: "PAY-012", date: "15 Mar 2026", amount: "R$ 79,90", method: "PIX", status: "paid" },
-  { id: "PAY-011", date: "15 Fev 2026", amount: "R$ 79,90", method: "PIX", status: "paid" },
-  { id: "PAY-010", date: "15 Jan 2026", amount: "R$ 79,90", method: "PIX", status: "paid" },
-  { id: "PAY-009", date: "15 Dez 2025", amount: "R$ 39,90", method: "PIX", status: "paid" },
-  { id: "PAY-008", date: "15 Nov 2025", amount: "R$ 39,90", method: "PIX", status: "paid" },
-];
+// Skeleton card
+const Skeleton = ({ className }: { className?: string }) => (
+  <div className={cn("rounded-xl bg-muted/50 dark:bg-white/5 animate-pulse", className)} />
+);
 
 export default function MeuPlanoPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "plans" | "billing">("overview");
+  const [data, setData] = useState<PlanData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/subscriber/plan")
+      .then((r) => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then((d) => setData(d))
+      .catch(() => setError("Não foi possível carregar os dados do plano."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const cp = data?.currentPlan ?? null;
+
+  // Progress calculation
+  const now = Date.now();
+  const start = cp?.activatedAt ? new Date(cp.activatedAt).getTime() : now;
+  const end = cp?.expiresAt ? new Date(cp.expiresAt).getTime() : now;
+  const isLifetime = cp?.type === "LIFETIME" || !cp?.expiresAt;
+  const totalMs = end - start || 1;
+  const usedMs = now - start;
+  const planPct = isLifetime ? 100 : Math.min(100, Math.max(0, Math.round((usedMs / totalMs) * 100)));
+  const daysLeft = isLifetime ? null : Math.max(0, Math.ceil((end - now) / 86_400_000));
+  const planDuration = cp ? (PLAN_DURATION_DAYS[cp.type] ?? 30) : 30;
 
   return (
     <div>
-      <PageHeader
-        title="Meu Plano"
-        subtitle="Gerencie sua assinatura e pagamentos"
-      />
+      <PageHeader title="Meu Plano" subtitle="Gerencie sua assinatura e pagamentos" />
 
       {/* Tabs */}
       <motion.div
@@ -122,7 +138,15 @@ export default function MeuPlanoPage() {
         ))}
       </motion.div>
 
-      {/* Overview Tab */}
+      {/* Error state */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 mb-6">
+          <HiOutlineExclamationCircle className="w-5 h-5 text-red-500 shrink-0" />
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* ── Overview Tab ── */}
       {activeTab === "overview" && (
         <div className="space-y-6">
           {/* Current Plan Card */}
@@ -136,42 +160,92 @@ export default function MeuPlanoPage() {
               <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-white blur-3xl" />
             </div>
             <div className="relative z-10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="success" dot className="!bg-white/20 !text-white">Ativo</Badge>
+              {loading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-6 w-32 !bg-white/20" />
+                  <Skeleton className="h-10 w-56 !bg-white/20" />
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 !bg-white/20" />)}
                   </div>
-                  <h2 className="text-3xl font-extrabold text-white">Plano {currentPlan.name}</h2>
-                  <p className="text-white/60 text-sm mt-1">
-                    <span className="text-white font-bold text-2xl">{currentPlan.price}</span>
-                    <span className="text-white/50">/{currentPlan.period}</span>
-                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" className="!bg-white/15 !border-white/20 !text-white hover:!bg-white/25">
-                    <HiOutlineArrowPath className="w-4 h-4" />
-                    Alterar Plano
+              ) : cp ? (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="success" dot className="!bg-white/20 !text-white">Ativo</Badge>
+                      </div>
+                      <h2 className="text-3xl font-extrabold text-white">Plano {cp.name}</h2>
+                      <p className="text-white/60 text-sm mt-1">
+                        <span className="text-white font-bold text-2xl">{fmtCurrency(cp.promotionalPrice ?? cp.price)}</span>
+                        <span className="text-white/50">/{PLAN_TYPE_LABEL[cp.type] ?? cp.type}</span>
+                      </p>
+                    </div>
+                    <Button variant="secondary" size="sm" className="!bg-white/15 !border-white/20 !text-white hover:!bg-white/25"
+                      onClick={() => setActiveTab("plans")}>
+                      <HiOutlineArrowPath className="w-4 h-4" />
+                      Alterar Plano
+                    </Button>
+                  </div>
+
+                  {/* Progress bar */}
+                  {!isLifetime && (
+                    <div className="mt-5 mb-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Ciclo do plano</span>
+                        <span className="text-[11px] font-bold text-white">
+                          {daysLeft === 0 ? "Expira hoje" : `${daysLeft} dias restantes`}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/20 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-white/80"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${planPct}%` }}
+                          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[9px] text-white/50">{planPct}% utilizado</span>
+                        <span className="text-[9px] text-white/50">{planDuration} dias total</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
+                    <div>
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Ativação</p>
+                      <p className="text-sm font-bold text-white mt-0.5">{fmtDate(cp.activatedAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Expiração</p>
+                      <p className="text-sm font-bold text-white mt-0.5">
+                        {isLifetime ? "∞ Vitalício" : cp.expiresAt ? fmtDate(cp.expiresAt) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Método</p>
+                      <p className="text-sm font-bold text-white mt-0.5">{cp.lastPaymentMethod ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Próx. Renovação</p>
+                      <p className="text-sm font-bold text-white mt-0.5">
+                        {isLifetime ? "—" : cp.expiresAt ? fmtDate(cp.expiresAt) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-white font-bold text-lg">Nenhum plano ativo</p>
+                  <p className="text-white/60 text-sm mt-1">Escolha um plano para começar</p>
+                  <Button variant="secondary" size="sm" className="!bg-white/15 !border-white/20 !text-white hover:!bg-white/25 mt-4"
+                    onClick={() => setActiveTab("plans")}>
+                    <HiOutlineArrowUpCircle className="w-4 h-4" />
+                    Ver Planos
                   </Button>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Ativação</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{currentPlan.activatedAt}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Expiração</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{currentPlan.expiresAt}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Método</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{currentPlan.method}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Próx. Cobrança</p>
-                  <p className="text-sm font-bold text-white mt-0.5">{currentPlan.nextBilling}</p>
-                </div>
-              </div>
+              )}
             </div>
           </motion.div>
 
@@ -184,33 +258,53 @@ export default function MeuPlanoPage() {
               transition={{ duration: 0.4, delay: 0.2 }}
             >
               <h3 className="text-sm font-bold text-foreground mb-5">Uso do Plano</h3>
-              <div className="space-y-5">
-                {usageLimits.map((item) => {
-                  const pct = Math.round((item.used / item.total) * 100);
-                  return (
+              {loading ? (
+                <div className="space-y-5">
+                  {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Labels created — real data */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-foreground">Rótulos criados</span>
+                      <span className="text-xs font-bold text-foreground">
+                        {data?.usage.labelsCreated ?? 0}
+                        <span className="text-muted-foreground font-normal"> salvos</span>
+                      </span>
+                    </div>
+                    <div className="h-2.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-blue-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, ((data?.usage.labelsCreated ?? 0) / 100) * 100)}%` }}
+                        transition={{ duration: 0.8, delay: 0.3 }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{data?.usage.labelsCreated ?? 0} modelo(s) salvo(s)</p>
+                  </div>
+
+                  {/* Placeholder metrics */}
+                  {[
+                    { label: "Gerações de IA", note: "em breve", color: "bg-violet-500" },
+                    { label: "Armazenamento", note: "em breve", color: "bg-emerald-500" },
+                  ].map((item) => (
                     <div key={item.label}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-foreground">{item.label}</span>
-                        <span className="text-xs font-bold text-foreground">
-                          {item.unit ? `${item.used} ${item.unit}` : item.used} <span className="text-muted-foreground font-normal">/ {item.unit ? `${item.total} ${item.unit}` : item.total}</span>
-                        </span>
+                        <span className="text-[10px] text-muted-foreground italic">{item.note}</span>
                       </div>
                       <div className="h-2.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
-                        <motion.div
-                          className={cn("h-full rounded-full", item.color)}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${pct}%` }}
-                          transition={{ duration: 0.8, delay: 0.3 }}
-                        />
+                        <div className="h-full w-0 rounded-full" />
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">{pct}% utilizado</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Monitoramento em desenvolvimento</p>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
 
-            {/* Features */}
+            {/* Plan features / benefits */}
             <motion.div
               className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 shadow-sm p-5"
               initial={{ opacity: 0, y: 20 }}
@@ -218,76 +312,111 @@ export default function MeuPlanoPage() {
               transition={{ duration: 0.4, delay: 0.25 }}
             >
               <h3 className="text-sm font-bold text-foreground mb-5">Recursos do Plano</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {planFeatures.map((feat) => (
-                  <div key={feat.label} className="flex items-center gap-3 p-3 bg-muted/20 dark:bg-white/[0.02] rounded-xl">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <feat.icon className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-foreground">{feat.value}</p>
-                      <p className="text-[10px] text-muted-foreground">{feat.label}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {loading ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+                </div>
+              ) : cp?.benefits?.length ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {cp.benefits.slice(0, 6).map((benefit, i) => {
+                    const Icon = featureIcons[i % featureIcons.length];
+                    return (
+                      <div key={benefit} className="flex items-center gap-3 p-3 bg-muted/20 dark:bg-white/[0.02] rounded-xl">
+                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-xs font-medium text-foreground leading-snug">{benefit}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-sm">Sem plano ativo</p>
+                  <p className="text-xs mt-1">Assine um plano para ver os recursos</p>
+                </div>
+              )}
             </motion.div>
           </div>
         </div>
       )}
 
-      {/* Plans Tab */}
+      {/* ── Plans Tab ── */}
       {activeTab === "plans" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {plans.map((plan, i) => (
-            <motion.div
-              key={plan.name}
-              className={cn(
-                "relative bg-white dark:bg-[#12121a] rounded-2xl border shadow-sm p-6 transition-all",
-                plan.color,
-                plan.current && "shadow-md"
-              )}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge variant="primary">Seu plano atual</Badge>
-                </div>
-              )}
-              <div className="text-center mb-5 pt-2">
-                <h3 className="text-lg font-extrabold text-foreground">{plan.name}</h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{plan.desc}</p>
-                <div className="mt-3">
-                  <span className="text-3xl font-extrabold text-foreground">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground">/mês</span>
-                </div>
-              </div>
-              <div className="space-y-2.5 mb-6">
-                {plan.features.map((feat) => (
-                  <div key={feat} className="flex items-center gap-2.5">
-                    <HiOutlineCheckCircle className={cn("w-4 h-4 shrink-0", plan.current ? "text-primary" : "text-muted-foreground")} />
-                    <span className="text-xs text-foreground">{feat}</span>
+          {loading ? (
+            [...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-96" />
+            ))
+          ) : data?.availablePlans.length ? (
+            data.availablePlans.map((plan, i) => {
+              const isCurrent = plan.id === cp?.id;
+              return (
+                <motion.div
+                  key={plan.id}
+                  className={cn(
+                    "relative bg-white dark:bg-[#12121a] rounded-2xl border shadow-sm p-6 transition-all",
+                    isCurrent
+                      ? "border-primary/50 ring-2 ring-primary/20 shadow-md"
+                      : "border-border/40 dark:border-white/8"
+                  )}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.1 + i * 0.08 }}
+                >
+                  {isCurrent && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge variant="primary">Seu plano atual</Badge>
+                    </div>
+                  )}
+                  <div className="text-center mb-5 pt-2">
+                    <h3 className="text-lg font-extrabold text-foreground">{plan.name}</h3>
+                    {plan.description && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{plan.description}</p>
+                    )}
+                    <div className="mt-3">
+                      {plan.promotionalPrice ? (
+                        <>
+                          <span className="text-sm text-muted-foreground line-through mr-2">{fmtCurrency(plan.price)}</span>
+                          <span className="text-3xl font-extrabold text-foreground">{fmtCurrency(plan.promotionalPrice)}</span>
+                        </>
+                      ) : (
+                        <span className="text-3xl font-extrabold text-foreground">{fmtCurrency(plan.price)}</span>
+                      )}
+                      <span className="text-sm text-muted-foreground">/{PLAN_TYPE_LABEL[plan.type] ?? plan.type}</span>
+                    </div>
                   </div>
-                ))}
-              </div>
-              {plan.current ? (
-                <Button variant="secondary" size="md" className="w-full justify-center" disabled>
-                  Plano Atual
-                </Button>
-              ) : (
-                <Button variant={plan.name === "Enterprise" ? "primary" : "secondary"} size="md" className="w-full justify-center">
-                  <HiOutlineArrowUpCircle className="w-4 h-4" />
-                  {plan.name === "Enterprise" ? "Fazer Upgrade" : "Mudar Plano"}
-                </Button>
-              )}
-            </motion.div>
-          ))}
+                  <div className="space-y-2.5 mb-6">
+                    {plan.benefits.map((b) => (
+                      <div key={b} className="flex items-center gap-2.5">
+                        <HiOutlineCheckCircle className={cn("w-4 h-4 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} />
+                        <span className="text-xs text-foreground">{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {isCurrent ? (
+                    <Button variant="secondary" size="md" className="w-full justify-center" disabled>
+                      Plano Atual
+                    </Button>
+                  ) : (
+                    <Button variant="primary" size="md" className="w-full justify-center">
+                      <HiOutlineArrowUpCircle className="w-4 h-4" />
+                      {cp ? (plan.price > cp.price ? "Fazer Upgrade" : "Mudar Plano") : "Assinar"}
+                    </Button>
+                  )}
+                </motion.div>
+              );
+            })
+          ) : (
+            <div className="col-span-3 text-center py-16 text-muted-foreground">
+              <HiOutlineExclamationCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">Nenhum plano disponível no momento.</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Billing Tab */}
+      {/* ── Billing Tab ── */}
       {activeTab === "billing" && (
         <motion.div
           className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 shadow-sm overflow-hidden"
@@ -295,34 +424,63 @@ export default function MeuPlanoPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.15 }}
         >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/40 dark:border-white/8">
-                  <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">ID</th>
-                  <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
-                  <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Valor</th>
-                  <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Método</th>
-                  <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billingHistory.map((item) => (
-                  <tr key={item.id} className="border-b border-border/20 dark:border-white/5 last:border-0 hover:bg-muted/20 dark:hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-3.5 text-xs font-mono font-bold text-primary">{item.id}</td>
-                    <td className="px-5 py-3.5 text-xs text-foreground">{item.date}</td>
-                    <td className="px-5 py-3.5 text-sm font-bold text-foreground">{item.amount}</td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{item.method}</span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge variant="success" dot>Pago</Badge>
-                    </td>
+          {loading ? (
+            <div className="p-6 space-y-3">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+            </div>
+          ) : data?.billingHistory.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border/40 dark:border-white/8">
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">ID</th>
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Valor</th>
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Método</th>
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                    <th className="px-5 py-3.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.billingHistory.map((item) => {
+                    const badge = STATUS_BADGE[item.status] ?? { variant: "default" as const, label: item.statusLabel };
+                    return (
+                      <tr key={item.id} className="border-b border-border/20 dark:border-white/5 last:border-0 hover:bg-muted/20 dark:hover:bg-white/[0.02] transition-colors">
+                        <td className="px-5 py-3.5 text-xs font-mono font-bold text-primary">{item.id.slice(0, 8).toUpperCase()}</td>
+                        <td className="px-5 py-3.5 text-xs text-foreground">{fmtDate(item.date)}</td>
+                        <td className="px-5 py-3.5 text-sm font-bold text-foreground">{fmtCurrency(item.amount)}</td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{item.method}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge variant={badge.variant} dot>{badge.label}</Badge>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          {item.invoiceUrl && (
+                            <a
+                              href={item.invoiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                            >
+                              Fatura
+                              <HiOutlineArrowTopRightOnSquare className="w-3 h-3" />
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-16 text-muted-foreground">
+              <HiOutlineCreditCard className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium">Nenhum pagamento registrado</p>
+              <p className="text-xs mt-1">O histórico aparecerá após a primeira cobrança</p>
+            </div>
+          )}
         </motion.div>
       )}
     </div>
