@@ -4,16 +4,18 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import StudioTopbar from "@/components/studio/StudioTopbar";
 import StudioStepper from "@/components/studio/StudioStepper";
+import StepInicio from "@/components/studio/StepInicio";
 import StepBriefing from "@/components/studio/StepBriefing";
 import StepTipoRotulo from "@/components/studio/StepTipoRotulo";
+import StepInfoFrente from "@/components/studio/StepInfoFrente";
 import StepDados from "@/components/studio/StepDados";
+import StepMaterial from "@/components/studio/StepMaterial";
 import StepRevisao from "@/components/studio/StepRevisao";
 import StepExport from "@/components/studio/StepExport";
 import LeftPanel from "@/components/studio/LeftPanel";
 import CanvasArea from "@/components/studio/CanvasArea";
 import RightPanel from "@/components/studio/RightPanel";
-import BarcodeSvg from "@/components/studio/BarcodeSvg";
-import QrCodeSvg from "@/components/studio/QrCodeSvg";
+import VersoText from "@/components/studio/VersoText";
 import { toast } from "sonner";
 
 const defaultLayers = [
@@ -53,11 +55,26 @@ const defaultFields = {
   warnings: "",
   directions: "",
   tips: "",
-  expiry: "",
-  batch: "",
-  registration: "",
+  expiry: "VIDE EMBALAGEM",
+  batch: "VIDE EMBALAGEM",
+  registration: "100000",
   sac: "",
   barcode: "",
+  // Informações da frente (FASE 4)
+  logoUrl: "",
+  productType: "",
+  ativos: "",
+  volumagem: "",
+  moodBoardUrls: "",
+  moodKeywords: "",
+  aiFrontUrl: "",
+  // Customização extra (FASE 4)
+  customSealUrls: "",
+  // Material e acabamento (FASE 5)
+  printMaterial: "",
+  printSubmaterial: "",
+  printFinish: "",
+  finishExtras: "",
   // Fabricante
   manufacturerName: "",
   manufacturerCnpj: "",
@@ -184,7 +201,7 @@ export default function EstudioIAPage() {
         }
         if (cd.activeTemplate) setActiveTemplate(cd.activeTemplate as string);
         if (Array.isArray(cd.activeAssets)) setActiveAssets(cd.activeAssets as string[]);
-        setCurrentStep(4);
+        setCurrentStep(6);
         setSaved(true);
       })
       .catch(() => {});
@@ -324,33 +341,32 @@ export default function EstudioIAPage() {
         saved={saved}
         saving={saving}
         onSave={handleSave}
-        onExport={() => setCurrentStep(6)}
-        advanceLabel={currentStep === 4 ? "Próximo: Revisão" : undefined}
-        onAdvance={currentStep === 4 ? () => setCurrentStep(5) : undefined}
+        onExport={() => setCurrentStep(9)}
+        advanceLabel={currentStep === 6 ? "Próximo: Material" : undefined}
+        onAdvance={currentStep === 6 ? () => setCurrentStep(7) : undefined}
       />
 
       <StudioStepper currentStep={currentStep} onStepChange={setCurrentStep} />
 
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {currentStep === 1 && (
-          <StepBriefing
+          <StepInicio
             fields={productFields}
-            onChange={handleFieldChange}
+            onFieldChange={handleFieldChange}
             onNext={() => setCurrentStep(2)}
           />
         )}
 
         {currentStep === 2 && (
-          <StepTipoRotulo
+          <StepBriefing
             fields={productFields}
-            onFieldChange={handleFieldChange}
+            onChange={handleFieldChange}
             onNext={() => setCurrentStep(3)}
-            onPrev={() => setCurrentStep(1)}
           />
         )}
 
         {currentStep === 3 && (
-          <StepDados
+          <StepTipoRotulo
             fields={productFields}
             onFieldChange={handleFieldChange}
             onNext={() => setCurrentStep(4)}
@@ -359,6 +375,24 @@ export default function EstudioIAPage() {
         )}
 
         {currentStep === 4 && (
+          <StepInfoFrente
+            fields={productFields}
+            onFieldChange={handleFieldChange}
+            onNext={() => setCurrentStep(5)}
+            onPrev={() => setCurrentStep(3)}
+          />
+        )}
+
+        {currentStep === 5 && (
+          <StepDados
+            fields={productFields}
+            onFieldChange={handleFieldChange}
+            onNext={() => setCurrentStep(6)}
+            onPrev={() => setCurrentStep(4)}
+          />
+        )}
+
+        {currentStep === 6 && (
           <div className="flex flex-1 overflow-hidden">
             <LeftPanel
               collapsed={leftCollapsed}
@@ -377,6 +411,29 @@ export default function EstudioIAPage() {
                   prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
                 );
                 setSaved(false);
+              }}
+              customSealUrls={productFields.customSealUrls}
+              onAddCustomSeal={(dataUrl) => {
+                pushSnapshot();
+                const cur = (productFields.customSealUrls ?? "").split("|").filter(Boolean);
+                const next = [...cur, dataUrl].join("|");
+                handleFieldChange("customSealUrls", next);
+              }}
+              onRemoveCustomSeal={(idx) => {
+                pushSnapshot();
+                const cur = (productFields.customSealUrls ?? "").split("|").filter(Boolean);
+                const next = cur.filter((_, i) => i !== idx).join("|");
+                handleFieldChange("customSealUrls", next);
+                // limpa ativos que referenciam esse índice ou maior
+                setActiveAssets((prev) =>
+                  prev
+                    .filter((id) => id !== `custom-${idx}`)
+                    .map((id) => {
+                      if (!id.startsWith("custom-")) return id;
+                      const i = Number(id.replace("custom-", ""));
+                      return i > idx ? `custom-${i - 1}` : id;
+                    })
+                );
               }}
             />
             <CanvasArea
@@ -408,6 +465,8 @@ export default function EstudioIAPage() {
                 manufacturerAddress: productFields.manufacturerAddress,
                 manufacturerChemist: productFields.manufacturerChemist,
                 manufacturerCountry: productFields.manufacturerCountry,
+                aiFrontUrl: productFields.aiFrontUrl,
+                logoUrl: productFields.logoUrl,
                 supplierName: productFields.supplierName,
                 supplierCnpj: productFields.supplierCnpj,
                 supplierIe: productFields.supplierIe,
@@ -416,6 +475,7 @@ export default function EstudioIAPage() {
               layers={layers}
               activeTemplate={activeTemplate}
               activeAssets={activeAssets}
+              customSealUrls={productFields.customSealUrls}
               onUndo={undo}
               onRedo={redo}
               canUndo={undoStack.length > 0}
@@ -432,21 +492,32 @@ export default function EstudioIAPage() {
           </div>
         )}
 
-        {currentStep === 5 && (
-          <StepRevisao
+        {currentStep === 7 && (
+          <StepMaterial
             fields={productFields}
-            labelImg={labelImg}
-            onNext={() => setCurrentStep(6)}
-            onPrev={() => setCurrentStep(4)}
+            onFieldChange={handleFieldChange}
+            onNext={() => setCurrentStep(8)}
+            onPrev={() => setCurrentStep(6)}
           />
         )}
 
-        {currentStep === 6 && (
+        {currentStep === 8 && (
+          <StepRevisao
+            fields={productFields}
+            labelImg={labelImg}
+            onNext={() => setCurrentStep(9)}
+            onPrev={() => setCurrentStep(7)}
+          />
+        )}
+
+        {currentStep === 9 && (
           <StepExport
             labelImg={labelImg}
             productName={productFields.productName}
             brandName={productFields.brandName}
-            onPrev={() => setCurrentStep(5)}
+            aiFrontUrl={productFields.aiFrontUrl}
+            labelType={productFields.labelType}
+            onPrev={() => setCurrentStep(8)}
             onExport={handleExport}
             onSaveToGallery={handleSave}
           />
@@ -477,14 +548,14 @@ const EXPORT_TEMPLATE_STYLES: Record<string, { imgFrom: string; imgTo: string; a
 const EXPORT_DEFAULT_STYLE = { imgFrom: "#eff6ff", imgTo: "#f5f3ff", accent: "#4f46e5", accentBg: "#c7d2fe" };
 
 const EXPORT_ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
-  vegano: { emoji: "�", short: "Vegano" },
+  vegano: { emoji: "🌱", short: "Vegano" },
   "cruelty-free": { emoji: "🐰", short: "Cruelty-free" },
-  natural: { emoji: "��", short: "Natural" },
+  natural: { emoji: "🌿", short: "Natural" },
   dermato: { emoji: "✅", short: "Dermato" },
   "sem-parabenos": { emoji: "🚫", short: "S/ Parabenos" },
   anvisa: { emoji: "🏛️", short: "ANVISA" },
   reciclavel: { emoji: "♻️", short: "Reciclável" },
-  reciclo: { emoji: "�", short: "Reciclo" },
+  reciclo: { emoji: "🔄", short: "Reciclo" },
   "mat-pet": { emoji: "♳", short: "PET" },
   "mat-pead": { emoji: "♴", short: "PEAD" },
   "mat-pvc": { emoji: "♵", short: "PVC" },
@@ -492,7 +563,17 @@ const EXPORT_ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
   "mat-pp": { emoji: "♷", short: "PP" },
   "mat-ps": { emoji: "♸", short: "PS" },
   "mat-outros": { emoji: "♹", short: "Outros" },
-  "pao-6": { emoji: "�", short: "PAO 6M" },
+  "pao-1": { emoji: "🕓", short: "PAO 1M" },
+  "pao-2": { emoji: "🕓", short: "PAO 2M" },
+  "pao-3": { emoji: "🕓", short: "PAO 3M" },
+  "pao-4": { emoji: "🕓", short: "PAO 4M" },
+  "pao-5": { emoji: "🕓", short: "PAO 5M" },
+  "pao-6": { emoji: "🕓", short: "PAO 6M" },
+  "pao-7": { emoji: "🕓", short: "PAO 7M" },
+  "pao-8": { emoji: "🕓", short: "PAO 8M" },
+  "pao-9": { emoji: "🕓", short: "PAO 9M" },
+  "pao-10": { emoji: "🕓", short: "PAO 10M" },
+  "pao-11": { emoji: "🕓", short: "PAO 11M" },
   "pao-12": { emoji: "🕓", short: "PAO 12M" },
   "pao-24": { emoji: "🕓", short: "PAO 24M" },
   "pao-36": { emoji: "🕓", short: "PAO 36M" },
@@ -529,6 +610,21 @@ function ExportLabelCanvas({
               {activeAssets.length > 0 && (
                 <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1.5">
                   {activeAssets.map((id) => {
+                    if (id.startsWith("custom-")) {
+                      const idx = Number(id.replace("custom-", ""));
+                      const urls = (fields.customSealUrls ?? "").split("|").filter(Boolean);
+                      const url = urls[idx];
+                      if (!url) return null;
+                      return (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={id}
+                          src={url}
+                          alt={`Selo ${idx + 1}`}
+                          className="h-6 w-6 rounded-full bg-white shadow-sm border border-white/60 object-contain p-0.5"
+                        />
+                      );
+                    }
                     const badge = EXPORT_ASSET_BADGES[id];
                     if (!badge) return null;
                     return (
@@ -554,118 +650,12 @@ function ExportLabelCanvas({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            {isVisible("introduction") && fields.introduction && (
-              <p className="text-[7px] italic text-gray-700 leading-relaxed line-clamp-3 px-2">
-                {fields.introduction}
-              </p>
-            )}
-
-            {isVisible("directions") && (
-              <div className="p-2 rounded-lg">
-                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Modo de uso</p>
-                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                  {fields.directions || "Modo de uso não informado."}
-                </p>
-              </div>
-            )}
-
-            {isVisible("tips") && fields.tips && (
-              <div className="p-2 rounded-lg">
-                <p className="text-[6px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Dicas</p>
-                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">{fields.tips}</p>
-              </div>
-            )}
-
-            {isVisible("ingredients") && (
-              <div className="p-2 rounded-lg flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição (INCI)</p>
-                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                    {fields.ingredientsPT || fields.ingredients || "Composição não informada."}
-                  </p>
-                  {fields.ingredientsEN && (
-                    <p className="text-[6px] text-gray-500 italic leading-relaxed line-clamp-2 mt-0.5">
-                      {fields.ingredientsEN}
-                    </p>
-                  )}
-                </div>
-                {fields.ingredientsLink && (
-                  <div className="shrink-0">
-                    <QrCodeSvg value={fields.ingredientsLink} size={36} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isVisible("manufacturer") && (fields.manufacturerName || fields.manufacturerCnpj) && (
-              <div className="p-2 rounded-lg">
-                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fabricado por</p>
-                <p className="text-[6px] text-gray-600 leading-tight">
-                  {fields.manufacturerName}
-                  {fields.manufacturerCnpj && ` — CNPJ ${fields.manufacturerCnpj}`}
-                  {fields.manufacturerIe && ` / IE ${fields.manufacturerIe}`}
-                </p>
-                {fields.manufacturerAddress && (
-                  <p className="text-[6px] text-gray-500 leading-tight">{fields.manufacturerAddress}</p>
-                )}
-                <p className="text-[6px] text-gray-500">
-                  {fields.manufacturerChemist && `Quím. Resp.: ${fields.manufacturerChemist} · `}
-                  {fields.manufacturerCountry || "Indústria Brasileira"}
-                </p>
-              </div>
-            )}
-
-            {isVisible("supplier") && fields.supplierName && (
-              <div className="p-2 rounded-lg">
-                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fornecedor exclusivo</p>
-                <p className="text-[6px] text-gray-600 leading-tight">
-                  {fields.supplierName}
-                  {fields.supplierCnpj && ` — CNPJ ${fields.supplierCnpj}`}
-                </p>
-                {fields.supplierAddress && (
-                  <p className="text-[6px] text-gray-500 leading-tight">{fields.supplierAddress}</p>
-                )}
-              </div>
-            )}
-
-            {isVisible("anvisa") && (
-              <div className="p-2 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[6px] font-bold text-gray-400">CONTEÚDO: {fields.weight || "—"}</p>
-                    <p className="text-[6px] text-gray-400">Validade: {fields.expiry || "—"}</p>
-                    {fields.batch && <p className="text-[6px] text-gray-400">Lote: {fields.batch}</p>}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[5px] text-gray-400">ANVISA: {fields.registration || "—"}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(isVisible("sac") || isVisible("barcode")) && (
-              <div className="flex items-end justify-between gap-2 px-2">
-                {isVisible("sac") && (
-                  <div>
-                    <p className="text-[5px] font-bold uppercase tracking-wider text-gray-400">SAC</p>
-                    <p className="text-[7px] text-gray-700 font-semibold">{fields.sac || "0800 000 0000"}</p>
-                  </div>
-                )}
-                {isVisible("barcode") && fields.barcode && (
-                  <div className="text-center">
-                    <BarcodeSvg
-                      value={fields.barcode}
-                      width={1}
-                      height={28}
-                      displayValue={true}
-                      className="max-w-[90px]"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <VersoText
+            fields={fields}
+            layerVisible={isVisible}
+            baseFontSize={6}
+            className="space-y-1 px-1"
+          />
 
           {isVisible("warnings") && (
             <div className="mt-auto pt-1.5">

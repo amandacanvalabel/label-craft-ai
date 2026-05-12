@@ -11,11 +11,16 @@ import {
   HiOutlineCheckCircle,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+const Mockup3D = dynamic(() => import("./Mockup3D"), { ssr: false });
 
 interface StepExportProps {
   labelImg: string;
   productName: string;
   brandName: string;
+  aiFrontUrl?: string;
+  labelType?: string;
   onPrev: () => void;
   onExport: (format: string, channel: string, resolution: string) => Promise<void>;
   onSaveToGallery: () => Promise<void>;
@@ -40,7 +45,7 @@ const resolutions = [
   { id: "600", label: "600 dpi", desc: "Alta qualidade" },
 ];
 
-export default function StepExport({ labelImg, productName, brandName, onPrev, onExport, onSaveToGallery }: StepExportProps) {
+export default function StepExport({ labelImg, productName, brandName, aiFrontUrl, labelType, onPrev, onExport, onSaveToGallery }: StepExportProps) {
   const [format, setFormat] = useState("pdf");
   const [channel, setChannel] = useState("both");
   const [resolution, setResolution] = useState("300");
@@ -86,14 +91,25 @@ export default function StepExport({ labelImg, productName, brandName, onPrev, o
         </div>
 
         <div className="grid grid-cols-[200px_1fr] gap-6">
-          {/* Preview */}
-          <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 p-4 flex flex-col items-center gap-3 self-start">
-            <div className="w-full aspect-[5/7] bg-gradient-to-br from-blue-50 to-violet-50 dark:from-blue-500/10 dark:to-violet-500/10 rounded-xl flex items-center justify-center">
-              <span className="text-5xl">{labelImg}</span>
-            </div>
+          {/* Preview com Mockup 3D */}
+          <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 p-3 flex flex-col items-center gap-3 self-start">
+            {aiFrontUrl ? (
+              <Mockup3D
+                labelImageUrl={aiFrontUrl}
+                shape={labelType === "in-mold" ? "tube" : labelType === "adesivo" ? "pump" : "cylinder"}
+                height={260}
+              />
+            ) : (
+              <div className="w-full aspect-[5/7] bg-gradient-to-br from-blue-50 to-violet-50 dark:from-blue-500/10 dark:to-violet-500/10 rounded-xl flex items-center justify-center">
+                <span className="text-5xl">{labelImg}</span>
+              </div>
+            )}
             <div className="text-center w-full">
               <p className="text-xs font-bold text-foreground truncate">{productName || "—"}</p>
               <p className="text-[10px] text-muted-foreground">{brandName}</p>
+              {aiFrontUrl && (
+                <p className="text-[9px] text-muted-foreground/70 mt-1">Arraste para rotacionar</p>
+              )}
             </div>
             {exported && (
               <div className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">

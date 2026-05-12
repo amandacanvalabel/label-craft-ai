@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiOutlineRectangleGroup,
@@ -40,6 +40,9 @@ interface LeftPanelProps {
   onApplyTemplate: (id: string) => void;
   activeAssets: string[];
   onToggleAsset: (id: string) => void;
+  customSealUrls?: string;
+  onAddCustomSeal?: (dataUrl: string) => void;
+  onRemoveCustomSeal?: (index: number) => void;
 }
 
 const templates: Template[] = [
@@ -69,11 +72,22 @@ const assets = [
   { id: "mat-pp", name: "PP (5)", img: "♷", group: "Reciclagem" },
   { id: "mat-ps", name: "PS (6)", img: "♸", group: "Reciclagem" },
   { id: "mat-outros", name: "Outros (7)", img: "♹", group: "Reciclagem" },
-  // PAO - Período após abertura
+  // PAO - Período após abertura (14 opções)
+  { id: "pao-1", name: "PAO 1 mês", img: "1M", group: "Validade pós-abertura" },
+  { id: "pao-2", name: "PAO 2 meses", img: "2M", group: "Validade pós-abertura" },
+  { id: "pao-3", name: "PAO 3 meses", img: "3M", group: "Validade pós-abertura" },
+  { id: "pao-4", name: "PAO 4 meses", img: "4M", group: "Validade pós-abertura" },
+  { id: "pao-5", name: "PAO 5 meses", img: "5M", group: "Validade pós-abertura" },
   { id: "pao-6", name: "PAO 6 meses", img: "6M", group: "Validade pós-abertura" },
+  { id: "pao-7", name: "PAO 7 meses", img: "7M", group: "Validade pós-abertura" },
+  { id: "pao-8", name: "PAO 8 meses", img: "8M", group: "Validade pós-abertura" },
+  { id: "pao-9", name: "PAO 9 meses", img: "9M", group: "Validade pós-abertura" },
+  { id: "pao-10", name: "PAO 10 meses", img: "10M", group: "Validade pós-abertura" },
+  { id: "pao-11", name: "PAO 11 meses", img: "11M", group: "Validade pós-abertura" },
   { id: "pao-12", name: "PAO 12 meses", img: "12M", group: "Validade pós-abertura" },
   { id: "pao-24", name: "PAO 24 meses", img: "24M", group: "Validade pós-abertura" },
   { id: "pao-36", name: "PAO 36 meses", img: "36M", group: "Validade pós-abertura" },
+  // Selos customizados (uploaded)
 ];
 
 const tabs = [
@@ -99,10 +113,29 @@ const LeftPanel = ({
   onApplyTemplate,
   activeAssets,
   onToggleAsset,
+  customSealUrls,
+  onAddCustomSeal,
+  onRemoveCustomSeal,
 }: LeftPanelProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("templates");
   const [templateFilter, setTemplateFilter] = useState("Todos");
   const templateCategories = ["Todos", "Cosméticos"];
+  const customSeals = (customSealUrls ?? "").split("|").filter(Boolean);
+  const customSealInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCustomUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    for (const file of files) {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result ?? ""));
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      onAddCustomSeal?.(dataUrl);
+    }
+    if (customSealInputRef.current) customSealInputRef.current.value = "";
+  };
 
   const filteredTemplates = templateFilter === "Todos"
     ? templates
@@ -300,6 +333,65 @@ const LeftPanel = ({
                       </div>
                     </div>
                   ))}
+
+                  {/* Selos Personalizados (uploaded) */}
+                  <div className="mb-4">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Personalizados
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {customSeals.map((url, idx) => {
+                        const id = `custom-${idx}`;
+                        const isActive = activeAssets.includes(id);
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "group relative p-3 rounded-xl border transition-all text-center",
+                              isActive
+                                ? "bg-primary/10 border-primary/40 ring-1 ring-primary/30"
+                                : "bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border-transparent hover:border-primary/20"
+                            )}
+                          >
+                            <button onClick={() => onToggleAsset(id)} className="w-full">
+                              {isActive && (
+                                <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
+                                  <span className="text-[7px] text-white font-bold">✓</span>
+                                </div>
+                              )}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`Selo ${idx + 1}`} className="w-7 h-7 mx-auto mb-1 object-contain" />
+                              <p className={cn("text-[9px] font-medium", isActive ? "text-primary" : "text-foreground")}>Selo {idx + 1}</p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onRemoveCustomSeal?.(idx)}
+                              className="absolute top-0.5 left-0.5 text-[9px] text-red-500 opacity-0 group-hover:opacity-100 px-1"
+                              aria-label="Remover selo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => customSealInputRef.current?.click()}
+                        className="p-3 rounded-xl border border-dashed border-border/60 dark:border-white/10 bg-muted/20 dark:bg-white/[0.02] hover:bg-muted/40 dark:hover:bg-white/5 text-center transition-all"
+                      >
+                        <div className="text-xl mb-1">＋</div>
+                        <p className="text-[9px] font-medium text-muted-foreground">Anexar selo</p>
+                      </button>
+                      <input
+                        ref={customSealInputRef}
+                        type="file"
+                        accept=".svg,.png,.jpg,.jpeg,image/*"
+                        multiple
+                        onChange={handleCustomUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

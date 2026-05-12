@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import BarcodeSvg from "./BarcodeSvg";
 import QrCodeSvg from "./QrCodeSvg";
+import VersoText from "./VersoText";
 
 interface Layer {
   id: string;
@@ -52,6 +53,8 @@ interface CanvasAreaProps {
     manufacturerAddress?: string;
     manufacturerChemist?: string;
     manufacturerCountry?: string;
+    aiFrontUrl?: string;
+    logoUrl?: string;
     supplierName?: string;
     supplierCnpj?: string;
     supplierIe?: string;
@@ -60,6 +63,7 @@ interface CanvasAreaProps {
   layers: Layer[];
   activeTemplate: string | null;
   activeAssets: string[];
+  customSealUrls?: string;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
@@ -90,14 +94,14 @@ const DEFAULT_STYLE = {
 };
 
 const ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
-  vegano: { emoji: "�", short: "Vegano" },
+  vegano: { emoji: "🌱", short: "Vegano" },
   "cruelty-free": { emoji: "🐰", short: "Cruelty-free" },
-  natural: { emoji: "��", short: "Natural" },
+  natural: { emoji: "🌿", short: "Natural" },
   dermato: { emoji: "✅", short: "Dermato" },
   "sem-parabenos": { emoji: "🚫", short: "Sem Parabenos" },
   anvisa: { emoji: "🏛️", short: "ANVISA" },
   reciclavel: { emoji: "♻️", short: "Reciclável" },
-  reciclo: { emoji: "�", short: "Reciclo" },
+  reciclo: { emoji: "🔄", short: "Reciclo" },
   "mat-pet": { emoji: "♳", short: "PET" },
   "mat-pead": { emoji: "♴", short: "PEAD" },
   "mat-pvc": { emoji: "♵", short: "PVC" },
@@ -105,7 +109,17 @@ const ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
   "mat-pp": { emoji: "♷", short: "PP" },
   "mat-ps": { emoji: "♸", short: "PS" },
   "mat-outros": { emoji: "♹", short: "Outros" },
-  "pao-6": { emoji: "�", short: "PAO 6M" },
+  "pao-1": { emoji: "🕓", short: "PAO 1M" },
+  "pao-2": { emoji: "🕓", short: "PAO 2M" },
+  "pao-3": { emoji: "🕓", short: "PAO 3M" },
+  "pao-4": { emoji: "🕓", short: "PAO 4M" },
+  "pao-5": { emoji: "🕓", short: "PAO 5M" },
+  "pao-6": { emoji: "🕓", short: "PAO 6M" },
+  "pao-7": { emoji: "🕓", short: "PAO 7M" },
+  "pao-8": { emoji: "🕓", short: "PAO 8M" },
+  "pao-9": { emoji: "🕓", short: "PAO 9M" },
+  "pao-10": { emoji: "🕓", short: "PAO 10M" },
+  "pao-11": { emoji: "🕓", short: "PAO 11M" },
   "pao-12": { emoji: "🕓", short: "PAO 12M" },
   "pao-24": { emoji: "🕓", short: "PAO 24M" },
   "pao-36": { emoji: "🕓", short: "PAO 36M" },
@@ -118,6 +132,7 @@ const CanvasArea = ({
   layers,
   activeTemplate,
   activeAssets,
+  customSealUrls,
   onUndo,
   onRedo,
   canUndo = false,
@@ -169,7 +184,24 @@ const CanvasArea = ({
                 style={{ background: `linear-gradient(135deg, ${style.imgFrom}, ${style.imgTo})` }}
                 onClick={(e) => handleClick("product-image", e)}
               >
-                <span className="text-7xl">{labelPreview.img || "📋"}</span>
+                {labelPreview.aiFrontUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={labelPreview.aiFrontUrl}
+                    alt="Rótulo gerado pela IA"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-7xl">{labelPreview.img || "📋"}</span>
+                )}
+                {labelPreview.logoUrl && !labelPreview.aiFrontUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={labelPreview.logoUrl}
+                    alt="Logo"
+                    className="absolute top-3 left-3 max-h-8 max-w-[40%] object-contain"
+                  />
+                )}
 
                 {/* Category badge */}
                 <div
@@ -183,6 +215,21 @@ const CanvasArea = ({
                 {activeAssets.length > 0 && (
                   <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1.5">
                     {activeAssets.map((id) => {
+                      if (id.startsWith("custom-")) {
+                        const idx = Number(id.replace("custom-", ""));
+                        const urls = (customSealUrls ?? "").split("|").filter(Boolean);
+                        const url = urls[idx];
+                        if (!url) return null;
+                        return (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={id}
+                            src={url}
+                            alt={`Selo ${idx + 1}`}
+                            className="h-6 w-6 rounded-full bg-white shadow-sm border border-white/60 object-contain p-0.5"
+                          />
+                        );
+                      }
                       const badge = ASSET_BADGES[id];
                       if (!badge) return null;
                       return (
@@ -217,130 +264,15 @@ const CanvasArea = ({
               </div>
             )}
 
-            {/* ── Info blocks ── */}
-            <div className="space-y-1.5">
-
-              {isVisible("introduction") && labelPreview.introduction && (
-                <div className={ringCls("introduction")} onClick={(e) => handleClick("introduction", e)}>
-                  <p className="text-[7px] italic text-gray-700 leading-relaxed line-clamp-3">
-                    {labelPreview.introduction}
-                  </p>
-                </div>
-              )}
-
-              {isVisible("directions") && (
-                <div className={ringCls("directions")} onClick={(e) => handleClick("directions", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Modo de uso</p>
-                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                    {labelPreview.directions || "Modo de uso não informado."}
-                  </p>
-                </div>
-              )}
-
-              {isVisible("tips") && labelPreview.tips && (
-                <div className={ringCls("tips")} onClick={(e) => handleClick("tips", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Dicas</p>
-                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">{labelPreview.tips}</p>
-                </div>
-              )}
-
-              {/* Ingredients (PT + EN) */}
-              {isVisible("ingredients") && (
-                <div className={ringCls("ingredients")} onClick={(e) => handleClick("ingredients", e)}>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição (INCI)</p>
-                      <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                        {labelPreview.ingredientsPT || labelPreview.ingredients || "Composição não informada."}
-                      </p>
-                      {labelPreview.ingredientsEN && (
-                        <p className="text-[6px] text-gray-500 italic leading-relaxed line-clamp-2 mt-0.5">
-                          {labelPreview.ingredientsEN}
-                        </p>
-                      )}
-                    </div>
-                    {labelPreview.ingredientsLink && (
-                      <div className="shrink-0">
-                        <QrCodeSvg value={labelPreview.ingredientsLink} size={36} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Fabricante */}
-              {isVisible("manufacturer") && (
-                <div className={ringCls("manufacturer")} onClick={(e) => handleClick("manufacturer", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fabricado por</p>
-                  <p className="text-[6px] text-gray-600 leading-tight">
-                    {labelPreview.manufacturerName || "Nome da indústria"}
-                    {labelPreview.manufacturerCnpj && ` — CNPJ ${labelPreview.manufacturerCnpj}`}
-                    {labelPreview.manufacturerIe && ` / IE ${labelPreview.manufacturerIe}`}
-                  </p>
-                  {labelPreview.manufacturerAddress && (
-                    <p className="text-[6px] text-gray-500 leading-tight">{labelPreview.manufacturerAddress}</p>
-                  )}
-                  <p className="text-[6px] text-gray-500">
-                    {labelPreview.manufacturerChemist && `Quím. Resp.: ${labelPreview.manufacturerChemist} · `}
-                    {labelPreview.manufacturerCountry || "Indústria Brasileira"}
-                  </p>
-                </div>
-              )}
-
-              {/* Fornecedor exclusivo */}
-              {isVisible("supplier") && labelPreview.supplierName && (
-                <div className={ringCls("supplier")} onClick={(e) => handleClick("supplier", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fornecedor exclusivo</p>
-                  <p className="text-[6px] text-gray-600 leading-tight">
-                    {labelPreview.supplierName}
-                    {labelPreview.supplierCnpj && ` — CNPJ ${labelPreview.supplierCnpj}`}
-                    {labelPreview.supplierIe && ` / IE ${labelPreview.supplierIe}`}
-                  </p>
-                  {labelPreview.supplierAddress && (
-                    <p className="text-[6px] text-gray-500 leading-tight">{labelPreview.supplierAddress}</p>
-                  )}
-                </div>
-              )}
-
-              {/* ANVISA info (layer: anvisa) */}
-              {isVisible("anvisa") && (
-                <div className={ringCls("anvisa")} onClick={(e) => handleClick("anvisa", e)}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[6px] font-bold text-gray-400">PESO LÍQ: {labelPreview.weight || "—"}</p>
-                      <p className="text-[6px] text-gray-400">Validade: {labelPreview.expiry || "—"}</p>
-                      {labelPreview.batch && <p className="text-[6px] text-gray-400">Lote: {labelPreview.batch}</p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[5px] text-gray-400">ANVISA: {labelPreview.registration || "—"}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SAC + barcode bottom row */}
-              {(isVisible("sac") || isVisible("barcode")) && (
-                <div className="flex items-end justify-between gap-2">
-                  {isVisible("sac") && (
-                    <div className={ringCls("sac")} onClick={(e) => handleClick("sac", e)}>
-                      <p className="text-[5px] font-bold uppercase tracking-wider text-gray-400">SAC</p>
-                      <p className="text-[7px] text-gray-700 font-semibold">{labelPreview.sac || "0800 000 0000"}</p>
-                    </div>
-                  )}
-                  {isVisible("barcode") && labelPreview.barcode && (
-                    <div className={cn(ringCls("barcode"), "text-center")} onClick={(e) => handleClick("barcode", e)}>
-                      <BarcodeSvg
-                        value={labelPreview.barcode}
-                        width={1}
-                        height={28}
-                        displayValue={true}
-                        className="max-w-[90px]"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* ── Verso técnico: parágrafos diagramados ── */}
+            <VersoText
+              fields={labelPreview}
+              layerVisible={isVisible}
+              baseFontSize={6}
+              onSectionClick={(id, e) => handleClick(id, e)}
+              ringCls={ringCls}
+              className="space-y-1"
+            />
 
             {isVisible("warnings") && (
               <div className="mt-auto pt-1.5">

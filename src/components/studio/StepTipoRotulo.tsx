@@ -53,9 +53,10 @@ const TYPES = [
 ] as const;
 
 const SIDES = [
+  { id: "unico", label: "Único (frente + verso na mesma face)" },
   { id: "frente", label: "Só frente" },
   { id: "verso", label: "Só verso" },
-  { id: "ambos", label: "Frente e verso" },
+  { id: "ambos", label: "Frente e verso (dois adesivos)" },
 ] as const;
 
 const inputCls =
@@ -149,7 +150,7 @@ export default function StepTipoRotulo({ fields, onFieldChange, onNext, onPrev }
                 <label className="text-[11px] font-bold text-foreground">
                   Lado do Rótulo <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {SIDES.map((s) => (
                     <button
                       key={s.id}

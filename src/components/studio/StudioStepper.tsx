@@ -4,12 +4,15 @@ import { HiOutlineCheck } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { id: 1, label: "Briefing", sub: "Dados básicos" },
-  { id: 2, label: "Tipo de Rótulo", sub: "Sleeve / Adesivo / Serigrafia" },
-  { id: 3, label: "Dados Obrigatórios", sub: "Cosmético ANVISA" },
-  { id: 4, label: "Design", sub: "Canvas & IA" },
-  { id: 5, label: "Revisão", sub: "Checklist" },
-  { id: 6, label: "Exportar", sub: "Arte final" },
+  { id: 1, label: "Início", sub: "Categoria / Escanear frasco" },
+  { id: 2, label: "Briefing", sub: "Dados básicos" },
+  { id: 3, label: "Tipo de Rótulo", sub: "Sleeve / Adesivo / Serigrafia" },
+  { id: 4, label: "Frente", sub: "Logo, ativos, volumagem" },
+  { id: 5, label: "Verso", sub: "Dados ANVISA" },
+  { id: 6, label: "Design", sub: "Canvas & IA" },
+  { id: 7, label: "Material", sub: "Impressão e acabamento" },
+  { id: 8, label: "Revisão", sub: "Checklist" },
+  { id: 9, label: "Exportar", sub: "Arte final" },
 ];
 
 interface StudioStepperProps {

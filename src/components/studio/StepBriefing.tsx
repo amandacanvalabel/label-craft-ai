@@ -10,8 +10,6 @@ interface ProductFields {
   category: string;
   packaging: string;
   introduction: string;
-  registration: string;
-  sac: string;
   [key: string]: string;
 }
 
@@ -108,25 +106,6 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
                 <option value="">Selecione...</option>
                 {packagings.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Processo ANVISA / Autorização">
-              <input
-                className={inputCls}
-                value={fields.registration}
-                onChange={(e) => onChange("registration", e.target.value)}
-                placeholder="Ex: 25351.000000/2026-00 (deixe X12345 se ainda não tem)"
-              />
-            </Field>
-            <Field label="SAC">
-              <input
-                className={inputCls}
-                value={fields.sac}
-                onChange={(e) => onChange("sac", e.target.value)}
-                placeholder="Ex: 0800 123 4567"
-              />
             </Field>
           </div>
 

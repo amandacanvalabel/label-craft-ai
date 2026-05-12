@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   HiOutlineArrowLeft,
   HiOutlineArrowRight,
@@ -69,10 +70,10 @@ function Section({ icon: Icon, title, subtitle, children, defaultOpen = true }: 
 export default function StepDados({ fields, onFieldChange, onNext, onPrev }: StepDadosProps) {
   const g = (k: string) => fields[k] ?? "";
   const requiredFilled = [
-    { key: "ingredients", label: "Composição/ingredientes", val: g("ingredients") },
+    { key: "ingredients", label: "Composição/ingredientes (PT)", val: g("ingredientsPT") || g("ingredients") },
     { key: "directions", label: "Modo de uso", val: g("directions") },
     { key: "warnings", label: "Advertências e restrições", val: g("warnings") },
-    { key: "expiry", label: "Prazo de validade", val: g("expiry") },
+    { key: "sac", label: "SAC", val: g("sac") },
     { key: "manufacturerName", label: "Fabricante (nome)", val: g("manufacturerName") },
     { key: "manufacturerCnpj", label: "CNPJ do fabricante", val: g("manufacturerCnpj") },
   ];
@@ -195,23 +196,38 @@ export default function StepDados({ fields, onFieldChange, onNext, onPrev }: Ste
             </div>
           </Section>
 
-          <Section icon={HiOutlineShieldCheck} title="Validade, lote e código de barras">
+          <Section icon={HiOutlineShieldCheck} title="Validade, lote, ANVISA, SAC e código de barras">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground">Validade e Lote</label>
+              <input
+                value={g("expiry") || "VIDE EMBALAGEM"}
+                onChange={(e) => onFieldChange("expiry", e.target.value)}
+                className={inputCls}
+              />
+              <p className="text-[9px] text-muted-foreground">
+                Por padrão fica &quot;VIDE EMBALAGEM&quot; — a data real é gravada pela gráfica na embalagem física.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <RequiredLabel filled={Boolean(g("expiry").trim())}>Prazo de Validade</RequiredLabel>
+                <label className="text-[11px] font-bold text-foreground">Processo ANVISA</label>
                 <input
-                  value={g("expiry")}
-                  onChange={(e) => onFieldChange("expiry", e.target.value)}
-                  placeholder="Ex: 24 meses após fabricação"
+                  value={g("registration")}
+                  onChange={(e) => onFieldChange("registration", e.target.value)}
+                  placeholder="100000 (se ainda não houver)"
                   className={inputCls}
                 />
+                <p className="text-[9px] text-muted-foreground">
+                  Liberado depois da aprovação. Se não tiver ainda, preencha com <strong>100000</strong>.
+                </p>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-foreground">Lote</label>
+                <label className="text-[11px] font-bold text-foreground">SAC</label>
                 <input
-                  value={g("batch")}
-                  onChange={(e) => onFieldChange("batch", e.target.value)}
-                  placeholder="Ex: L20260510"
+                  value={g("sac")}
+                  onChange={(e) => onFieldChange("sac", e.target.value)}
+                  placeholder="0800 123 4567"
                   className={inputCls}
                 />
               </div>
@@ -265,13 +281,15 @@ export default function StepDados({ fields, onFieldChange, onNext, onPrev }: Ste
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-foreground">Químico Responsável (CRQ)</label>
+                <label className="text-[11px] font-bold text-foreground">Químico Responsável (CRQ-V)</label>
                 <input
                   value={g("manufacturerChemist")}
-                  onChange={(e) => onFieldChange("manufacturerChemist", e.target.value)}
-                  placeholder="Ex: CRQ-V 12345"
+                  onChange={(e) => onFieldChange("manufacturerChemist", e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  placeholder="Apenas número (Ex: 12345)"
+                  inputMode="numeric"
                   className={inputCls}
                 />
+                <p className="text-[9px] text-muted-foreground">Aparecerá no rótulo como &quot;Quím. Resp.: CRQ-V {g("manufacturerChemist") || "12345"}&quot;.</p>
               </div>
             </div>
 
@@ -286,13 +304,41 @@ export default function StepDados({ fields, onFieldChange, onNext, onPrev }: Ste
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-foreground">País / Indústria</label>
-              <input
-                value={g("manufacturerCountry")}
-                onChange={(e) => onFieldChange("manufacturerCountry", e.target.value)}
-                placeholder="Indústria Brasileira"
-                className={inputCls}
-              />
+              <label className="text-[11px] font-bold text-foreground">Origem da Indústria</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onFieldChange("manufacturerCountry", "Indústria Brasileira")}
+                  className={cn(
+                    "px-3 py-2.5 text-xs font-semibold rounded-xl border transition-all",
+                    (g("manufacturerCountry") === "" || g("manufacturerCountry") === "Indústria Brasileira")
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/40 dark:border-white/8 bg-muted/30 dark:bg-white/[0.03] text-foreground hover:border-primary/40"
+                  )}
+                >
+                  Indústria Brasileira
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFieldChange("manufacturerCountry", "Outro país")}
+                  className={cn(
+                    "px-3 py-2.5 text-xs font-semibold rounded-xl border transition-all",
+                    (g("manufacturerCountry") !== "" && g("manufacturerCountry") !== "Indústria Brasileira")
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/40 dark:border-white/8 bg-muted/30 dark:bg-white/[0.03] text-foreground hover:border-primary/40"
+                  )}
+                >
+                  Outro país / Importado
+                </button>
+              </div>
+              {g("manufacturerCountry") && g("manufacturerCountry") !== "Indústria Brasileira" && (
+                <input
+                  value={g("manufacturerCountry") === "Outro país" ? "" : g("manufacturerCountry")}
+                  onChange={(e) => onFieldChange("manufacturerCountry", e.target.value || "Outro país")}
+                  placeholder="Ex: Indústria Italiana, Indústria Coreana..."
+                  className={inputCls}
+                />
+              )}
             </div>
           </Section>
 
