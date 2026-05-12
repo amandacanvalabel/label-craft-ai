@@ -39,6 +39,7 @@
     "dotenv": "^17.3.1",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.0.2",
     "jose": "^6.2.2",
     "jsbarcode": "^3.12.3",
     "jsonwebtoken": "^9.0.3",

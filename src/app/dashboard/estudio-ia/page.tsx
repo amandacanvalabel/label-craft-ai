@@ -261,7 +261,7 @@ export default function EstudioIAPage() {
     el.style.transform = "none";
 
     try {
-      const html2canvas = (await import("html2canvas")).default;
+      const html2canvas = (await import("html2canvas-pro")).default;
       const dpi = Number(resolution) || 300;
       const scale = Math.max(1, dpi / 96);
       const canvas = await html2canvas(el, {
