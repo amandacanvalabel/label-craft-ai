@@ -12,6 +12,8 @@ import {
   HiOutlineHandRaised,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import BarcodeSvg from "./BarcodeSvg";
+import QrCodeSvg from "./QrCodeSvg";
 
 interface Layer {
   id: string;
@@ -30,13 +32,30 @@ interface CanvasAreaProps {
     brandName?: string;
     category: string;
     img: string;
+    introduction?: string;
+    tips?: string;
     ingredients?: string;
+    ingredientsPT?: string;
+    ingredientsEN?: string;
+    ingredientsLink?: string;
     warnings?: string;
     directions?: string;
     weight?: string;
     expiry?: string;
+    batch?: string;
     registration?: string;
     sac?: string;
+    barcode?: string;
+    manufacturerName?: string;
+    manufacturerCnpj?: string;
+    manufacturerIe?: string;
+    manufacturerAddress?: string;
+    manufacturerChemist?: string;
+    manufacturerCountry?: string;
+    supplierName?: string;
+    supplierCnpj?: string;
+    supplierIe?: string;
+    supplierAddress?: string;
   };
   layers: Layer[];
   activeTemplate: string | null;
@@ -71,14 +90,25 @@ const DEFAULT_STYLE = {
 };
 
 const ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
-  a1: { emoji: "🌿", short: "Natural" },
-  a2: { emoji: "✅", short: "Dermato" },
-  a3: { emoji: "🏛️", short: "ANVISA" },
-  a4: { emoji: "🌱", short: "Vegano" },
-  a5: { emoji: "🚫", short: "Sem Parabenos" },
-  a6: { emoji: "✨", short: "Cruelty-free" },
-  a7: { emoji: "♻️", short: "Reciclável" },
-  a8: { emoji: "📊", short: "Cód. Barras" },
+  vegano: { emoji: "�", short: "Vegano" },
+  "cruelty-free": { emoji: "🐰", short: "Cruelty-free" },
+  natural: { emoji: "��", short: "Natural" },
+  dermato: { emoji: "✅", short: "Dermato" },
+  "sem-parabenos": { emoji: "🚫", short: "Sem Parabenos" },
+  anvisa: { emoji: "🏛️", short: "ANVISA" },
+  reciclavel: { emoji: "♻️", short: "Reciclável" },
+  reciclo: { emoji: "�", short: "Reciclo" },
+  "mat-pet": { emoji: "♳", short: "PET" },
+  "mat-pead": { emoji: "♴", short: "PEAD" },
+  "mat-pvc": { emoji: "♵", short: "PVC" },
+  "mat-pebd": { emoji: "♶", short: "PEBD" },
+  "mat-pp": { emoji: "♷", short: "PP" },
+  "mat-ps": { emoji: "♸", short: "PS" },
+  "mat-outros": { emoji: "♹", short: "Outros" },
+  "pao-6": { emoji: "�", short: "PAO 6M" },
+  "pao-12": { emoji: "🕓", short: "PAO 12M" },
+  "pao-24": { emoji: "🕓", short: "PAO 24M" },
+  "pao-36": { emoji: "🕓", short: "PAO 36M" },
 };
 
 const CanvasArea = ({
@@ -190,12 +220,10 @@ const CanvasArea = ({
             {/* ── Info blocks ── */}
             <div className="space-y-1.5">
 
-              {/* Ingredients (layer: ingredients) */}
-              {isVisible("ingredients") && (
-                <div className={ringCls("ingredients")} onClick={(e) => handleClick("ingredients", e)}>
-                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição</p>
-                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                    {labelPreview.ingredients || "Composição não informada."}
+              {isVisible("introduction") && labelPreview.introduction && (
+                <div className={ringCls("introduction")} onClick={(e) => handleClick("introduction", e)}>
+                  <p className="text-[7px] italic text-gray-700 leading-relaxed line-clamp-3">
+                    {labelPreview.introduction}
                   </p>
                 </div>
               )}
@@ -209,6 +237,71 @@ const CanvasArea = ({
                 </div>
               )}
 
+              {isVisible("tips") && labelPreview.tips && (
+                <div className={ringCls("tips")} onClick={(e) => handleClick("tips", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Dicas</p>
+                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">{labelPreview.tips}</p>
+                </div>
+              )}
+
+              {/* Ingredients (PT + EN) */}
+              {isVisible("ingredients") && (
+                <div className={ringCls("ingredients")} onClick={(e) => handleClick("ingredients", e)}>
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição (INCI)</p>
+                      <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                        {labelPreview.ingredientsPT || labelPreview.ingredients || "Composição não informada."}
+                      </p>
+                      {labelPreview.ingredientsEN && (
+                        <p className="text-[6px] text-gray-500 italic leading-relaxed line-clamp-2 mt-0.5">
+                          {labelPreview.ingredientsEN}
+                        </p>
+                      )}
+                    </div>
+                    {labelPreview.ingredientsLink && (
+                      <div className="shrink-0">
+                        <QrCodeSvg value={labelPreview.ingredientsLink} size={36} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Fabricante */}
+              {isVisible("manufacturer") && (
+                <div className={ringCls("manufacturer")} onClick={(e) => handleClick("manufacturer", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fabricado por</p>
+                  <p className="text-[6px] text-gray-600 leading-tight">
+                    {labelPreview.manufacturerName || "Nome da indústria"}
+                    {labelPreview.manufacturerCnpj && ` — CNPJ ${labelPreview.manufacturerCnpj}`}
+                    {labelPreview.manufacturerIe && ` / IE ${labelPreview.manufacturerIe}`}
+                  </p>
+                  {labelPreview.manufacturerAddress && (
+                    <p className="text-[6px] text-gray-500 leading-tight">{labelPreview.manufacturerAddress}</p>
+                  )}
+                  <p className="text-[6px] text-gray-500">
+                    {labelPreview.manufacturerChemist && `Quím. Resp.: ${labelPreview.manufacturerChemist} · `}
+                    {labelPreview.manufacturerCountry || "Indústria Brasileira"}
+                  </p>
+                </div>
+              )}
+
+              {/* Fornecedor exclusivo */}
+              {isVisible("supplier") && labelPreview.supplierName && (
+                <div className={ringCls("supplier")} onClick={(e) => handleClick("supplier", e)}>
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fornecedor exclusivo</p>
+                  <p className="text-[6px] text-gray-600 leading-tight">
+                    {labelPreview.supplierName}
+                    {labelPreview.supplierCnpj && ` — CNPJ ${labelPreview.supplierCnpj}`}
+                    {labelPreview.supplierIe && ` / IE ${labelPreview.supplierIe}`}
+                  </p>
+                  {labelPreview.supplierAddress && (
+                    <p className="text-[6px] text-gray-500 leading-tight">{labelPreview.supplierAddress}</p>
+                  )}
+                </div>
+              )}
+
               {/* ANVISA info (layer: anvisa) */}
               {isVisible("anvisa") && (
                 <div className={ringCls("anvisa")} onClick={(e) => handleClick("anvisa", e)}>
@@ -216,12 +309,35 @@ const CanvasArea = ({
                     <div>
                       <p className="text-[6px] font-bold text-gray-400">PESO LÍQ: {labelPreview.weight || "—"}</p>
                       <p className="text-[6px] text-gray-400">Validade: {labelPreview.expiry || "—"}</p>
+                      {labelPreview.batch && <p className="text-[6px] text-gray-400">Lote: {labelPreview.batch}</p>}
                     </div>
                     <div className="text-right">
                       <p className="text-[5px] text-gray-400">ANVISA: {labelPreview.registration || "—"}</p>
-                      <p className="text-[5px] text-gray-400">SAC: {labelPreview.sac || "—"}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* SAC + barcode bottom row */}
+              {(isVisible("sac") || isVisible("barcode")) && (
+                <div className="flex items-end justify-between gap-2">
+                  {isVisible("sac") && (
+                    <div className={ringCls("sac")} onClick={(e) => handleClick("sac", e)}>
+                      <p className="text-[5px] font-bold uppercase tracking-wider text-gray-400">SAC</p>
+                      <p className="text-[7px] text-gray-700 font-semibold">{labelPreview.sac || "0800 000 0000"}</p>
+                    </div>
+                  )}
+                  {isVisible("barcode") && labelPreview.barcode && (
+                    <div className={cn(ringCls("barcode"), "text-center")} onClick={(e) => handleClick("barcode", e)}>
+                      <BarcodeSvg
+                        value={labelPreview.barcode}
+                        width={1}
+                        height={28}
+                        displayValue={true}
+                        className="max-w-[90px]"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

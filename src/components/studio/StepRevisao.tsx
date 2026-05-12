@@ -41,12 +41,17 @@ const checklist = [
   { id: "productName", label: "Nome do produto presente e legível" },
   { id: "brandName", label: "Marca identificada" },
   { id: "weight", label: "Conteúdo líquido declarado" },
-  { id: "ingredients", label: "Composição/ingredientes presente" },
+  { id: "ingredients", label: "Composição/ingredientes presente (PT e/ou EN)" },
   { id: "directions", label: "Modo de uso informado" },
-  { id: "warnings", label: "Advertências e restrições em destaque" },
+  { id: "warnings", label: "Precauções / advertências em destaque" },
   { id: "expiry", label: "Prazo de validade informado" },
+  { id: "batch", label: "Lote definido" },
   { id: "registration", label: "Processo ANVISA / autorização" },
   { id: "sac", label: "SAC do fabricante" },
+  { id: "barcode", label: "Código de barras (EAN-13) preenchido" },
+  { id: "manufacturerName", label: "Razão social do fabricante" },
+  { id: "manufacturerCnpj", label: "CNPJ do fabricante" },
+  { id: "manufacturerAddress", label: "Endereço do fabricante" },
 ];
 
 const statusStyle: Record<ApprovalStatus, { label: string; color: string; bg: string }> = {

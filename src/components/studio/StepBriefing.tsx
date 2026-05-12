@@ -9,6 +9,7 @@ interface ProductFields {
   weight: string;
   category: string;
   packaging: string;
+  introduction: string;
   registration: string;
   sac: string;
   [key: string]: string;
@@ -116,7 +117,7 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
                 className={inputCls}
                 value={fields.registration}
                 onChange={(e) => onChange("registration", e.target.value)}
-                placeholder="Ex: 25351.000000/2026-00"
+                placeholder="Ex: 25351.000000/2026-00 (deixe X12345 se ainda não tem)"
               />
             </Field>
             <Field label="SAC">
@@ -128,6 +129,19 @@ export default function StepBriefing({ fields, onChange, onNext }: StepBriefingP
               />
             </Field>
           </div>
+
+          <Field label="Introdução do Produto">
+            <textarea
+              className={inputCls + " resize-none"}
+              rows={3}
+              value={fields.introduction}
+              onChange={(e) => onChange("introduction", e.target.value)}
+              placeholder="Ex: O Shampoo Babyliss é específico para quem faz o uso do modelador Babyliss…"
+            />
+            <p className="text-[9px] text-muted-foreground mt-1">
+              Pequeno texto descritivo que abre o verso do rótulo (1º parágrafo).
+            </p>
+          </Field>
         </div>
 
         <div className="flex justify-end mt-6">

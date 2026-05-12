@@ -52,14 +52,28 @@ const templates: Template[] = [
 ];
 
 const assets = [
-  { id: "a1", name: "Natural", img: "🌿" },
-  { id: "a2", name: "Dermatologicamente Testado", img: "✅" },
-  { id: "a3", name: "Selo ANVISA", img: "🏛️" },
-  { id: "a4", name: "Selo Vegano", img: "🌱" },
-  { id: "a5", name: "Sem Parabenos", img: "🚫" },
-  { id: "a6", name: "Cruelty-free", img: "✨" },
-  { id: "a7", name: "Reciclável", img: "♻️" },
-  { id: "a8", name: "Código Barras", img: "📊" },
+  // Certificações
+  { id: "vegano", name: "Selo Vegano", img: "🌱", group: "Certificações" },
+  { id: "cruelty-free", name: "Não testado em animais", img: "🐰", group: "Certificações" },
+  { id: "natural", name: "Natural", img: "🌿", group: "Certificações" },
+  { id: "dermato", name: "Dermatologicamente testado", img: "✅", group: "Certificações" },
+  { id: "sem-parabenos", name: "Sem parabenos", img: "🚫", group: "Certificações" },
+  { id: "anvisa", name: "Selo ANVISA", img: "🏛️", group: "Certificações" },
+  // Reciclagem
+  { id: "reciclavel", name: "Material reciclável", img: "♻️", group: "Reciclagem" },
+  { id: "reciclo", name: "Símbolo de reciclo", img: "🔄", group: "Reciclagem" },
+  { id: "mat-pet", name: "PET (1)", img: "♳", group: "Reciclagem" },
+  { id: "mat-pead", name: "PEAD (2)", img: "♴", group: "Reciclagem" },
+  { id: "mat-pvc", name: "PVC (3)", img: "♵", group: "Reciclagem" },
+  { id: "mat-pebd", name: "PEBD (4)", img: "♶", group: "Reciclagem" },
+  { id: "mat-pp", name: "PP (5)", img: "♷", group: "Reciclagem" },
+  { id: "mat-ps", name: "PS (6)", img: "♸", group: "Reciclagem" },
+  { id: "mat-outros", name: "Outros (7)", img: "♹", group: "Reciclagem" },
+  // PAO - Período após abertura
+  { id: "pao-6", name: "PAO 6 meses", img: "6M", group: "Validade pós-abertura" },
+  { id: "pao-12", name: "PAO 12 meses", img: "12M", group: "Validade pós-abertura" },
+  { id: "pao-24", name: "PAO 24 meses", img: "24M", group: "Validade pós-abertura" },
+  { id: "pao-36", name: "PAO 36 meses", img: "36M", group: "Validade pós-abertura" },
 ];
 
 const tabs = [
@@ -256,31 +270,36 @@ const LeftPanel = ({
                   transition={{ duration: 0.2 }}
                 >
                   <p className="text-[10px] text-muted-foreground mb-2">Clique para adicionar/remover do canvas</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {assets.map((a) => {
-                      const isActive = activeAssets.includes(a.id);
-                      return (
-                        <button
-                          key={a.id}
-                          onClick={() => onToggleAsset(a.id)}
-                          className={cn(
-                            "group p-3 rounded-xl border transition-all text-center relative",
-                            isActive
-                              ? "bg-primary/10 border-primary/40 ring-1 ring-primary/30"
-                              : "bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border-transparent hover:border-primary/20"
-                          )}
-                        >
-                          {isActive && (
-                            <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
-                              <span className="text-[7px] text-white font-bold">✓</span>
-                            </div>
-                          )}
-                          <div className="text-xl mb-1">{a.img}</div>
-                          <p className={cn("text-[9px] font-medium", isActive ? "text-primary" : "text-foreground")}>{a.name}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {Array.from(new Set(assets.map((a) => a.group))).map((group) => (
+                    <div key={group} className="mb-4">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">{group}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {assets.filter((a) => a.group === group).map((a) => {
+                          const isActive = activeAssets.includes(a.id);
+                          return (
+                            <button
+                              key={a.id}
+                              onClick={() => onToggleAsset(a.id)}
+                              className={cn(
+                                "group p-3 rounded-xl border transition-all text-center relative",
+                                isActive
+                                  ? "bg-primary/10 border-primary/40 ring-1 ring-primary/30"
+                                  : "bg-muted/30 dark:bg-white/[0.02] hover:bg-muted/60 dark:hover:bg-white/[0.05] border-transparent hover:border-primary/20"
+                              )}
+                            >
+                              {isActive && (
+                                <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
+                                  <span className="text-[7px] text-white font-bold">✓</span>
+                                </div>
+                              )}
+                              <div className="text-xl mb-1">{a.img}</div>
+                              <p className={cn("text-[9px] font-medium", isActive ? "text-primary" : "text-foreground")}>{a.name}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>

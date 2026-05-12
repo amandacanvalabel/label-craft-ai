@@ -5,10 +5,11 @@ import { cn } from "@/lib/utils";
 
 const STEPS = [
   { id: 1, label: "Briefing", sub: "Dados básicos" },
-  { id: 2, label: "Dados Obrigatórios", sub: "Cosmético ANVISA" },
-  { id: 3, label: "Design", sub: "Canvas & IA" },
-  { id: 4, label: "Revisão", sub: "Checklist" },
-  { id: 5, label: "Exportar", sub: "Arte final" },
+  { id: 2, label: "Tipo de Rótulo", sub: "Sleeve / Adesivo / Serigrafia" },
+  { id: 3, label: "Dados Obrigatórios", sub: "Cosmético ANVISA" },
+  { id: 4, label: "Design", sub: "Canvas & IA" },
+  { id: 5, label: "Revisão", sub: "Checklist" },
+  { id: 6, label: "Exportar", sub: "Arte final" },
 ];
 
 interface StudioStepperProps {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   HiOutlineArrowLeft,
@@ -7,13 +8,14 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineShieldCheck,
   HiOutlineCheckCircle,
+  HiOutlineBuildingOffice2,
+  HiOutlineBeaker,
+  HiOutlineQrCode,
+  HiOutlineLightBulb,
 } from "react-icons/hi2";
 
 interface StepDadosProps {
-  ingredients: string;
-  warnings: string;
-  directions: string;
-  expiry: string;
+  fields: Record<string, string>;
   onFieldChange: (field: string, value: string) => void;
   onNext: () => void;
   onPrev: () => void;
@@ -35,20 +37,44 @@ function RequiredLabel({ children, filled }: { children: React.ReactNode; filled
   );
 }
 
-export default function StepDados({
-  ingredients,
-  warnings,
-  directions,
-  expiry,
-  onFieldChange,
-  onNext,
-  onPrev,
-}: StepDadosProps) {
+function Section({ icon: Icon, title, subtitle, children, defaultOpen = true }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 dark:hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-primary" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-[13px] font-bold text-foreground">{title}</p>
+          {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
+        </div>
+        <span className={"text-muted-foreground transition-transform " + (open ? "rotate-180" : "")}>▾</span>
+      </button>
+      {open && <div className="p-5 pt-0 space-y-4">{children}</div>}
+    </div>
+  );
+}
+
+export default function StepDados({ fields, onFieldChange, onNext, onPrev }: StepDadosProps) {
+  const g = (k: string) => fields[k] ?? "";
   const requiredFilled = [
-    { key: "ingredients", label: "Composição/ingredientes", val: ingredients },
-    { key: "directions", label: "Modo de uso", val: directions },
-    { key: "warnings", label: "Advertências e restrições", val: warnings },
-    { key: "expiry", label: "Prazo de validade", val: expiry },
+    { key: "ingredients", label: "Composição/ingredientes", val: g("ingredients") },
+    { key: "directions", label: "Modo de uso", val: g("directions") },
+    { key: "warnings", label: "Advertências e restrições", val: g("warnings") },
+    { key: "expiry", label: "Prazo de validade", val: g("expiry") },
+    { key: "manufacturerName", label: "Fabricante (nome)", val: g("manufacturerName") },
+    { key: "manufacturerCnpj", label: "CNPJ do fabricante", val: g("manufacturerCnpj") },
   ];
   const missing = requiredFilled.filter((f) => !f.val.trim());
   const canAdvance = missing.length === 0;
@@ -79,50 +105,240 @@ export default function StepDados({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 p-5 space-y-5">
-          <div className="space-y-1.5">
-            <RequiredLabel filled={Boolean(ingredients.trim())}>Composição / Ingredientes</RequiredLabel>
-            <textarea
-              value={ingredients}
-              onChange={(e) => onFieldChange("ingredients", e.target.value)}
-              placeholder="Ex: Aqua, Glycerin, Cetearyl Alcohol, Parfum, Phenoxyethanol..."
-              rows={4}
-              className={inputCls + " resize-none"}
-            />
-            <p className="text-[9px] text-muted-foreground">Use nomenclatura INCI quando disponível.</p>
-          </div>
+        <div className="space-y-4">
+          <Section icon={HiOutlineBeaker} title="Uso, dicas e advertências" subtitle="Modo de uso, dicas e precauções que vão no verso do rótulo">
+            <div className="space-y-1.5">
+              <RequiredLabel filled={Boolean(g("directions").trim())}>Modo de Uso</RequiredLabel>
+              <textarea
+                value={g("directions")}
+                onChange={(e) => onFieldChange("directions", e.target.value)}
+                placeholder="Ex: Aplicar sobre a pele limpa e seca, massageando até completa absorção."
+                rows={3}
+                className={inputCls + " resize-none"}
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <RequiredLabel filled={Boolean(directions.trim())}>Modo de Uso</RequiredLabel>
-            <textarea
-              value={directions}
-              onChange={(e) => onFieldChange("directions", e.target.value)}
-              placeholder="Ex: Aplicar sobre a pele limpa e seca, massageando até completa absorção."
-              rows={3}
-              className={inputCls + " resize-none"}
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                <HiOutlineLightBulb className="w-3.5 h-3.5 text-amber-500" /> Dicas (opcional)
+              </label>
+              <textarea
+                value={g("tips")}
+                onChange={(e) => onFieldChange("tips", e.target.value)}
+                placeholder="Ex: Para melhor resultado, aplicar com a pele úmida após o banho."
+                rows={2}
+                className={inputCls + " resize-none"}
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <RequiredLabel filled={Boolean(warnings.trim())}>Advertências / Restrições</RequiredLabel>
-            <textarea
-              value={warnings}
-              onChange={(e) => onFieldChange("warnings", e.target.value)}
-              placeholder="Ex: Uso externo. Evite contato com os olhos. Manter fora do alcance de crianças."
-              rows={3}
-              className={inputCls + " resize-none"}
-            />
-          </div>
+            <div className="space-y-1.5">
+              <RequiredLabel filled={Boolean(g("warnings").trim())}>Precauções / Advertências</RequiredLabel>
+              <textarea
+                value={g("warnings")}
+                onChange={(e) => onFieldChange("warnings", e.target.value)}
+                placeholder="Ex: Uso externo. Evite contato com os olhos. Manter fora do alcance de crianças."
+                rows={3}
+                className={inputCls + " resize-none"}
+              />
+            </div>
+          </Section>
 
-          <div className="space-y-1.5">
-            <RequiredLabel filled={Boolean(expiry.trim())}>Prazo de Validade</RequiredLabel>
-            <input
-              value={expiry}
-              onChange={(e) => onFieldChange("expiry", e.target.value)}
-              placeholder="Ex: 24 meses após fabricação"
-              className={inputCls}
-            />
-          </div>
+          <Section icon={HiOutlineBeaker} title="Ingredientes (INCI)" subtitle="Português e/ou inglês — ou link para QR-Code">
+            <div className="space-y-1.5">
+              <RequiredLabel filled={Boolean(g("ingredients").trim())}>Composição (resumo principal)</RequiredLabel>
+              <textarea
+                value={g("ingredients")}
+                onChange={(e) => onFieldChange("ingredients", e.target.value)}
+                placeholder="Ex: Aqua, Glycerin, Cetearyl Alcohol, Parfum, Phenoxyethanol..."
+                rows={3}
+                className={inputCls + " resize-none"}
+              />
+              <p className="text-[9px] text-muted-foreground">Use nomenclatura INCI quando disponível.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Ingredientes em Português</label>
+                <textarea
+                  value={g("ingredientsPT")}
+                  onChange={(e) => onFieldChange("ingredientsPT", e.target.value)}
+                  placeholder="Versão em português (opcional)"
+                  rows={3}
+                  className={inputCls + " resize-none"}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Ingredientes em Inglês</label>
+                <textarea
+                  value={g("ingredientsEN")}
+                  onChange={(e) => onFieldChange("ingredientsEN", e.target.value)}
+                  placeholder="English INCI (opcional)"
+                  rows={3}
+                  className={inputCls + " resize-none"}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                <HiOutlineQrCode className="w-3.5 h-3.5 text-primary" /> Link para QR-Code (opcional)
+              </label>
+              <input
+                value={g("ingredientsLink")}
+                onChange={(e) => onFieldChange("ingredientsLink", e.target.value)}
+                placeholder="https://meusite.com/produto/ingredientes.pdf"
+                className={inputCls}
+              />
+              <p className="text-[9px] text-muted-foreground">
+                Se informado, será gerado um QR-Code que aponta para esse link no rótulo.
+              </p>
+            </div>
+          </Section>
+
+          <Section icon={HiOutlineShieldCheck} title="Validade, lote e código de barras">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <RequiredLabel filled={Boolean(g("expiry").trim())}>Prazo de Validade</RequiredLabel>
+                <input
+                  value={g("expiry")}
+                  onChange={(e) => onFieldChange("expiry", e.target.value)}
+                  placeholder="Ex: 24 meses após fabricação"
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Lote</label>
+                <input
+                  value={g("batch")}
+                  onChange={(e) => onFieldChange("batch", e.target.value)}
+                  placeholder="Ex: L20260510"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground">Código de Barras (EAN-13)</label>
+              <input
+                value={g("barcode")}
+                onChange={(e) => onFieldChange("barcode", e.target.value.replace(/\D/g, "").slice(0, 13))}
+                placeholder="13 dígitos numéricos"
+                inputMode="numeric"
+                className={inputCls}
+              />
+              <p className="text-[9px] text-muted-foreground">
+                O código de barras será gerado vetorialmente no rótulo final.
+              </p>
+            </div>
+          </Section>
+
+          <Section icon={HiOutlineBuildingOffice2} title="Fabricante" subtitle="Dados obrigatórios para a rotulagem ANVISA">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <RequiredLabel filled={Boolean(g("manufacturerName").trim())}>Nome da Indústria</RequiredLabel>
+                <input
+                  value={g("manufacturerName")}
+                  onChange={(e) => onFieldChange("manufacturerName", e.target.value)}
+                  placeholder="Razão social"
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <RequiredLabel filled={Boolean(g("manufacturerCnpj").trim())}>CNPJ</RequiredLabel>
+                <input
+                  value={g("manufacturerCnpj")}
+                  onChange={(e) => onFieldChange("manufacturerCnpj", e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">IE (se houver)</label>
+                <input
+                  value={g("manufacturerIe")}
+                  onChange={(e) => onFieldChange("manufacturerIe", e.target.value)}
+                  placeholder="Inscrição estadual"
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Químico Responsável (CRQ)</label>
+                <input
+                  value={g("manufacturerChemist")}
+                  onChange={(e) => onFieldChange("manufacturerChemist", e.target.value)}
+                  placeholder="Ex: CRQ-V 12345"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground">Endereço Completo</label>
+              <input
+                value={g("manufacturerAddress")}
+                onChange={(e) => onFieldChange("manufacturerAddress", e.target.value)}
+                placeholder="Rua, número, bairro, cidade, UF, CEP"
+                className={inputCls}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-foreground">País / Indústria</label>
+              <input
+                value={g("manufacturerCountry")}
+                onChange={(e) => onFieldChange("manufacturerCountry", e.target.value)}
+                placeholder="Indústria Brasileira"
+                className={inputCls}
+              />
+            </div>
+          </Section>
+
+          <Section icon={HiOutlineBuildingOffice2} title="Fornecedor Exclusivo (opcional)" subtitle="Use se o produto é distribuído por terceiros" defaultOpen={false}>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Nome</label>
+                <input
+                  value={g("supplierName")}
+                  onChange={(e) => onFieldChange("supplierName", e.target.value)}
+                  placeholder="Razão social"
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">CNPJ</label>
+                <input
+                  value={g("supplierCnpj")}
+                  onChange={(e) => onFieldChange("supplierCnpj", e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">IE (se houver)</label>
+                <input
+                  value={g("supplierIe")}
+                  onChange={(e) => onFieldChange("supplierIe", e.target.value)}
+                  placeholder="Inscrição estadual"
+                  className={inputCls}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground">Endereço</label>
+                <input
+                  value={g("supplierAddress")}
+                  onChange={(e) => onFieldChange("supplierAddress", e.target.value)}
+                  placeholder="Endereço completo"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </Section>
         </div>
 
         {!canAdvance && (

@@ -5,35 +5,71 @@ import { useSearchParams } from "next/navigation";
 import StudioTopbar from "@/components/studio/StudioTopbar";
 import StudioStepper from "@/components/studio/StudioStepper";
 import StepBriefing from "@/components/studio/StepBriefing";
+import StepTipoRotulo from "@/components/studio/StepTipoRotulo";
 import StepDados from "@/components/studio/StepDados";
 import StepRevisao from "@/components/studio/StepRevisao";
 import StepExport from "@/components/studio/StepExport";
 import LeftPanel from "@/components/studio/LeftPanel";
 import CanvasArea from "@/components/studio/CanvasArea";
 import RightPanel from "@/components/studio/RightPanel";
+import BarcodeSvg from "@/components/studio/BarcodeSvg";
+import QrCodeSvg from "@/components/studio/QrCodeSvg";
 import { toast } from "sonner";
 
 const defaultLayers = [
   { id: "product-image", name: "Imagem do Produto", type: "image", visible: true, locked: false },
   { id: "product-name", name: "Nome do Produto", type: "text", visible: true, locked: false },
-  { id: "ingredients", name: "Composição", type: "text", visible: true, locked: false },
+  { id: "introduction", name: "Introdução", type: "text", visible: true, locked: false },
   { id: "directions", name: "Modo de Uso", type: "text", visible: true, locked: false },
-  { id: "warnings", name: "Advertências", type: "text", visible: true, locked: true },
+  { id: "tips", name: "Dicas", type: "text", visible: true, locked: false },
+  { id: "warnings", name: "Precauções / Advertências", type: "text", visible: true, locked: true },
+  { id: "ingredients", name: "Ingredientes (PT / EN)", type: "text", visible: true, locked: false },
+  { id: "manufacturer", name: "Fabricante", type: "text", visible: true, locked: false },
+  { id: "supplier", name: "Fornecedor Exclusivo", type: "text", visible: false, locked: false },
   { id: "anvisa", name: "Dados Regulatórios", type: "text", visible: true, locked: false },
+  { id: "sac", name: "SAC", type: "text", visible: true, locked: false },
+  { id: "barcode", name: "Código de Barras", type: "image", visible: true, locked: false },
 ];
 
 const defaultFields = {
+  // Briefing
   productName: "",
   brandName: "",
   weight: "",
   category: "Cosméticos",
   packaging: "",
+  introduction: "",
+  // Tipo de rótulo
+  labelType: "",
+  labelSide: "",
+  labelWidth: "",
+  labelHeight: "",
+  labelMoldUrl: "",
+  // Conteúdo regulatório
   ingredients: "",
+  ingredientsEN: "",
+  ingredientsPT: "",
+  ingredientsLink: "",
   warnings: "",
   directions: "",
+  tips: "",
   expiry: "",
+  batch: "",
   registration: "",
   sac: "",
+  barcode: "",
+  // Fabricante
+  manufacturerName: "",
+  manufacturerCnpj: "",
+  manufacturerIe: "",
+  manufacturerAddress: "",
+  manufacturerChemist: "",
+  manufacturerCountry: "Indústria Brasileira",
+  // Fornecedor exclusivo (opcional)
+  supplierName: "",
+  supplierCnpj: "",
+  supplierIe: "",
+  supplierAddress: "",
 };
 
 const categoryEmoji: Record<string, string> = {
@@ -148,7 +184,7 @@ export default function EstudioIAPage() {
         }
         if (cd.activeTemplate) setActiveTemplate(cd.activeTemplate as string);
         if (Array.isArray(cd.activeAssets)) setActiveAssets(cd.activeAssets as string[]);
-        setCurrentStep(3);
+        setCurrentStep(4);
         setSaved(true);
       })
       .catch(() => {});
@@ -288,9 +324,9 @@ export default function EstudioIAPage() {
         saved={saved}
         saving={saving}
         onSave={handleSave}
-        onExport={() => setCurrentStep(5)}
-        advanceLabel={currentStep === 3 ? "Próximo: Revisão" : undefined}
-        onAdvance={currentStep === 3 ? () => setCurrentStep(4) : undefined}
+        onExport={() => setCurrentStep(6)}
+        advanceLabel={currentStep === 4 ? "Próximo: Revisão" : undefined}
+        onAdvance={currentStep === 4 ? () => setCurrentStep(5) : undefined}
       />
 
       <StudioStepper currentStep={currentStep} onStepChange={setCurrentStep} />
@@ -305,11 +341,8 @@ export default function EstudioIAPage() {
         )}
 
         {currentStep === 2 && (
-          <StepDados
-            ingredients={productFields.ingredients}
-            warnings={productFields.warnings}
-            directions={productFields.directions}
-            expiry={productFields.expiry}
+          <StepTipoRotulo
+            fields={productFields}
             onFieldChange={handleFieldChange}
             onNext={() => setCurrentStep(3)}
             onPrev={() => setCurrentStep(1)}
@@ -317,6 +350,15 @@ export default function EstudioIAPage() {
         )}
 
         {currentStep === 3 && (
+          <StepDados
+            fields={productFields}
+            onFieldChange={handleFieldChange}
+            onNext={() => setCurrentStep(4)}
+            onPrev={() => setCurrentStep(2)}
+          />
+        )}
+
+        {currentStep === 4 && (
           <div className="flex flex-1 overflow-hidden">
             <LeftPanel
               collapsed={leftCollapsed}
@@ -346,13 +388,30 @@ export default function EstudioIAPage() {
                 brandName: productFields.brandName,
                 category: productFields.category,
                 img: labelImg,
+                introduction: productFields.introduction,
+                tips: productFields.tips,
                 ingredients: productFields.ingredients,
+                ingredientsPT: productFields.ingredientsPT,
+                ingredientsEN: productFields.ingredientsEN,
+                ingredientsLink: productFields.ingredientsLink,
                 warnings: productFields.warnings,
                 directions: productFields.directions,
                 weight: productFields.weight,
                 expiry: productFields.expiry,
+                batch: productFields.batch,
                 registration: productFields.registration,
                 sac: productFields.sac,
+                barcode: productFields.barcode,
+                manufacturerName: productFields.manufacturerName,
+                manufacturerCnpj: productFields.manufacturerCnpj,
+                manufacturerIe: productFields.manufacturerIe,
+                manufacturerAddress: productFields.manufacturerAddress,
+                manufacturerChemist: productFields.manufacturerChemist,
+                manufacturerCountry: productFields.manufacturerCountry,
+                supplierName: productFields.supplierName,
+                supplierCnpj: productFields.supplierCnpj,
+                supplierIe: productFields.supplierIe,
+                supplierAddress: productFields.supplierAddress,
               }}
               layers={layers}
               activeTemplate={activeTemplate}
@@ -373,21 +432,21 @@ export default function EstudioIAPage() {
           </div>
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <StepRevisao
             fields={productFields}
             labelImg={labelImg}
-            onNext={() => setCurrentStep(5)}
-            onPrev={() => setCurrentStep(3)}
+            onNext={() => setCurrentStep(6)}
+            onPrev={() => setCurrentStep(4)}
           />
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 6 && (
           <StepExport
             labelImg={labelImg}
             productName={productFields.productName}
             brandName={productFields.brandName}
-            onPrev={() => setCurrentStep(4)}
+            onPrev={() => setCurrentStep(5)}
             onExport={handleExport}
             onSaveToGallery={handleSave}
           />
@@ -418,14 +477,25 @@ const EXPORT_TEMPLATE_STYLES: Record<string, { imgFrom: string; imgTo: string; a
 const EXPORT_DEFAULT_STYLE = { imgFrom: "#eff6ff", imgTo: "#f5f3ff", accent: "#4f46e5", accentBg: "#c7d2fe" };
 
 const EXPORT_ASSET_BADGES: Record<string, { emoji: string; short: string }> = {
-  a1: { emoji: "🌿", short: "Natural" },
-  a2: { emoji: "✅", short: "Dermato" },
-  a3: { emoji: "🏛️", short: "ANVISA" },
-  a4: { emoji: "🌱", short: "Vegano" },
-  a5: { emoji: "🚫", short: "S/ Parabenos" },
-  a6: { emoji: "✨", short: "Cruelty-free" },
-  a7: { emoji: "♻️", short: "Reciclável" },
-  a8: { emoji: "📊", short: "Cód. Barras" },
+  vegano: { emoji: "�", short: "Vegano" },
+  "cruelty-free": { emoji: "🐰", short: "Cruelty-free" },
+  natural: { emoji: "��", short: "Natural" },
+  dermato: { emoji: "✅", short: "Dermato" },
+  "sem-parabenos": { emoji: "🚫", short: "S/ Parabenos" },
+  anvisa: { emoji: "🏛️", short: "ANVISA" },
+  reciclavel: { emoji: "♻️", short: "Reciclável" },
+  reciclo: { emoji: "�", short: "Reciclo" },
+  "mat-pet": { emoji: "♳", short: "PET" },
+  "mat-pead": { emoji: "♴", short: "PEAD" },
+  "mat-pvc": { emoji: "♵", short: "PVC" },
+  "mat-pebd": { emoji: "♶", short: "PEBD" },
+  "mat-pp": { emoji: "♷", short: "PP" },
+  "mat-ps": { emoji: "♸", short: "PS" },
+  "mat-outros": { emoji: "♹", short: "Outros" },
+  "pao-6": { emoji: "�", short: "PAO 6M" },
+  "pao-12": { emoji: "🕓", short: "PAO 12M" },
+  "pao-24": { emoji: "🕓", short: "PAO 24M" },
+  "pao-36": { emoji: "🕓", short: "PAO 36M" },
 };
 
 function ExportLabelCanvas({
@@ -485,13 +555,10 @@ function ExportLabelCanvas({
           )}
 
           <div className="space-y-1.5">
-            {isVisible("ingredients") && (
-              <div className="p-2 rounded-lg">
-                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição</p>
-                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
-                  {fields.ingredients || "Composição não informada."}
-                </p>
-              </div>
+            {isVisible("introduction") && fields.introduction && (
+              <p className="text-[7px] italic text-gray-700 leading-relaxed line-clamp-3 px-2">
+                {fields.introduction}
+              </p>
             )}
 
             {isVisible("directions") && (
@@ -503,18 +570,99 @@ function ExportLabelCanvas({
               </div>
             )}
 
+            {isVisible("tips") && fields.tips && (
+              <div className="p-2 rounded-lg">
+                <p className="text-[6px] font-bold uppercase tracking-wider text-amber-500 mb-0.5">Dicas</p>
+                <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">{fields.tips}</p>
+              </div>
+            )}
+
+            {isVisible("ingredients") && (
+              <div className="p-2 rounded-lg flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Composição (INCI)</p>
+                  <p className="text-[7px] text-gray-600 leading-relaxed line-clamp-2">
+                    {fields.ingredientsPT || fields.ingredients || "Composição não informada."}
+                  </p>
+                  {fields.ingredientsEN && (
+                    <p className="text-[6px] text-gray-500 italic leading-relaxed line-clamp-2 mt-0.5">
+                      {fields.ingredientsEN}
+                    </p>
+                  )}
+                </div>
+                {fields.ingredientsLink && (
+                  <div className="shrink-0">
+                    <QrCodeSvg value={fields.ingredientsLink} size={36} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isVisible("manufacturer") && (fields.manufacturerName || fields.manufacturerCnpj) && (
+              <div className="p-2 rounded-lg">
+                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fabricado por</p>
+                <p className="text-[6px] text-gray-600 leading-tight">
+                  {fields.manufacturerName}
+                  {fields.manufacturerCnpj && ` — CNPJ ${fields.manufacturerCnpj}`}
+                  {fields.manufacturerIe && ` / IE ${fields.manufacturerIe}`}
+                </p>
+                {fields.manufacturerAddress && (
+                  <p className="text-[6px] text-gray-500 leading-tight">{fields.manufacturerAddress}</p>
+                )}
+                <p className="text-[6px] text-gray-500">
+                  {fields.manufacturerChemist && `Quím. Resp.: ${fields.manufacturerChemist} · `}
+                  {fields.manufacturerCountry || "Indústria Brasileira"}
+                </p>
+              </div>
+            )}
+
+            {isVisible("supplier") && fields.supplierName && (
+              <div className="p-2 rounded-lg">
+                <p className="text-[6px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Fornecedor exclusivo</p>
+                <p className="text-[6px] text-gray-600 leading-tight">
+                  {fields.supplierName}
+                  {fields.supplierCnpj && ` — CNPJ ${fields.supplierCnpj}`}
+                </p>
+                {fields.supplierAddress && (
+                  <p className="text-[6px] text-gray-500 leading-tight">{fields.supplierAddress}</p>
+                )}
+              </div>
+            )}
+
             {isVisible("anvisa") && (
               <div className="p-2 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[6px] font-bold text-gray-400">CONTEÚDO: {fields.weight || "—"}</p>
                     <p className="text-[6px] text-gray-400">Validade: {fields.expiry || "—"}</p>
+                    {fields.batch && <p className="text-[6px] text-gray-400">Lote: {fields.batch}</p>}
                   </div>
                   <div className="text-right">
                     <p className="text-[5px] text-gray-400">ANVISA: {fields.registration || "—"}</p>
-                    <p className="text-[5px] text-gray-400">SAC: {fields.sac || "—"}</p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {(isVisible("sac") || isVisible("barcode")) && (
+              <div className="flex items-end justify-between gap-2 px-2">
+                {isVisible("sac") && (
+                  <div>
+                    <p className="text-[5px] font-bold uppercase tracking-wider text-gray-400">SAC</p>
+                    <p className="text-[7px] text-gray-700 font-semibold">{fields.sac || "0800 000 0000"}</p>
+                  </div>
+                )}
+                {isVisible("barcode") && fields.barcode && (
+                  <div className="text-center">
+                    <BarcodeSvg
+                      value={fields.barcode}
+                      width={1}
+                      height={28}
+                      displayValue={true}
+                      className="max-w-[90px]"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
