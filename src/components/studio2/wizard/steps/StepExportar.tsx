@@ -18,7 +18,8 @@ export default function StepExportar() {
 
   const L = useStudioStore((s) => s.editor.label);
   const material = useStudioStore((s) => s.material);
-  const faces = useStudioStore((s) => Object.keys(s.editor.faces || {}));
+  const facesMap = useStudioStore((s) => s.editor.faces);
+  const faces = Object.keys(facesMap || {});
   const matComplete = isMaterialComplete(material);
 
   const doPDF = async () => {
