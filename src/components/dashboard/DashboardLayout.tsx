@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
@@ -21,7 +21,11 @@ interface User {
 
 const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const siteSettings = useSiteSettings();
+  // O estúdio (editor v2) é full-screen e tem sua própria topbar — renderiza
+  // sem o chrome do dashboard (Sidebar/Topbar/padding).
+  const fullscreen = pathname?.startsWith("/dashboard/estudio-ia");
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,9 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   }
 
   if (!user) return null;
+
+  // Estúdio full-screen: sem Sidebar/Topbar/padding (a auth acima já rodou).
+  if (fullscreen) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] dark:bg-[#0a0a0f] transition-colors duration-300">

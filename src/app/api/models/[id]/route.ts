@@ -26,13 +26,14 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const { name, canvasData } = await req.json();
+  const { name, canvasData, thumbnail } = await req.json();
 
   const updated = await prisma.subscriberModel.updateMany({
     where: { id, subscriberId: session.id },
     data: {
       ...(name ? { name: name.trim() } : {}),
       ...(canvasData !== undefined ? { canvasData } : {}),
+      ...(typeof thumbnail === "string" ? { thumbnail } : {}),
     },
   });
 

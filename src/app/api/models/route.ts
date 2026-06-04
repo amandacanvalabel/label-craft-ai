@@ -18,13 +18,14 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, canvasData } = await req.json();
+  const { name, canvasData, thumbnail } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
 
   const model = await prisma.subscriberModel.create({
     data: {
       name: name.trim(),
       canvasData: canvasData ?? {},
+      ...(typeof thumbnail === "string" ? { thumbnail } : {}),
       subscriberId: session.id,
     },
   });

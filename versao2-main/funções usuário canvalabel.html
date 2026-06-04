@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CanvaLabel · Checklist de Funções</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f0e8;
+    --paper-2:#ece6d8;
+    --ink:#2b2419;
+    --ink-soft:#6b6253;
+    --ink-faint:#9a9082;
+    --line:#ddd4c2;
+    --accent:#c1572a;
+    --accent-deep:#9d4420;
+    --accent-soft:#f0d9cc;
+    --green:#5a7d4f;
+    --green-soft:#dde7d6;
+    --gold:#b8893a;
+    --shadow:rgba(43,36,25,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Newsreader',Georgia,serif;
+    font-size:16px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(193,87,42,.04) 0, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(184,137,58,.05) 0, transparent 45%);
+    min-height:100vh;
+  }
+
+  .wrap{max-width:860px;margin:0 auto;padding:48px 28px 100px}
+
+  /* Cabeçalho */
+  header{
+    text-align:center;margin-bottom:14px;position:relative;
+  }
+  .eyebrow{
+    font-family:'Fraunces',serif;font-size:12px;font-weight:600;
+    letter-spacing:.32em;text-transform:uppercase;color:var(--accent);
+    margin-bottom:18px;
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:900;
+    font-size:clamp(38px,7vw,62px);line-height:.98;
+    letter-spacing:-.02em;margin-bottom:16px;
+  }
+  h1 em{font-style:italic;color:var(--accent)}
+  .sub{
+    font-size:18px;color:var(--ink-soft);max-width:540px;margin:0 auto;
+    font-style:italic;
+  }
+  .rule{
+    width:60px;height:2px;background:var(--accent);margin:28px auto 0;
+  }
+
+  /* Barra de progresso global */
+  .progress-card{
+    background:var(--paper-2);border:1px solid var(--line);
+    border-radius:4px;padding:26px 30px;margin:40px 0 48px;
+    box-shadow:0 2px 0 var(--line);
+    position:sticky;top:16px;z-index:50;
+    backdrop-filter:blur(8px);
+    background:rgba(236,230,216,.93);
+  }
+  .progress-top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin-bottom:16px;flex-wrap:wrap;gap:8px;
+  }
+  .progress-label{
+    font-family:'Fraunces',serif;font-size:13px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);
+  }
+  .progress-pct{
+    font-family:'Fraunces',serif;font-size:32px;font-weight:900;
+    color:var(--accent);letter-spacing:-.02em;line-height:1;
+  }
+  .progress-pct span{font-size:16px;color:var(--ink-faint);font-weight:600}
+  .progress-bar{
+    height:10px;background:var(--paper);border:1px solid var(--line);
+    border-radius:6px;overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));
+    border-radius:6px;transition:width .5s cubic-bezier(.2,.8,.3,1);
+    width:0%;
+  }
+  .progress-count{
+    font-size:13px;color:var(--ink-faint);margin-top:10px;
+    font-family:'Fraunces',serif;letter-spacing:.02em;
+  }
+
+  /* Seção */
+  .section{margin-bottom:44px;scroll-margin-top:160px}
+  .section-head{
+    display:flex;align-items:baseline;gap:14px;
+    padding-bottom:14px;margin-bottom:8px;
+    border-bottom:2px solid var(--ink);
+  }
+  .section-num{
+    font-family:'Fraunces',serif;font-size:14px;font-weight:700;
+    color:var(--accent);letter-spacing:.05em;
+  }
+  .section-title{
+    font-family:'Fraunces',serif;font-size:26px;font-weight:700;
+    letter-spacing:-.01em;flex:1;
+  }
+  .section-badge{
+    font-family:'Fraunces',serif;font-size:12px;font-weight:600;
+    color:var(--ink-faint);letter-spacing:.04em;white-space:nowrap;
+  }
+
+  /* Item de checklist */
+  .item{
+    display:flex;align-items:flex-start;gap:14px;
+    padding:13px 16px;border-radius:4px;
+    cursor:pointer;transition:background .15s;
+    border-bottom:1px solid var(--line);
+  }
+  .item:last-child{border-bottom:none}
+  .item:hover{background:var(--paper-2)}
+  .item.done{opacity:.62}
+
+  .checkbox{
+    width:24px;height:24px;flex:none;margin-top:2px;
+    border:2px solid var(--ink-soft);border-radius:5px;
+    display:grid;place-items:center;transition:.18s;
+    background:var(--paper);
+  }
+  .item:hover .checkbox{border-color:var(--accent)}
+  .item.done .checkbox{
+    background:var(--green);border-color:var(--green);
+  }
+  .checkbox svg{
+    width:15px;height:15px;stroke:#fff;stroke-width:3.5;
+    opacity:0;transform:scale(.5);transition:.18s;
+  }
+  .item.done .checkbox svg{opacity:1;transform:scale(1)}
+
+  .item-body{flex:1;min-width:0}
+  .item-title{
+    font-family:'Fraunces',serif;font-size:16px;font-weight:600;
+    letter-spacing:-.005em;line-height:1.35;
+  }
+  .item.done .item-title{text-decoration:line-through;text-decoration-color:var(--ink-faint)}
+  .item-desc{
+    font-size:14.5px;color:var(--ink-soft);margin-top:3px;line-height:1.45;
+  }
+
+  /* Navegação flutuante de seções */
+  .toc{
+    position:fixed;left:calc(50% - 600px);top:200px;width:150px;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .toc a{
+    font-family:'Fraunces',serif;font-size:12.5px;color:var(--ink-faint);
+    text-decoration:none;padding:5px 10px;border-left:2px solid var(--line);
+    transition:.15s;letter-spacing:.01em;
+  }
+  .toc a:hover{color:var(--accent);border-left-color:var(--accent)}
+  .toc a.active{color:var(--ink);border-left-color:var(--accent);font-weight:600}
+  @media(max-width:1320px){.toc{display:none}}
+
+  /* Rodapé / ações */
+  .footer-actions{
+    display:flex;gap:12px;justify-content:center;margin-top:48px;flex-wrap:wrap;
+  }
+  .btn{
+    font-family:'Fraunces',serif;font-size:14px;font-weight:600;
+    padding:11px 22px;border-radius:4px;cursor:pointer;
+    border:1.5px solid var(--ink);background:transparent;color:var(--ink);
+    transition:.15s;letter-spacing:.02em;
+  }
+  .btn:hover{background:var(--ink);color:var(--paper)}
+  .btn.print:hover{background:var(--accent);border-color:var(--accent)}
+
+  .saved-note{
+    text-align:center;font-size:13px;color:var(--ink-faint);
+    margin-top:24px;font-style:italic;
+  }
+  .saved-note b{color:var(--green);font-style:normal}
+
+  /* Legenda topo */
+  .legend{
+    display:flex;gap:20px;justify-content:center;margin-bottom:40px;
+    flex-wrap:wrap;font-size:13px;color:var(--ink-soft);
+  }
+  .legend span{display:flex;align-items:center;gap:7px}
+  .legend .dot{width:12px;height:12px;border-radius:50%}
+
+  @media print{
+    .progress-card{position:static}
+    .toc,.footer-actions,.saved-note{display:none}
+    body{background:#fff}
+    .item{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<nav class="toc" id="toc"></nav>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CanvaLabel · Controle de Produto</div>
+    <h1>Checklist de <em>Funções</em></h1>
+    <p class="sub">Todas as funcionalidades disponíveis para o usuário final. Marque o que já foi testado e validado.</p>
+    <div class="rule"></div>
+  </header>
+
+  <div class="progress-card">
+    <div class="progress-top">
+      <span class="progress-label">Progresso de validação</span>
+      <span class="progress-pct" id="pct">0<span>%</span></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="fill"></div></div>
+    <div class="progress-count" id="count">0 de 0 funções marcadas</div>
+  </div>
+
+  <div id="sections"></div>
+
+  <div class="footer-actions">
+    <button class="btn" id="checkAll">Marcar tudo</button>
+    <button class="btn" id="uncheckAll">Desmarcar tudo</button>
+    <button class="btn print" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+  <p class="saved-note">As marcações são salvas automaticamente neste navegador. <b id="lastSaved"></b></p>
+</div>
+
+<script>
+// ===== Dados: todas as funções do usuário final =====
+const DATA = [
+  {
+    titulo: "Criação de rótulo (Wizard)",
+    badge: "Fluxo principal",
+    itens: [
+      ["Tela inicial com categorias", "Escolher tipo de produto (cosméticos) para começar"],
+      ["Wizard guiado de 13 etapas", "Passo a passo do produto até o rótulo final"],
+      ["Geração com IA", "IA cria textos, listas de ingredientes e instruções"],
+      ["Seleção de material", "Escolher tipo de papel/adesivo do rótulo"],
+      ["Acabamentos", "Verniz, laminação e outros acabamentos"],
+      ["Definição de dimensões", "Tamanho e formato do rótulo com sangria"],
+    ],
+  },
+  {
+    titulo: "Editor visual",
+    badge: "Edição",
+    itens: [
+      ["Editor de arrastar e soltar", "Mover, redimensionar e posicionar elementos"],
+      ["Edição de texto rico", "Negrito, itálico, cor, tamanho e fonte"],
+      ["Paleta de cores da marca", "Cores favoritas aplicáveis com um clique"],
+      ["Inserir logo da marca", "Adicionar a logo configurada ao canvas"],
+      ["Refazer layout com IA", "Pedir novas variações de layout para a IA"],
+      ["Zoom e ajuste de tela", "Controles de zoom in/out e enquadrar"],
+      ["Desfazer / Refazer", "Histórico de até 50 ações"],
+      ["Múltiplas faces do rótulo", "Frente, verso e laterais"],
+    ],
+  },
+  {
+    titulo: "Conformidade ANVISA",
+    badge: "Diferencial",
+    itens: [
+      ["Revisor automático ANVISA", "Checagem de 18 regras da RDC 907/2024"],
+      ["Selo de status de conformidade", "Indicador visual do que falta no rótulo"],
+      ["Apontamento de itens faltantes", "Lista do que precisa corrigir (CNPJ, validade, etc)"],
+    ],
+  },
+  {
+    titulo: "Exportação e salvamento",
+    badge: "Saída",
+    itens: [
+      ["PDF técnico para gráfica", "300 DPI com marcas de corte e sangria"],
+      ["Exportar em PNG", "Imagem para uso digital"],
+      ["Preview profissional", "Visualização do rótulo antes de baixar"],
+      ["Salvamento de projeto", "Guardar e reabrir rótulos"],
+      ["Salvamento automático", "Auto-save enquanto edita"],
+    ],
+  },
+  {
+    titulo: "Organização de projetos",
+    badge: "Biblioteca",
+    itens: [
+      ["Tela inicial com projetos recentes", "\"Continuar de onde parou\""],
+      ["Pastas", "Organizar rótulos em pastas"],
+      ["Subpastas (Profissional)", "Hierarquia de pastas para o plano Pro"],
+      ["Cores e busca de pastas", "Personalizar e localizar pastas"],
+      ["Cards de projeto", "Abrir, mover, renomear e apagar projetos"],
+      ["Modal \"Meus projetos\"", "Biblioteca completa com busca e filtros"],
+    ],
+  },
+  {
+    titulo: "Conta e personalização",
+    badge: "Perfil",
+    itens: [
+      ["Menu do avatar", "Acesso rápido a conta, uso e configurações"],
+      ["Dados pessoais", "Nome, email, telefone, empresa e CNPJ"],
+      ["Identidade visual da marca", "Logo e paleta de cores (todos os planos)"],
+      ["Preferências", "Configurações de conta do usuário"],
+      ["Modo claro / escuro", "Alternância de tema"],
+      ["Equipe (Profissional)", "Convidar membros para colaborar"],
+    ],
+  },
+  {
+    titulo: "Planos e cobrança",
+    badge: "Monetização",
+    itens: [
+      ["3 planos (Free / Starter / Profissional)", "Comparação e escolha de plano"],
+      ["Aba de uso mensal", "Acompanhar gerações de IA, rótulos e storage"],
+      ["Alerta de limite atingido", "Aviso quando esgota o limite do plano"],
+      ["Pacotes adicionais de crédito", "Comprar mais gerações/imagens avulsas"],
+      ["Modal de compra de pacote", "Checkout de créditos extras"],
+      ["Histórico de faturas", "Ver cobranças anteriores"],
+      ["Aplicar cupom de desconto", "Usar código promocional"],
+    ],
+  },
+  {
+    titulo: "Suporte ao cliente",
+    badge: "Atendimento",
+    itens: [
+      ["Botão flutuante de suporte", "Acesso ao chat em qualquer tela"],
+      ["Assistente IA", "IA tenta resolver a dúvida na hora"],
+      ["Escalar para atendente humano", "Passar para uma pessoa quando a IA não resolve"],
+      ["Histórico de conversas", "Ver atendimentos anteriores"],
+      ["Enviar anexos", "Mandar prints e documentos no chat"],
+      ["Notificação de resposta", "Aviso quando o suporte responde"],
+      ["Reabrir conversa resolvida", "Voltar a um atendimento fechado"],
+    ],
+  },
+  {
+    titulo: "Comunicação recebida",
+    badge: "Avisos",
+    itens: [
+      ["Banner de avisos no topo", "Anúncios e promoções dentro do app"],
+      ["Dispensar banner", "Fechar avisos individualmente"],
+    ],
+  },
+];
+
+const STORAGE_KEY = 'canvalabel.checklist.funcoes.v1';
+
+// Carrega estado salvo
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e){ state = {}; }
+
+const sectionsEl = document.getElementById('sections');
+const tocEl = document.getElementById('toc');
+let totalItens = 0;
+
+DATA.forEach((sec, si) => {
+  totalItens += sec.itens.length;
+
+  // TOC
+  const a = document.createElement('a');
+  a.href = '#sec-' + si;
+  a.textContent = sec.titulo;
+  a.dataset.sec = si;
+  tocEl.appendChild(a);
+
+  // Seção
+  const secEl = document.createElement('section');
+  secEl.className = 'section';
+  secEl.id = 'sec-' + si;
+
+  const num = String(si + 1).padStart(2, '0');
+  let html = `
+    <div class="section-head">
+      <span class="section-num">${num}</span>
+      <span class="section-title">${sec.titulo}</span>
+      <span class="section-badge" id="secbadge-${si}"></span>
+    </div>
+  `;
+
+  sec.itens.forEach((item, ii) => {
+    const key = si + '-' + ii;
+    const done = state[key] ? 'done' : '';
+    html += `
+      <div class="item ${done}" data-key="${key}">
+        <div class="checkbox">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="item-body">
+          <div class="item-title">${item[0]}</div>
+          <div class="item-desc">${item[1]}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  secEl.innerHTML = html;
+  sectionsEl.appendChild(secEl);
+});
+
+// ===== Interação =====
+function save(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  const d = new Date();
+  document.getElementById('lastSaved').textContent =
+    'Salvo às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function updateProgress(){
+  const done = Object.values(state).filter(Boolean).length;
+  const pct = totalItens > 0 ? Math.round(done / totalItens * 100) : 0;
+  document.getElementById('fill').style.width = pct + '%';
+  document.getElementById('pct').innerHTML = pct + '<span>%</span>';
+  document.getElementById('count').textContent = `${done} de ${totalItens} funções marcadas`;
+
+  // Badges por seção
+  DATA.forEach((sec, si) => {
+    let scDone = 0;
+    sec.itens.forEach((_, ii) => { if(state[si+'-'+ii]) scDone++; });
+    const badge = document.getElementById('secbadge-' + si);
+    if(badge) badge.textContent = `${scDone}/${sec.itens.length}`;
+  });
+}
+
+document.querySelectorAll('.item').forEach(item => {
+  item.addEventListener('click', () => {
+    const key = item.dataset.key;
+    state[key] = !state[key];
+    item.classList.toggle('done', state[key]);
+    save();
+    updateProgress();
+  });
+});
+
+document.getElementById('checkAll').addEventListener('click', () => {
+  DATA.forEach((sec, si) => sec.itens.forEach((_, ii) => state[si+'-'+ii] = true));
+  document.querySelectorAll('.item').forEach(i => i.classList.add('done'));
+  save(); updateProgress();
+});
+document.getElementById('uncheckAll').addEventListener('click', () => {
+  state = {};
+  document.querySelectorAll('.item').forEach(i => i.classList.remove('done'));
+  save(); updateProgress();
+});
+
+// Scroll spy pra TOC
+const secEls = [...document.querySelectorAll('.section')];
+const tocLinks = [...document.querySelectorAll('.toc a')];
+window.addEventListener('scroll', () => {
+  let active = 0;
+  secEls.forEach((s, i) => {
+    if(window.scrollY + 220 >= s.offsetTop) active = i;
+  });
+  tocLinks.forEach((l, i) => l.classList.toggle('active', i === active));
+});
+
+updateProgress();
+</script>
+</body>
+</html>
