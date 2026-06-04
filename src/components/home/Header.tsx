@@ -236,20 +236,9 @@ const Header = () => {
     >
       <div className="max-w-[1440px] mx-auto px-6 h-18 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          {siteSettings.logoHeaderUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={siteSettings.logoHeaderUrl} alt={siteSettings.siteName} className="w-8 h-8 rounded-lg object-contain" />
-          ) : (
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
-                {siteSettings.siteName.slice(0, 2).toUpperCase()}
-              </span>
-            </div>
-          )}
-          <span className="text-lg font-bold tracking-tight text-foreground">
-            {siteSettings.siteName}
-          </span>
+        <Link href="/" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt={siteSettings.siteName} className="h-9 w-auto object-contain" />
         </Link>
 
         {/* Desktop Nav */}

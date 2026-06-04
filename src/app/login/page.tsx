@@ -71,13 +71,9 @@ const LoginPage = () => {
         <div className="neo-card p-8 sm:p-10">
           {/* Logo inside card */}
           <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                <span className="text-white font-bold text-base">CL</span>
-              </div>
-              <span className="text-2xl font-bold tracking-tight text-foreground">
-                Canva<span className="gradient-text">Label</span>
-              </span>
+            <Link href="/" className="inline-flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="CanvaLabel" className="h-11 w-auto object-contain" />
             </Link>
           </div>
           <AnimatePresence mode="wait">

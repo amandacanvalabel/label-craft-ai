@@ -60,9 +60,8 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20 animate-pulse">
-            <span className="text-white font-bold text-sm">{siteSettings.siteName.slice(0, 2).toUpperCase()}</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/favicon.png" alt={siteSettings.siteName} className="w-14 h-14 object-contain animate-pulse" />
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />

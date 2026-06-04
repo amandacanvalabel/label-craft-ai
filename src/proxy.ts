@@ -15,7 +15,9 @@ export default async function proxy(req: NextRequest) {
     pathname === "/login" ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon")
+    pathname.startsWith("/favicon") ||
+    // Arquivos estáticos públicos (logo, imagens, fontes, etc.)
+    /\.(png|jpe?g|svg|gif|webp|ico|css|js|map|woff2?|ttf|txt|xml|json)$/i.test(pathname)
   ) {
     // If logged in and trying to access login, redirect to dashboard
     if (pathname === "/login" && token) {

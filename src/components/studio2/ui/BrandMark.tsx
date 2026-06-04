@@ -15,11 +15,9 @@ export default function BrandMark({ withLabel, id }: { withLabel?: boolean; id?:
 
   return (
     <button className="brand brand-link" id={id} title="Voltar para os modelos" onClick={goHome}>
-      <span className="mk">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="6" width="18" height="12" rx="2" />
-          <path d="M7 10h6M7 14h4" />
-        </svg>
+      <span className="mk" style={{ background: "transparent", padding: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/favicon.png" alt="CanvaLabel" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </span>
       {withLabel && (
         <span>

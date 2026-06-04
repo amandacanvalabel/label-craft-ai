@@ -52,17 +52,9 @@ const Footer = async () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-16">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-5">
-              {settings.logoFooterUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={settings.logoFooterUrl} alt={settings.siteName} className="w-8 h-8 rounded-lg object-contain" />
-              ) : (
-                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">
-                    {settings.siteName.slice(0, 2).toUpperCase()}
-                  </span>
-                </div>
-              )}
+            <Link href="/" className="flex items-center gap-2.5 mb-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/favicon.png" alt={settings.siteName} className="w-9 h-9 object-contain" />
               <span className="text-lg font-bold tracking-tight">
                 {settings.siteName}
               </span>

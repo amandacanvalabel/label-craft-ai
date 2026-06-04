@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: settings.keywords,
     metadataBase: new URL(settings.canonicalUrl),
     alternates: { canonical: settings.canonicalUrl },
-    icons: settings.faviconUrl ? { icon: settings.faviconUrl, shortcut: settings.faviconUrl } : undefined,
+    icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/favicon.png" },
     openGraph: {
       title: settings.metaTitle,
       description: settings.metaDescription,

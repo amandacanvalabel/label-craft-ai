@@ -66,16 +66,8 @@ const Sidebar = ({ role, expanded, onExpandedChange }: SidebarProps) => {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-border/40 dark:border-white/8 shrink-0">
         <Link href={role === "ADMIN" ? "/admin" : "/dashboard"} className="flex items-center gap-3 overflow-hidden">
-          {siteSettings.logoHeaderUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={siteSettings.logoHeaderUrl} alt={siteSettings.siteName} className="w-10 h-10 rounded-xl object-contain shadow-md shadow-primary/20 shrink-0" />
-          ) : (
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
-              <span className="text-white font-bold text-sm">
-                {siteSettings.siteName.slice(0, 2).toUpperCase()}
-              </span>
-            </div>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/favicon.png" alt={siteSettings.siteName} className="w-10 h-10 object-contain shrink-0" />
           <AnimatePresence>
             {expanded && (
               <motion.span
