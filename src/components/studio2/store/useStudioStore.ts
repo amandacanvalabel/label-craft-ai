@@ -65,6 +65,7 @@ export function createInitialState(): StudioState {
       briefingVector: null,
       variations: [],
       chosenVariation: 0,
+      brief: null,
     },
     editor: {
       label: { w: 70, h: 90, bleed: 3, safe: 4, bg: "#ffffff" },

@@ -171,6 +171,20 @@ export interface AnalysisResult {
   [k: string]: unknown;
 }
 
+export type Palette = { bg: string; primary: string; accent: string; secondary: string; text: string };
+
+// Briefing de design produzido pela IA real (/api/ai/generate-design): estilo,
+// template e paletas. Alimenta o motor de geração editável (não posiciona
+// elementos — apenas direciona template + cores + cópia).
+export interface AiBrief {
+  templateId: string;
+  style: Record<string, number>;
+  palette: Palette;
+  palettes: { name: string; roles: Palette }[];
+  copy: { nome: string; oque: string; ativos: string; volume: string };
+  note: string;
+}
+
 export interface AiState {
   prompt: string;
   extractedPalette: string[];
@@ -178,6 +192,7 @@ export interface AiState {
   briefingVector: Record<string, number> | null;
   variations: Variation[];
   chosenVariation: number;
+  brief: AiBrief | null;
 }
 
 export interface Variation {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStudioStore } from "../../store/useStudioStore";
 import { stepIdx } from "../../data/steps";
 import { analyzeReferences } from "../../generate/analyze";
+import { fetchAiBrief } from "../../generate/aiBrief";
 
 // Porte de RENDER.gerando — animação de etapas + geração assíncrona.
 export default function StepGerando() {
@@ -13,6 +14,7 @@ export default function StepGerando() {
   const setAnalysis = useStudioStore((s) => s.setAnalysis);
   const generateVariationsNow = useStudioStore((s) => s.generateVariationsNow);
   const applyVariation = useStudioStore((s) => s.applyVariation);
+  const patch = useStudioStore((s) => s.patch);
 
   const hasPrompt = !!(prompt && prompt.trim().length > 0);
   const hasRefs = !!(refs && refs.length > 0);
@@ -33,14 +35,42 @@ export default function StepGerando() {
     if (startedRef.current) return;
     startedRef.current = true;
 
+    // Navega para "variacoes" só quando animação E geração terminarem — assim a
+    // chamada de IA (que pode demorar mais que a animação) sempre é refletida.
+    let animDone = false;
+    let genDone = false;
+    let navigated = false;
+    const maybeGo = () => {
+      if (animDone && genDone && !navigated) {
+        navigated = true;
+        go(stepIdx("variacoes"));
+      }
+    };
+
     // Geração em paralelo à animação
     (async () => {
       if (hasRefs) {
         const analysis = await analyzeReferences(refs);
         setAnalysis(analysis);
       }
+      // IA real interpreta o prompt → briefing de design (template + paleta +
+      // cópia). Null = sem chave/offline/erro: cai no parsing heurístico.
+      const brief = await fetchAiBrief(useStudioStore.getState());
+      if (brief) {
+        patch("ai", { brief });
+        // Preenche campos da frente só quando o usuário não informou (não
+        // sobrescreve o que ele digitou no wizard).
+        const f = useStudioStore.getState().frente;
+        const fill: Record<string, string> = {};
+        (["nome", "oque", "ativos", "volume"] as const).forEach((k) => {
+          if (!f[k]?.trim() && brief.copy[k]?.trim()) fill[k] = brief.copy[k];
+        });
+        if (Object.keys(fill).length) patch("frente", fill);
+      }
       generateVariationsNow();
       applyVariation(0);
+      genDone = true;
+      maybeGo();
     })();
 
     // Animação dos passos
@@ -51,7 +81,10 @@ export default function StepGerando() {
       if (i < steps.length) {
         timer = setTimeout(tick, 520);
       } else {
-        timer = setTimeout(() => go(stepIdx("variacoes")), 380);
+        timer = setTimeout(() => {
+          animDone = true;
+          maybeGo();
+        }, 380);
       }
     };
     let timer = setTimeout(tick, 350);

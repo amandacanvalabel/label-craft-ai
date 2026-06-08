@@ -108,6 +108,11 @@ function buildBriefingVector(state: StudioState): { vec: StyleVec; promptColors:
   let vec = makeVector();
   const parsed = parsePrompt(state.ai.prompt);
   vec = mergeVectors(vec, parsed.vec, 1, 2);
+  // Quando há briefing de IA real, ele domina a interpretação do prompt
+  // (peso forte sobre o parsing heurístico de palavras-chave).
+  if (state.ai.brief?.style) {
+    vec = mergeVectors(vec, state.ai.brief.style, 1, 3);
+  }
   if (state.ai.analysis) {
     vec = mergeVectors(vec, visualAnalysisToVector(state.ai.analysis), 2, 1);
   }
@@ -127,10 +132,31 @@ function buildVariation(tpl: (typeof TEMPLATES)[number], paletteEntry: { name: s
 // Gera 4 variações combinando rank de templates (por distância do vetor) com paletas.
 export function generateVariations(state: StudioState): { variations: Variation[]; briefingVector: StyleVec } {
   const { vec: brief, promptColors } = buildBriefingVector(state);
+  const aiBrief = state.ai.brief;
 
   const ranked = TEMPLATES.map((t) => ({ tpl: t, distance: vectorDistance(brief, t.style || makeVector()) })).sort(
     (a, b) => a.distance - b.distance,
   );
+
+  // Caminho IA real: a 1ª variação é exatamente a recomendação da IA (template
+  // + paleta escolhidos pelo modelo a partir do prompt); as demais usam as
+  // paletas alternativas sugeridas pela IA e templates próximos. Tudo continua
+  // sendo Elements editáveis montados pelo motor de templates.
+  if (aiBrief) {
+    const aiTpl = TEMPLATES.find((t) => t.id === aiBrief.templateId) || ranked[0].tpl;
+    const out: Variation[] = [];
+    out.push(buildVariation(aiTpl, { name: "Recomendação da IA", roles: aiBrief.palette }));
+    aiBrief.palettes.forEach((p) => {
+      if (out.length < 4) out.push(buildVariation(aiTpl, { name: p.name, roles: p.roles }));
+    });
+    for (const r of ranked) {
+      if (out.length >= 4) break;
+      if (r.tpl.id === aiTpl.id) continue;
+      out.push(buildVariation(r.tpl, { name: r.tpl.name, roles: aiBrief.palette }));
+    }
+    while (out.length < 4) out.push(buildVariation(aiTpl, { name: aiTpl.name, roles: aiTpl.palette }));
+    return { variations: out.slice(0, 4), briefingVector: brief };
+  }
 
   const palettes: { name: string; roles: Palette }[] = [];
   const extractedRoles = state.ai.analysis ? paletteToRoles(state.ai.analysis.palette) : null;
