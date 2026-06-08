@@ -189,8 +189,15 @@ export default function PropsPanel({ onOpenFontPicker, onChangeShape }: { onOpen
             {el.type === "text" && (
               <div className="prow"><div className="pfield"><label>Alinhamento</label>
                 <div className="seg">
-                  {(["left", "center", "right", "justify"] as const).map((a) => (
-                    <button key={a} className={el.align === a ? "on" : ""} onClick={() => up({ align: a })}>{a[0].toUpperCase()}</button>
+                  {([
+                    ["left", "M3 6h18M3 12h12M3 18h15"],
+                    ["center", "M3 6h18M6 12h12M5 18h14"],
+                    ["right", "M3 6h18M9 12h12M6 18h15"],
+                    ["justify", "M3 6h18M3 12h18M3 18h18"],
+                  ] as const).map(([a, d]) => (
+                    <button key={a} className={el.align === a ? "on" : ""} title={a} onClick={() => up({ align: a })}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" dangerouslySetInnerHTML={{ __html: `<path d="${d}"/>` }} />
+                    </button>
                   ))}
                 </div></div>
                 <div className="pfield" style={{ flex: "0 0 52px" }}><label>Estilo</label>

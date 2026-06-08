@@ -19,6 +19,7 @@ interface Guide { axis: "v" | "h"; pos: number; }
 export default function Canvas() {
   const editor = useStudioStore((s) => s.editor);
   const finishes = useStudioStore((s) => s.finishes);
+  const edSetZoom = useStudioStore((s) => s.edSetZoom);
   const edSetFaceEls = useStudioStore((s) => s.edSetFaceEls);
   const edSelect = useStudioStore((s) => s.edSelect);
   const edToggle = useStudioStore((s) => s.edToggle);
@@ -33,6 +34,8 @@ export default function Canvas() {
   const selected = new Set(selIds(editor));
 
   const artRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<HTMLDivElement>(null);
+  const spaceRef = useRef(false);
   const rulerTopRef = useRef<HTMLCanvasElement>(null);
   const rulerLeftRef = useRef<HTMLCanvasElement>(null);
 
@@ -71,6 +74,66 @@ export default function Canvas() {
     paint(rulerTopRef.current, label.w, "h");
     paint(rulerLeftRef.current, label.h, "v");
   }, [label.w, label.h, ppm]);
+
+  // ---- zoom (Ctrl/Cmd + scroll) + pan (espaço/botão do meio + arrastar) ----
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const z = useStudioStore.getState().editor.zoom;
+      edSetZoom(z * (e.deltaY < 0 ? 1.12 : 0.9));
+    };
+
+    const isTyping = () => {
+      const ae = document.activeElement as HTMLElement | null;
+      return !!(ae && ["INPUT", "TEXTAREA", "SELECT"].includes(ae.tagName)) || !!document.querySelector(".el-text.editing");
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || spaceRef.current || isTyping()) return;
+      spaceRef.current = true;
+      e.preventDefault();
+      ws.style.cursor = "grab";
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      spaceRef.current = false;
+      ws.style.cursor = "";
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 1 && !spaceRef.current) return;
+      // Pan: intercepta antes da seleção do artboard (fase de captura).
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX, startY = e.clientY, sx = ws.scrollLeft, sy = ws.scrollTop;
+      ws.style.cursor = "grabbing";
+      const onMove = (ev: PointerEvent) => {
+        ws.scrollLeft = sx - (ev.clientX - startX);
+        ws.scrollTop = sy - (ev.clientY - startY);
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        ws.style.cursor = spaceRef.current ? "grab" : "";
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    };
+
+    ws.addEventListener("wheel", onWheel, { passive: false });
+    ws.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      ws.removeEventListener("wheel", onWheel);
+      ws.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [edSetZoom]);
 
   // ---- helpers ----
   const ptToMm = (e: { clientX: number; clientY: number }) => {
@@ -274,7 +337,7 @@ export default function Canvas() {
   useEffect(() => () => dragRef.current?.cleanup(), []);
 
   return (
-    <div className="workspace" id="workspace">
+    <div className="workspace" id="workspace" ref={wsRef}>
       <div className="stage">
         <div className="canvas-frame" id="frame">
           <div className="ruler-corner">mm</div>
