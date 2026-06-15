@@ -25,6 +25,7 @@ export default function PropsPanel({ onOpenFontPicker, onChangeShape }: { onOpen
   const edDuplicate = useStudioStore((s) => s.edDuplicate);
   const edDelete = useStudioStore((s) => s.edDelete);
   const edAlignMulti = useStudioStore((s) => s.edAlignMulti);
+  const brandColors = useStudioStore((s) => s.brandColors);
 
   const ids = selIds(editor);
   const els = editor.faces[editor.face] || [];
@@ -54,9 +55,19 @@ export default function PropsPanel({ onOpenFontPicker, onChangeShape }: { onOpen
   };
 
   const swatches = (onPick: (c: string) => void): ReactNode => (
-    <div className="swatches">
-      {PALETTE.map((c) => <div key={c} className="swatch" style={{ background: c }} onClick={() => onPick(c)} />)}
-    </div>
+    <>
+      {brandColors.length > 0 && (
+        <div className="brand-swatches">
+          <div className="brand-swatches-lbl">Cores da marca</div>
+          <div className="swatches">
+            {brandColors.map((c) => <div key={"b" + c} className="swatch" style={{ background: c }} title={c} onClick={() => onPick(c)} />)}
+          </div>
+        </div>
+      )}
+      <div className="swatches">
+        {PALETTE.map((c) => <div key={c} className="swatch" style={{ background: c }} onClick={() => onPick(c)} />)}
+      </div>
+    </>
   );
 
   const slider = (label: string, value: number, min: number, max: number, step: number, fmt: (v: number) => string, onInput: (v: number) => void): ReactNode => (

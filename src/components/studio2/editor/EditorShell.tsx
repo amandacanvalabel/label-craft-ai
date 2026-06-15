@@ -19,6 +19,7 @@ import { SHAPE_LIB } from "../data/svgLibs";
 import AnvisaPanel from "../anvisa/AnvisaPanel";
 import { runAnvisaChecks } from "../anvisa/checks";
 import PreviewModal from "./PreviewModal";
+import RefazerModal from "./RefazerModal";
 import { saveProject } from "../store/persistence";
 
 // Porte de #editor + buildEditor/edEnter. Canvas + toolbar + topbar interativa.
@@ -44,6 +45,7 @@ export default function EditorShell() {
   const [shapeGallery, setShapeGallery] = useState<null | { mode: "add" } | { mode: "change"; el: El }>(null);
   const [anvisaOpen, setAnvisaOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const dirty = useStudioStore((s) => s.dirty);
   const projectId = useStudioStore((s) => s.projectId);
@@ -174,7 +176,7 @@ export default function EditorShell() {
           <span className="tbtn-lbl">Salvar</span>
         </button>
         <div className="sep" />
-        <button className="tbtn" id="btnRegen" title="Refazer o layout com a IA" onClick={() => toast("Refazer com IA na Fase 5")}>
+        <button className="tbtn" id="btnRegen" title="Refazer o layout com a IA" onClick={() => setRegenOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2L12 8l6.5.5-5 4 1.5 6.5L9.5 15 4 19l1.5-6.5-5-4L7 8z" /></svg>
           <span className="tbtn-lbl">Refazer com IA</span>
         </button>
@@ -241,6 +243,7 @@ export default function EditorShell() {
         />
       )}
       {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)} />}
+      {regenOpen && <RefazerModal onClose={() => setRegenOpen(false)} />}
       {shapeGallery && (
         <ShapeGalleryModal
           onClose={() => setShapeGallery(null)}

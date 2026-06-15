@@ -95,8 +95,10 @@ export interface StudioStore extends StudioState {
   projectName: string;
   lastSaved: number | null;
   edReady: boolean;
+  brandColors: string[]; // paleta da marca do assinante (config), aplicável no editor
 
   // --- ações ---
+  setBrandColors: (colors: string[]) => void;
   go: (i: number) => void;
   goId: (id: StepId) => void;
   set: (partial: Partial<StudioState>) => void;
@@ -176,6 +178,8 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
   projectName: "Rótulo",
   lastSaved: null,
   edReady: false,
+  brandColors: [],
+  setBrandColors: (colors) => set({ brandColors: colors }),
   undoStack: [],
   undoIndex: -1,
 

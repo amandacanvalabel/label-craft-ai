@@ -23,6 +23,9 @@ export async function GET() {
       neighborhood: true,
       country: true,
       avatar: true,
+      brandName: true,
+      brandLogo: true,
+      brandColors: true,
     },
   });
 
@@ -39,6 +42,8 @@ const updateSchema = z.object({
   street: z.string().optional(),
   number: z.string().optional(),
   neighborhood: z.string().optional(),
+  brandName: z.string().max(80).optional(),
+  brandColors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida")).max(12).optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -48,7 +53,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const data = updateSchema.parse(body);
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+  }
+  const data = parsed.data;
 
   // Check if email already taken by someone else
   if (data.email && data.email !== session.email) {

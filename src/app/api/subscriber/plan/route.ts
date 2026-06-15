@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUsage } from "@/lib/usage";
 import { NextResponse } from "next/server";
 
 const PLAN_DURATION_DAYS: Record<string, number> = {
@@ -89,10 +90,8 @@ export async function GET() {
     };
   }
 
-  // Usage
-  const usage = {
-    labelsCreated: subscriber.models.length,
-  };
+  // Uso detalhado (IA, imagem, rótulos, storage) com limites do plano.
+  const usage = await getUsage(session.id);
 
   // Billing history
   const billingHistory = subscriber.payments.map((p) => ({

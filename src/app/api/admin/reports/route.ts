@@ -183,14 +183,14 @@ export async function GET(req: NextRequest) {
   }));
 
   // Sales by plan — fetch plan names
-  const planIds = salesByPlanRaw.map((r) => r.planId);
+  const planIds = salesByPlanRaw.map((r) => r.planId).filter((id): id is string => id !== null);
   const plans = planIds.length
     ? await prisma.plan.findMany({ where: { id: { in: planIds } }, select: { id: true, name: true } })
     : [];
   const planNameMap = new Map(plans.map((p) => [p.id, p.name]));
 
   const salesByPlan = salesByPlanRaw.map((r) => ({
-    name: planNameMap.get(r.planId) ?? "Desconhecido",
+    name: r.planId ? (planNameMap.get(r.planId) ?? "Desconhecido") : "Pacote de créditos",
     count: r._count.id,
     revenue: r._sum.amount ?? 0,
   }));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getUsage } from "@/lib/usage";
 
 export async function GET() {
   const session = await getSession();
@@ -20,6 +21,17 @@ export async function POST(req: Request) {
 
   const { name, canvasData, thumbnail } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
+
+  // Limite de rótulos salvos do plano (cobrança avançada).
+  if (session.role === "SUBSCRIBER") {
+    const usage = await getUsage(session.id);
+    if (usage && usage.labels.remaining !== null && usage.labels.remaining <= 0) {
+      return NextResponse.json(
+        { error: "Você atingiu o limite de rótulos salvos do seu plano. Faça upgrade para salvar mais.", code: "LIMIT_REACHED" },
+        { status: 402 },
+      );
+    }
+  }
 
   const model = await prisma.subscriberModel.create({
     data: {

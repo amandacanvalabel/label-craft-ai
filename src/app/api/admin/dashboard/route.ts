@@ -124,7 +124,7 @@ export async function GET() {
   const recentSales = recentPayments.map((p) => ({
     id: p.id,
     subscriberName: p.subscriber.name,
-    planName: p.plan.name,
+    planName: p.plan?.name ?? "Pacote de créditos",
     method: METHOD_LABEL[p.method] ?? p.method,
     amount: p.amount,
     status: p.status,

@@ -122,6 +122,9 @@ const Planos = () => {
   const [loading, setLoading] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
+  const [coupon, setCoupon] = useState("");
+  const [couponInfo, setCouponInfo] = useState<{ discount: number; finalAmount: number; label: string } | null>(null);
+  const [couponErr, setCouponErr] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [userData, setUserData] = useState<UserFormData>({
@@ -238,6 +241,8 @@ const Planos = () => {
         paymentMethod,
       };
 
+      if (couponInfo && coupon.trim()) body.couponCode = coupon.trim();
+
       if (paymentMethod === "card") {
         body.creditCard = {
           holderName: cardData.holderName,
@@ -276,6 +281,23 @@ const Planos = () => {
       setStep("userdata");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const applyCoupon = async () => {
+    if (!coupon.trim() || !selectedPlan) return;
+    setCouponErr("");
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: coupon, amount: getPrice(selectedPlan) }),
+      });
+      const d = await res.json();
+      if (d.valid) { setCouponInfo({ discount: d.discount, finalAmount: d.finalAmount, label: d.label }); }
+      else { setCouponInfo(null); setCouponErr(d.error || "Cupom inválido"); }
+    } catch {
+      setCouponErr("Erro ao validar o cupom");
     }
   };
 
@@ -538,10 +560,16 @@ const Planos = () => {
                 </p>
                 {step !== "success" && (
                   <div className="mt-3 flex items-end gap-1">
+                    {couponInfo && (
+                      <span className="text-lg font-semibold line-through text-white/50 mr-1">
+                        R$ {getPrice(selectedPlan).toFixed(2).replace(".", ",")}
+                      </span>
+                    )}
                     <span className="text-3xl font-extrabold">
-                      R$ {getPrice(selectedPlan).toFixed(2).replace(".", ",")}
+                      R$ {(couponInfo ? couponInfo.finalAmount : getPrice(selectedPlan)).toFixed(2).replace(".", ",")}
                     </span>
                     <span className="text-white/70 text-sm mb-0.5">/mês</span>
+                    {couponInfo && <span className="ml-2 mb-0.5 px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[11px] font-semibold">{couponInfo.label}</span>}
                   </div>
                 )}
 
@@ -842,6 +870,29 @@ const Planos = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Cupom de desconto */}
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Cupom de desconto</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={coupon}
+                            onChange={(e) => { setCoupon(e.target.value.toUpperCase()); setCouponInfo(null); setCouponErr(""); }}
+                            className="flex-1 px-4 py-3 rounded-xl border border-border/60 bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                            placeholder="Ex.: BEMVINDO10"
+                          />
+                          <button
+                            type="button"
+                            onClick={applyCoupon}
+                            className="px-4 py-3 rounded-xl border border-border/60 bg-muted/40 text-sm font-semibold hover:bg-muted/70 transition-all"
+                          >
+                            Aplicar
+                          </button>
+                        </div>
+                        {couponErr && <p className="text-xs text-red-500 mt-1.5">{couponErr}</p>}
+                        {couponInfo && <p className="text-xs text-emerald-600 mt-1.5">Cupom {couponInfo.label} aplicado — você economiza R$ {couponInfo.discount.toFixed(2).replace(".", ",")}</p>}
+                      </div>
 
                       <button
                         onClick={handleSubmitUserData}

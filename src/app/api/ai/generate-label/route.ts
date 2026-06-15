@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { checkCredit, consumeCredit } from "@/lib/usage";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -13,6 +14,11 @@ export async function POST(req: NextRequest) {
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt obrigatório" }, { status: 400 });
+    }
+
+    if (session.role === "SUBSCRIBER") {
+      const c = await checkCredit(session.id, "ai");
+      if (!c.ok) return NextResponse.json({ error: c.error, code: "LIMIT_REACHED" }, { status: 402 });
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -92,6 +98,8 @@ Regras obrigatórias:
 
     const fields = parsed.fields ?? {};
     const filledCount = Object.values(fields).filter((v) => v?.trim()).length;
+
+    if (session.role === "SUBSCRIBER") await consumeCredit(session.id, "ai");
 
     return NextResponse.json({
       message: parsed.message ?? `${filledCount} campo(s) gerado(s) com sucesso.`,

@@ -30,6 +30,18 @@ export default function StudioApp({ modelId }: StudioAppProps) {
     return () => obs.disconnect();
   }, []);
 
+  // Carrega a paleta da marca do assinante (config) para uso no editor.
+  useEffect(() => {
+    fetch("/api/subscriber/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.brandColors)) {
+          useStudioStore.getState().setBrandColors(data.brandColors);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Carrega modelo existente via ?id= e abre direto no editor.
   useEffect(() => {
     if (!modelId) return;

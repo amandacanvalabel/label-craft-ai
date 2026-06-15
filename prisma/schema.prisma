@@ -42,6 +42,16 @@ enum AIProvider {
   LEONARDO
 }
 
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum PaymentKind {
+  SUBSCRIPTION
+  CREDIT_PACKAGE
+}
+
 // ==================== MODELS ====================
 
 model Admin {
@@ -99,6 +109,18 @@ model Subscriber {
   planId    String?
   plan      Plan?    @relation(fields: [planId], references: [id])
 
+  // Identidade visual da marca (todos os planos)
+  brandName   String?
+  brandLogo   String?
+  brandColors String[] @default([])
+
+  // Uso e créditos (cobrança avançada)
+  aiCreditsUsed     Int      @default(0)  // gerações de IA usadas no ciclo
+  imageCreditsUsed  Int      @default(0)  // gerações de imagem usadas no ciclo
+  extraAiCredits    Int      @default(0)  // créditos avulsos comprados (não expiram no ciclo)
+  extraImageCredits Int      @default(0)
+  usagePeriodStart  DateTime @default(now()) // início do ciclo de uso (reset mensal)
+
   payments  Payment[]
   models    SubscriberModel[]
 
@@ -118,6 +140,12 @@ model Plan {
   promotionalPrice Float?
   isActive         Boolean  @default(true)
 
+  // Limites mensais (-1 = ilimitado)
+  monthlyAiCredits    Int @default(50)
+  monthlyImageCredits Int @default(10)
+  maxLabels           Int @default(20)
+  storageMb           Int @default(100)
+
   subscribers Subscriber[]
   payments    Payment[]
 
@@ -132,19 +160,60 @@ model Payment {
   amount          Float
   method          PaymentMethod
   status          PaymentStatus @default(PENDING)
+  kind            PaymentKind   @default(SUBSCRIPTION)
   asaasPaymentId  String?       @unique
   asaasInvoiceUrl String?
+
+  couponCode     String?
+  creditsApplied Boolean @default(false) // pacote: créditos já lançados ao subscriber?
 
   subscriberId String
   subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
 
-  planId String
-  plan   Plan   @relation(fields: [planId], references: [id])
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  creditPackageId String?
+  creditPackage   CreditPackage? @relation(fields: [creditPackageId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("payments")
+}
+
+model CreditPackage {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  aiCredits    Int      @default(0)
+  imageCredits Int      @default(0)
+  price        Float
+  isActive     Boolean  @default(true)
+
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("credit_packages")
+}
+
+model Coupon {
+  id         String     @id @default(cuid())
+  code       String     @unique
+  type       CouponType @default(PERCENT)
+  value      Float      // PERCENT: 0-100; FIXED: valor em R$
+  isActive   Boolean    @default(true)
+  maxUses    Int?       // null = ilimitado
+  usedCount  Int        @default(0)
+  minAmount  Float?     // valor mínimo da compra para aplicar
+  expiresAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
 }
 
 model SiteMetrics {

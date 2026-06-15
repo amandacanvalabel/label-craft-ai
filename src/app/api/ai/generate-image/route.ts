@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { checkCredit, consumeCredit } from "@/lib/usage";
 
 /**
  * POST /api/ai/generate-image
@@ -35,6 +36,11 @@ export async function POST(req: NextRequest) {
       moodKeywords?: string;
       size?: "1024x1024" | "1024x1536" | "1536x1024";
     };
+
+    if (session.role === "SUBSCRIBER") {
+      const c = await checkCredit(session.id, "image");
+      if (!c.ok) return NextResponse.json({ error: c.error, code: "LIMIT_REACHED" }, { status: 402 });
+    }
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -99,6 +105,8 @@ Requisitos técnicos do rótulo:
     if (!imageBase64) {
       return NextResponse.json({ error: "Imagem não retornada pela IA" }, { status: 502 });
     }
+
+    if (session.role === "SUBSCRIBER") await consumeCredit(session.id, "image");
 
     return NextResponse.json({ imageBase64, prompt });
   } catch (error) {

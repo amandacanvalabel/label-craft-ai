@@ -11,6 +11,9 @@ import {
   HiOutlineEye,
   HiOutlineEyeSlash,
   HiOutlineCamera,
+  HiOutlineSwatch,
+  HiOutlinePlus,
+  HiOutlineXMark,
 } from "react-icons/hi2";
 import PageHeader from "@/components/admin/PageHeader";
 import FormField, { Input, Toggle, Button } from "@/components/admin/FormField";
@@ -19,6 +22,7 @@ import { cn } from "@/lib/utils";
 const tabs = [
   { key: "profile", label: "Perfil", icon: HiOutlineUser },
   { key: "security", label: "Segurança", icon: HiOutlineShieldCheck },
+  { key: "brand", label: "Marca", icon: HiOutlineSwatch },
   { key: "notifications", label: "Notificações", icon: HiOutlineBellAlert },
   { key: "appearance", label: "Aparência", icon: HiOutlinePaintBrush },
 ] as const;
@@ -87,6 +91,16 @@ export default function ConfiguracoesPage() {
     city: "", state: "", street: "", number: "", neighborhood: "",
   });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Brand identity
+  const [brandName, setBrandName] = useState("");
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
+  const [brandColors, setBrandColors] = useState<string[]>([]);
+  const [newColor, setNewColor] = useState("#2563eb");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const brandLogoInputRef = useRef<HTMLInputElement>(null);
+
   const initials = profile.name
     ? profile.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
     : "?";
@@ -125,6 +139,9 @@ export default function ConfiguracoesPage() {
             neighborhood: data.neighborhood ?? "",
           });
           if (data.avatar) setAvatarUrl(data.avatar);
+          setBrandName(data.brandName ?? "");
+          setBrandLogo(data.brandLogo ?? null);
+          setBrandColors(Array.isArray(data.brandColors) ? data.brandColors : []);
         }
       })
       .catch(() => {})
@@ -155,6 +172,57 @@ export default function ConfiguracoesPage() {
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleBrandLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const res = await fetch("/api/subscriber/brand-logo", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Erro ao enviar logo"); return; }
+      setBrandLogo(data.brandLogo);
+      toast.success("Logo da marca atualizada");
+    } catch {
+      toast.error("Erro ao enviar logo");
+    } finally {
+      setUploadingLogo(false);
+      if (brandLogoInputRef.current) brandLogoInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveBrandLogo = async () => {
+    setBrandLogo(null);
+    await fetch("/api/subscriber/brand-logo", { method: "DELETE" });
+  };
+
+  const addBrandColor = () => {
+    const c = newColor.toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(c)) { toast.error("Cor inválida"); return; }
+    if (brandColors.includes(c)) return;
+    if (brandColors.length >= 12) { toast.error("Máximo de 12 cores"); return; }
+    setBrandColors([...brandColors, c]);
+  };
+
+  const handleSaveBrand = async () => {
+    setSavingBrand(true);
+    try {
+      const res = await fetch("/api/subscriber/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandName: brandName || undefined, brandColors }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Erro ao salvar"); return; }
+      toast.success("Identidade da marca salva");
+    } catch {
+      toast.error("Erro ao salvar a marca");
+    } finally {
+      setSavingBrand(false);
     }
   };
 
@@ -340,6 +408,73 @@ export default function ConfiguracoesPage() {
                 <div className="flex justify-end mt-5">
                   <Button variant="primary" size="sm" onClick={handleSaveProfile} disabled={savingProfile || loadingProfile}>
                     {savingProfile ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
+              </SettingsSection>
+            </>
+          )}
+
+          {/* ── Brand Tab ── */}
+          {activeTab === "brand" && (
+            <>
+              <SettingsSection title="Identidade da Marca" desc="Disponível em todos os planos. Usada no editor para aplicar sua identidade com um clique." delay={0.1}>
+                <div className="flex items-center gap-5">
+                  <div className="w-24 h-24 rounded-2xl border border-border/50 dark:border-white/10 bg-muted/30 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                    {brandLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={brandLogo} alt="Logo da marca" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <HiOutlineSwatch className="w-8 h-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <input ref={brandLogoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleBrandLogoUpload} className="hidden" />
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onClick={() => brandLogoInputRef.current?.click()} disabled={uploadingLogo}>
+                        <HiOutlineCamera className="w-4 h-4" />
+                        {uploadingLogo ? "Enviando..." : "Enviar logo"}
+                      </Button>
+                      {brandLogo && (
+                        <Button variant="ghost" onClick={handleRemoveBrandLogo}>Remover</Button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">PNG, SVG, JPG ou WebP. Máx. 2MB.</p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <FormField label="Nome da marca">
+                    <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="Ex.: Bella Cosméticos" />
+                  </FormField>
+                </div>
+              </SettingsSection>
+
+              <SettingsSection title="Paleta de Cores da Marca" desc="Suas cores favoritas aparecem no editor para aplicar com um clique." delay={0.15}>
+                <div className="flex flex-wrap gap-2.5 mb-4">
+                  {brandColors.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhuma cor adicionada ainda.</p>
+                  )}
+                  {brandColors.map((c) => (
+                    <div key={c} className="group relative">
+                      <div className="w-12 h-12 rounded-xl border border-border/50 dark:border-white/10 shadow-sm" style={{ background: c }} title={c} />
+                      <button
+                        onClick={() => setBrandColors(brandColors.filter((x) => x !== c))}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                        aria-label={`Remover ${c}`}
+                      >
+                        <HiOutlineXMark className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="w-10 h-10 rounded-lg border border-border/50 dark:border-white/10 cursor-pointer bg-transparent" />
+                  <Input value={newColor} onChange={(e) => setNewColor(e.target.value)} className="w-32 font-mono uppercase" />
+                  <Button variant="secondary" onClick={addBrandColor}><HiOutlinePlus className="w-4 h-4" /> Adicionar</Button>
+                </div>
+                <div className="flex justify-end mt-6">
+                  <Button onClick={handleSaveBrand} disabled={savingBrand}>
+                    {savingBrand ? "Salvando..." : "Salvar Marca"}
                   </Button>
                 </div>
               </SettingsSection>

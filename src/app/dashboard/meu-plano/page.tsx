@@ -22,6 +22,7 @@ import PageHeader from "@/components/admin/PageHeader";
 import Badge from "@/components/admin/Badge";
 import { Button } from "@/components/admin/FormField";
 import { cn } from "@/lib/utils";
+import BuyPackageModal from "@/components/dashboard/BuyPackageModal";
 
 const PLAN_DURATION_DAYS: Record<string, number> = {
   MONTHLY: 30, QUARTERLY: 90, SEMIANNUAL: 180, ANNUAL: 365, LIFETIME: 0,
@@ -64,11 +65,54 @@ interface BillingEntry {
   method: string; status: string; statusLabel: string; invoiceUrl: string | null;
 }
 
+interface MetricUsage { used: number; limit: number; extra: number; remaining: number | null }
+interface Usage {
+  ai: MetricUsage;
+  image: MetricUsage;
+  labels: { used: number; limit: number; remaining: number | null };
+  storage: { usedMb: number; limitMb: number };
+  periodStart: string;
+  periodEnd: string;
+}
+
 interface PlanData {
   currentPlan: CurrentPlan | null;
-  usage: { labelsCreated: number };
+  usage: Usage | null;
   billingHistory: BillingEntry[];
   availablePlans: AvailablePlan[];
+}
+
+// Barra de uso: mostra usado/limite, % e trata ilimitado (-1).
+function MetricBar({ label, icon: Icon, used, limit, extra = 0, color, unit }: {
+  label: string; icon: React.ComponentType<{ className?: string }>;
+  used: number; limit: number; extra?: number; color: string; unit?: string;
+}) {
+  const unlimited = limit === -1;
+  const total = unlimited ? 0 : limit + extra;
+  const pct = unlimited ? 0 : Math.min(100, total > 0 ? (used / total) * 100 : 0);
+  const exhausted = !unlimited && used >= total;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-foreground flex items-center gap-1.5"><Icon className="w-3.5 h-3.5 text-muted-foreground" />{label}</span>
+        <span className="text-xs font-bold text-foreground">
+          {unlimited ? (
+            <span className="text-emerald-600 dark:text-emerald-400">Ilimitado</span>
+          ) : (
+            <>{used}<span className="text-muted-foreground font-normal"> / {limit}{unit ?? ""}{extra > 0 ? ` (+${extra})` : ""}</span></>
+          )}
+        </span>
+      </div>
+      <div className="h-2.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
+        <motion.div
+          className={cn("h-full rounded-full", exhausted ? "bg-red-500" : color)}
+          initial={{ width: 0 }} animate={{ width: `${unlimited ? 8 : pct}%` }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+        />
+      </div>
+      {extra > 0 && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">{extra} crédito(s) avulso(s) disponível(is)</p>}
+    </div>
+  );
 }
 
 const featureIcons = [
@@ -86,14 +130,17 @@ export default function MeuPlanoPage() {
   const [data, setData] = useState<PlanData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [buyOpen, setBuyOpen] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     fetch("/api/subscriber/plan")
       .then((r) => r.ok ? r.json() : Promise.reject(r.statusText))
       .then((d) => setData(d))
       .catch(() => setError("Não foi possível carregar os dados do plano."))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   const cp = data?.currentPlan ?? null;
 
@@ -107,6 +154,13 @@ export default function MeuPlanoPage() {
   const planPct = isLifetime ? 100 : Math.min(100, Math.max(0, Math.round((usedMs / totalMs) * 100)));
   const daysLeft = isLifetime ? null : Math.max(0, Math.ceil((end - now) / 86_400_000));
   const planDuration = cp ? (PLAN_DURATION_DAYS[cp.type] ?? 30) : 30;
+
+  const usage = data?.usage ?? null;
+  const limitHit = usage
+    ? (usage.ai.remaining === 0 && usage.ai.extra === 0) ||
+      (usage.image.remaining === 0 && usage.image.extra === 0) ||
+      usage.labels.remaining === 0
+    : false;
 
   return (
     <div>
@@ -144,6 +198,20 @@ export default function MeuPlanoPage() {
         <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 mb-6">
           <HiOutlineExclamationCircle className="w-5 h-5 text-red-500 shrink-0" />
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Alerta de limite atingido */}
+      {!loading && limitHit && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-6">
+          <HiOutlineExclamationCircle className="w-5 h-5 text-amber-500 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-400 flex-1">
+            Você atingiu um limite do seu plano. Compre um pacote de créditos ou faça upgrade para continuar criando.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setBuyOpen(true)} className="px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold whitespace-nowrap">Comprar créditos</button>
+            <button onClick={() => setActiveTab("plans")} className="px-4 py-2 rounded-xl border border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold whitespace-nowrap">Ver planos</button>
+          </div>
         </div>
       )}
 
@@ -259,49 +327,23 @@ export default function MeuPlanoPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.2 }}
             >
-              <h3 className="text-sm font-bold text-foreground mb-5">Uso do Plano</h3>
-              {loading ? (
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-sm font-bold text-foreground">Uso do Plano</h3>
+                <button onClick={() => setBuyOpen(true)} className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/15 transition-colors flex items-center gap-1.5">
+                  <HiOutlineBolt className="w-3.5 h-3.5" /> Comprar créditos
+                </button>
+              </div>
+              {loading || !usage ? (
                 <div className="space-y-5">
-                  {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12" />)}
                 </div>
               ) : (
                 <div className="space-y-5">
-                  {/* Labels created — real data */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-foreground">Rótulos criados</span>
-                      <span className="text-xs font-bold text-foreground">
-                        {data?.usage.labelsCreated ?? 0}
-                        <span className="text-muted-foreground font-normal"> salvos</span>
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full bg-blue-500"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, ((data?.usage.labelsCreated ?? 0) / 100) * 100)}%` }}
-                        transition={{ duration: 0.8, delay: 0.3 }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">{data?.usage.labelsCreated ?? 0} modelo(s) salvo(s)</p>
-                  </div>
-
-                  {/* Placeholder metrics */}
-                  {[
-                    { label: "Gerações de IA", note: "em breve", color: "bg-violet-500" },
-                    { label: "Armazenamento", note: "em breve", color: "bg-emerald-500" },
-                  ].map((item) => (
-                    <div key={item.label}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-foreground">{item.label}</span>
-                        <span className="text-[10px] text-muted-foreground italic">{item.note}</span>
-                      </div>
-                      <div className="h-2.5 bg-muted dark:bg-white/8 rounded-full overflow-hidden">
-                        <div className="h-full w-0 rounded-full" />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">Monitoramento em desenvolvimento</p>
-                    </div>
-                  ))}
+                  <MetricBar label="Gerações de IA" icon={HiOutlineSparkles} used={usage.ai.used} limit={usage.ai.limit} extra={usage.ai.extra} color="bg-violet-500" />
+                  <MetricBar label="Gerações de imagem" icon={HiOutlineSparkles} used={usage.image.used} limit={usage.image.limit} extra={usage.image.extra} color="bg-fuchsia-500" />
+                  <MetricBar label="Rótulos salvos" icon={HiOutlineDocumentText} used={usage.labels.used} limit={usage.labels.limit} color="bg-blue-500" />
+                  <MetricBar label="Armazenamento" icon={HiOutlineCloudArrowUp} used={Math.round(usage.storage.usedMb)} limit={usage.storage.limitMb} color="bg-emerald-500" unit=" MB" />
+                  <p className="text-[10px] text-muted-foreground">Ciclo renova em {fmtDate(usage.periodEnd)}.</p>
                 </div>
               )}
             </motion.div>
@@ -487,6 +529,8 @@ export default function MeuPlanoPage() {
           )}
         </motion.div>
       )}
+
+      {buyOpen && <BuyPackageModal onClose={() => setBuyOpen(false)} onSuccess={load} />}
     </div>
   );
 }

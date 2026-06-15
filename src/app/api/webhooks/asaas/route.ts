@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { addCredits } from "@/lib/usage";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
     if (confirmedEvents.includes(event)) {
       const payment = await prisma.payment.findUnique({
         where: { asaasPaymentId: asaasPayment.id },
+        include: { creditPackage: true },
       });
 
       if (payment) {
@@ -33,6 +35,12 @@ export async function POST(req: NextRequest) {
           where: { id: payment.id },
           data: { status: "CONFIRMED" },
         });
+
+        // Compra de pacote: credita os créditos avulsos uma única vez.
+        if (payment.kind === "CREDIT_PACKAGE" && payment.creditPackage && !payment.creditsApplied) {
+          await addCredits(payment.subscriberId, payment.creditPackage.aiCredits, payment.creditPackage.imageCredits);
+          await prisma.payment.update({ where: { id: payment.id }, data: { creditsApplied: true } });
+        }
       }
     }
 

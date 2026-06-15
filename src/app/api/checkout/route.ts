@@ -8,6 +8,7 @@ import {
   getPixQrCode,
   type AsaasBillingType,
 } from "@/lib/asaas";
+import { validateCoupon, redeemCoupon } from "@/lib/coupon";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
       billingPeriod,
       paymentMethod,
       creditCard,
+      couponCode,
     } = body;
 
     // Validação básica
@@ -43,10 +45,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
     }
 
-    const price =
+    const basePrice =
       billingPeriod === "annual" && plan.promotionalPrice != null
         ? plan.promotionalPrice
         : plan.price;
+
+    // Cupom de desconto (opcional)
+    let price = basePrice;
+    let appliedCoupon: string | null = null;
+    if (couponCode?.trim()) {
+      const v = await validateCoupon(couponCode, basePrice);
+      if (!v.valid) return NextResponse.json({ error: v.error || "Cupom inválido" }, { status: 400 });
+      price = v.finalAmount ?? basePrice;
+      appliedCoupon = v.code ?? null;
+    }
 
     // Verificar se subscriber já existe
     let subscriber = await prisma.subscriber.findUnique({
@@ -137,10 +149,13 @@ export async function POST(req: NextRequest) {
             : "PENDING",
         asaasPaymentId: asaasPayment.id,
         asaasInvoiceUrl: asaasPayment.invoiceUrl,
+        couponCode: appliedCoupon,
         subscriberId: subscriber.id,
         planId: plan.id,
       },
     });
+
+    if (appliedCoupon) await redeemCoupon(appliedCoupon);
 
     // Resultado baseado no método de pagamento
     const result: Record<string, unknown> = {

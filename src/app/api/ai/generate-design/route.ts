@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { checkCredit, consumeCredit } from "@/lib/usage";
 
 // Interpretação do prompt livre por IA real → "briefing de design" que alimenta
 // o motor de geração editável (templates + paleta). A IA NÃO posiciona elementos
@@ -41,6 +42,12 @@ export async function POST(req: NextRequest) {
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt obrigatório" }, { status: 400 });
+    }
+
+    // Limite de uso (cobrança avançada) — admins não consomem créditos.
+    if (session.role === "SUBSCRIBER") {
+      const c = await checkCredit(session.id, "ai");
+      if (!c.ok) return NextResponse.json({ error: c.error, code: "LIMIT_REACHED" }, { status: 402 });
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -143,6 +150,8 @@ Regras:
       ativos: str(rawCopy.ativos),
       volume: str(rawCopy.volume),
     };
+
+    if (session.role === "SUBSCRIBER") await consumeCredit(session.id, "ai");
 
     return NextResponse.json({
       templateId,

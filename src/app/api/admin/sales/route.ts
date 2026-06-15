@@ -42,7 +42,7 @@ export async function GET() {
   ]);
 
   const sales = payments.map((p) => {
-    const dur = PLAN_DURATION_DAYS[p.plan.type] ?? 30;
+    const dur = p.plan ? (PLAN_DURATION_DAYS[p.plan.type] ?? 30) : 0;
     const expiresAt = p.status === "CONFIRMED" && dur > 0
       ? new Date(p.createdAt.getTime() + dur * 86_400_000).toISOString()
       : null;
@@ -51,7 +51,7 @@ export async function GET() {
       id: p.id,
       subscriberName: p.subscriber.name,
       subscriberEmail: p.subscriber.email,
-      planName: p.plan.name,
+      planName: p.plan?.name ?? "Pacote de créditos",
       method: p.method,
       amount: p.amount,
       status: p.status,

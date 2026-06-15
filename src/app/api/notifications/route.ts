@@ -89,7 +89,7 @@ export async function GET() {
         id: `pay-${p.id}`,
         type: "payment",
         title: "Pagamento confirmado",
-        desc: `Seu pagamento do plano ${p.plan.name} foi confirmado`,
+        desc: `Seu pagamento ${p.plan ? `do plano ${p.plan.name}` : "de créditos"} foi confirmado`,
         createdAt: p.createdAt.toISOString(),
       });
     }
