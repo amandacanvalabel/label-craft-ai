@@ -14,15 +14,18 @@ import {
   HiOutlineSwatch,
   HiOutlinePlus,
   HiOutlineXMark,
+  HiOutlineUserGroup,
+  HiOutlineTrash,
 } from "react-icons/hi2";
 import PageHeader from "@/components/admin/PageHeader";
-import FormField, { Input, Toggle, Button } from "@/components/admin/FormField";
+import FormField, { Input, Select, Toggle, Button } from "@/components/admin/FormField";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { key: "profile", label: "Perfil", icon: HiOutlineUser },
   { key: "security", label: "Segurança", icon: HiOutlineShieldCheck },
   { key: "brand", label: "Marca", icon: HiOutlineSwatch },
+  { key: "team", label: "Equipe", icon: HiOutlineUserGroup },
   { key: "notifications", label: "Notificações", icon: HiOutlineBellAlert },
   { key: "appearance", label: "Aparência", icon: HiOutlinePaintBrush },
 ] as const;
@@ -100,6 +103,45 @@ export default function ConfiguracoesPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
   const brandLogoInputRef = useRef<HTMLInputElement>(null);
+
+  // Equipe
+  interface TeamMemberT { id: string; email: string; role: "ADMIN" | "MEMBER"; status: "PENDING" | "ACTIVE"; name: string | null; avatar: string | null }
+  const [teamMembers, setTeamMembers] = useState<TeamMemberT[]>([]);
+  const [teamPro, setTeamPro] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
+  const [inviting, setInviting] = useState(false);
+
+  const loadTeam = async () => {
+    try {
+      const r = await fetch("/api/team");
+      if (r.ok) { const d = await r.json(); setTeamMembers(d.members); setTeamPro(d.isPro); }
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { loadTeam(); }, []);
+
+  const invite = async () => {
+    if (!inviteEmail.trim()) { toast.error("Informe um e-mail"); return; }
+    setInviting(true);
+    try {
+      const r = await fetch("/api/team", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: inviteEmail, role: inviteRole }) });
+      const d = await r.json();
+      if (!r.ok) { toast.error(d.error ?? "Erro ao convidar"); return; }
+      toast.success(d.status === "ACTIVE" ? "Membro adicionado" : "Convite enviado");
+      setInviteEmail("");
+      await loadTeam();
+    } finally { setInviting(false); }
+  };
+
+  const removeMember = async (id: string) => {
+    await fetch(`/api/team/${id}`, { method: "DELETE" });
+    setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const changeRole = async (id: string, role: "ADMIN" | "MEMBER") => {
+    await fetch(`/api/team/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }) });
+    setTeamMembers((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)));
+  };
 
   const initials = profile.name
     ? profile.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
@@ -479,6 +521,60 @@ export default function ConfiguracoesPage() {
                 </div>
               </SettingsSection>
             </>
+          )}
+
+          {/* ── Team Tab ── */}
+          {activeTab === "team" && (
+            <SettingsSection title="Equipe" desc="Convide membros para colaborar nos seus projetos. Recurso do plano Profissional." delay={0.1}>
+              {!teamPro && (
+                <div className="flex items-center gap-3 p-3 mb-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                  <HiOutlineUserGroup className="w-5 h-5 text-amber-500 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">Colaboração em equipe está disponível no plano <b>Profissional</b>.</p>
+                  <a href="/dashboard/meu-plano" className="text-xs font-semibold text-amber-700 dark:text-amber-400 underline whitespace-nowrap">Fazer upgrade</a>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 mb-5">
+                <Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="email@dapessoa.com" disabled={!teamPro} className="flex-1" />
+                <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as "ADMIN" | "MEMBER")} disabled={!teamPro} className="sm:w-36">
+                  <option value="MEMBER">Membro</option>
+                  <option value="ADMIN">Admin</option>
+                </Select>
+                <Button variant="primary" onClick={invite} disabled={!teamPro || inviting}>
+                  <HiOutlinePlus className="w-4 h-4" />{inviting ? "Convidando..." : "Convidar"}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {teamMembers.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum membro na equipe ainda.</p>
+                )}
+                {teamMembers.map((m) => (
+                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/40 dark:border-white/8">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0 overflow-hidden">
+                      {m.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.avatar} alt={m.name ?? m.email} className="w-full h-full object-cover" />
+                      ) : (m.name ?? m.email).slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{m.name ?? m.email}</p>
+                      {m.name && <p className="text-[11px] text-muted-foreground truncate">{m.email}</p>}
+                    </div>
+                    <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", m.status === "ACTIVE" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400")}>
+                      {m.status === "ACTIVE" ? "Ativo" : "Pendente"}
+                    </span>
+                    <select value={m.role} onChange={(e) => changeRole(m.id, e.target.value as "ADMIN" | "MEMBER")} className="text-xs bg-muted/40 dark:bg-white/5 border border-border/40 dark:border-white/10 rounded-lg px-2 py-1 text-foreground">
+                      <option value="MEMBER">Membro</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <button onClick={() => removeMember(m.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all">
+                      <HiOutlineTrash className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </SettingsSection>
           )}
 
           {/* ── Security Tab ── */}

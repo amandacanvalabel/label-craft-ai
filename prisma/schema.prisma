@@ -59,6 +59,16 @@ enum AnnouncementVariant {
   PROMO
 }
 
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+enum TeamStatus {
+  PENDING
+  ACTIVE
+}
+
 // ==================== MODELS ====================
 
 model Admin {
@@ -131,11 +141,32 @@ model Subscriber {
   payments  Payment[]
   models    SubscriberModel[]
   folders   Folder[]
+  teamMembersOwned TeamMember[] @relation("TeamOwner")
+  teamMemberships  TeamMember[] @relation("TeamMembership")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("subscribers")
+}
+
+model TeamMember {
+  id      String @id @default(cuid())
+  email   String
+  role    TeamRole   @default(MEMBER)
+  status  TeamStatus @default(PENDING)
+
+  ownerId String
+  owner   Subscriber @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  memberId String?
+  member   Subscriber? @relation("TeamMembership", fields: [memberId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  @@unique([ownerId, email])
+  @@map("team_members")
 }
 
 model Folder {

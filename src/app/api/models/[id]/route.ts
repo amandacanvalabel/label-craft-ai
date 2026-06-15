@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { canAccessModel } from "@/lib/team";
 
 export async function GET(
   _req: Request,
@@ -10,10 +11,11 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const model = await prisma.subscriberModel.findFirst({
-    where: { id, subscriberId: session.id },
-  });
-
+  // Dono OU membro ativo da equipe do dono.
+  if (!(await canAccessModel(session.id, id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const model = await prisma.subscriberModel.findUnique({ where: { id } });
   if (!model) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(model);
 }
@@ -28,23 +30,30 @@ export async function PATCH(
   const { id } = await params;
   const { name, canvasData, thumbnail, folderId } = await req.json();
 
-  // Mover para pasta: valida que a pasta é do próprio assinante (folderId null = "Sem pasta").
-  if (folderId) {
+  const model = await prisma.subscriberModel.findUnique({ where: { id }, select: { subscriberId: true } });
+  if (!model) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const isOwner = model.subscriberId === session.id;
+  // Não-dono só edita se for membro ativo da equipe do dono (colaboração).
+  if (!isOwner && !(await canAccessModel(session.id, id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Mover para pasta é só do dono (pastas pertencem a ele).
+  if (isOwner && folderId) {
     const folder = await prisma.folder.findFirst({ where: { id: folderId, subscriberId: session.id }, select: { id: true } });
     if (!folder) return NextResponse.json({ error: "Pasta inválida" }, { status: 400 });
   }
 
-  const updated = await prisma.subscriberModel.updateMany({
-    where: { id, subscriberId: session.id },
+  await prisma.subscriberModel.update({
+    where: { id },
     data: {
       ...(name ? { name: name.trim() } : {}),
       ...(canvasData !== undefined ? { canvasData } : {}),
       ...(typeof thumbnail === "string" ? { thumbnail } : {}),
-      ...(folderId !== undefined ? { folderId: folderId || null } : {}),
+      ...(isOwner && folderId !== undefined ? { folderId: folderId || null } : {}),
     },
   });
-
-  if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json({ ok: true });
 }

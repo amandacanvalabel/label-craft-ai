@@ -19,6 +19,7 @@ import {
   HiOutlineFolderPlus,
   HiOutlineFolderArrowDown,
   HiOutlineSquaresPlus,
+  HiOutlineUserGroup,
 } from "react-icons/hi2";
 import { toast } from "sonner";
 import PageHeader from "@/components/admin/PageHeader";
@@ -50,9 +51,10 @@ interface LabelModel {
   img: string;
   aiModel: string;
   folderId: string | null;
+  ownerName?: string;
 }
 
-function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: string; updatedAt: string; folderId?: string | null }, index: number): LabelModel {
+function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: string; updatedAt: string; folderId?: string | null; ownerName?: string }, index: number): LabelModel {
   const data = (m.canvasData ?? {}) as Partial<CanvasData>;
   return {
     id: m.id,
@@ -66,6 +68,7 @@ function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: 
     img: data.img ?? "📋",
     aiModel: data.aiModel ?? "—",
     folderId: m.folderId ?? null,
+    ownerName: m.ownerName,
   };
 }
 
@@ -110,6 +113,17 @@ export default function ModelosSalvosPage() {
   const [movingModel, setMovingModel] = useState<LabelModel | null>(null);
   const [savingFolder, setSavingFolder] = useState(false);
 
+  // Compartilhados comigo (equipe)
+  const [sharedModels, setSharedModels] = useState<LabelModel[]>([]);
+  const isShared = folderFilter === "shared";
+
+  useEffect(() => {
+    fetch("/api/team/shared-models")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: Parameters<typeof toLabel>[0][]) => setSharedModels(d.map((m, i) => toLabel(m, i))))
+      .catch(() => {});
+  }, []);
+
   const fetchModels = useCallback(async () => {
     setLoading(true);
     try {
@@ -143,6 +157,9 @@ export default function ModelosSalvosPage() {
   const noFolderCount = models.filter((m) => !m.folderId).length;
   const topFolders = folders.filter((f) => !f.parentId && f.name.toLowerCase().includes(folderSearch.toLowerCase()));
   const subFoldersOf = (id: string) => folders.filter((f) => f.parentId === id);
+
+  const filteredShared = sharedModels.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
+  const display = isShared ? filteredShared : filtered;
 
   const saveFolder = async () => {
     if (!folderForm.name.trim()) { toast.error("Dê um nome à pasta"); return; }
@@ -279,6 +296,13 @@ export default function ModelosSalvosPage() {
                 <span className="flex-1 text-left truncate">Sem pasta</span>
                 <span className="text-[10px] opacity-70">{noFolderCount}</span>
               </button>
+              {sharedModels.length > 0 && (
+                <button onClick={() => setFolderFilter("shared")} className={cn("w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors", folderFilter === "shared" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 dark:hover:bg-white/5")}>
+                  <HiOutlineUserGroup className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-left truncate">Compartilhados comigo</span>
+                  <span className="text-[10px] opacity-70">{sharedModels.length}</span>
+                </button>
+              )}
 
               {topFolders.map((f) => (
                 <div key={f.id}>
@@ -387,7 +411,7 @@ export default function ModelosSalvosPage() {
       {!loading && view === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           <AnimatePresence mode="popLayout">
-            {filtered.map((model, i) => {
+            {display.map((model, i) => {
               const st = statusMap[model.status];
               return (
                 <motion.div
@@ -408,6 +432,7 @@ export default function ModelosSalvosPage() {
                       <button onClick={() => setSelected(model)} className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-white dark:hover:bg-black/60 transition-all shadow-sm">
                         <HiOutlineEye className="w-3.5 h-3.5" />
                       </button>
+                      {!isShared && <>
                       <button onClick={() => openEdit(model)} className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-white dark:hover:bg-black/60 transition-all shadow-sm">
                         <HiOutlinePencilSquare className="w-3.5 h-3.5" />
                       </button>
@@ -417,9 +442,11 @@ export default function ModelosSalvosPage() {
                       <button onClick={() => setDeleteConfirm(model.id)} className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 transition-all shadow-sm">
                         <HiOutlineTrash className="w-3.5 h-3.5" />
                       </button>
+                      </>}
                     </div>
                   </div>
                   <div className="p-4">
+                    {model.ownerName && <p className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold mb-1 flex items-center gap-1"><HiOutlineUserGroup className="w-3 h-3" /> {model.ownerName}</p>}
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">{model.code}</span>
                       <span className="text-[10px] text-muted-foreground">{model.category}</span>
@@ -450,7 +477,7 @@ export default function ModelosSalvosPage() {
       {!loading && view === "list" && (
         <div className="space-y-2.5">
           <AnimatePresence mode="popLayout">
-            {filtered.map((model, i) => {
+            {display.map((model, i) => {
               const st = statusMap[model.status];
               return (
                 <motion.div
@@ -470,13 +497,14 @@ export default function ModelosSalvosPage() {
                       <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">{model.code}</span>
                       <Badge variant={st.variant} dot>{st.label}</Badge>
                     </div>
-                    <h3 className="text-sm font-bold text-foreground truncate">{model.name}</h3>
+                    <h3 className="text-sm font-bold text-foreground truncate">{model.name}{model.ownerName ? <span className="ml-2 text-[10px] font-medium text-violet-600 dark:text-violet-400">· {model.ownerName}</span> : null}</h3>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{model.category} · {model.aiModel} · {model.updatedAt}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => setSelected(model)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted/60 dark:hover:bg-white/5 hover:text-foreground transition-all">
+                    <button onClick={() => openInStudio(model)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all" title="Abrir no Estúdio">
                       <HiOutlineEye className="w-4 h-4" />
                     </button>
+                    {!isShared && <>
                     <button onClick={() => openEdit(model)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all">
                       <HiOutlinePencilSquare className="w-4 h-4" />
                     </button>
@@ -486,6 +514,7 @@ export default function ModelosSalvosPage() {
                     <button onClick={() => setDeleteConfirm(model.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all">
                       <HiOutlineTrash className="w-4 h-4" />
                     </button>
+                    </>}
                   </div>
                 </motion.div>
               );
@@ -494,14 +523,14 @@ export default function ModelosSalvosPage() {
         </div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && display.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <HiOutlinePhoto className="w-12 h-12 text-muted-foreground/50 mb-3" />
           <p className="text-sm font-semibold text-muted-foreground">
-            {models.length === 0 ? "Nenhum rótulo criado ainda" : "Nenhum modelo encontrado"}
+            {isShared ? "Nenhum rótulo compartilhado" : models.length === 0 ? "Nenhum rótulo criado ainda" : "Nenhum modelo encontrado"}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1">
-            {models.length === 0 ? "Clique em \"Novo Modelo\" ou crie um no Estúdio IA" : "Tente ajustar os filtros"}
+            {isShared ? "Quando alguém te adicionar à equipe, os rótulos aparecem aqui" : models.length === 0 ? "Clique em \"Novo Modelo\" ou crie um no Estúdio IA" : "Tente ajustar os filtros"}
           </p>
         </div>
       )}
