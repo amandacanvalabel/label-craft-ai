@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import AnnouncementBanner from "./AnnouncementBanner";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface DashboardLayoutProps {
@@ -91,7 +92,10 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
         animate={{ paddingLeft: sidebarExpanded ? 256 : 72 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       >
-        <div className="p-6">{children}</div>
+        <div className="p-6">
+          {role === "SUBSCRIBER" && <AnnouncementBanner />}
+          {children}
+        </div>
       </motion.main>
     </div>
   );

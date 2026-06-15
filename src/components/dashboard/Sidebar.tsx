@@ -15,6 +15,7 @@ import {
   HiOutlineSparkles,
   HiOutlineBookmarkSquare,
   HiOutlineRectangleGroup,
+  HiOutlineMegaphone,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -31,6 +32,7 @@ const adminItems: SidebarItem[] = [
   { label: "Assinantes", href: "/admin/assinantes", icon: HiOutlineUsers },
   { label: "Planos", href: "/admin/planos", icon: HiOutlineCreditCard },
   { label: "Modelos IA", href: "/admin/modelos-ia", icon: HiOutlineCpuChip },
+  { label: "Avisos", href: "/admin/avisos", icon: HiOutlineMegaphone },
   { label: "Relatórios", href: "/admin/relatorios", icon: HiOutlineChartBarSquare },
   { label: "Configurações", href: "/admin/configuracoes", icon: HiOutlineCog6Tooth },
 ];

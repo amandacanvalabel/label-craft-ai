@@ -52,6 +52,13 @@ enum PaymentKind {
   CREDIT_PACKAGE
 }
 
+enum AnnouncementVariant {
+  INFO
+  SUCCESS
+  WARNING
+  PROMO
+}
+
 // ==================== MODELS ====================
 
 model Admin {
@@ -280,6 +287,23 @@ model SubscriberModel {
   updatedAt DateTime @updatedAt
 
   @@map("subscriber_models")
+}
+
+model Announcement {
+  id        String              @id @default(cuid())
+  title     String
+  message   String
+  variant   AnnouncementVariant @default(INFO)
+  linkUrl   String?
+  linkLabel String?
+  isActive  Boolean             @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("announcements")
 }
 
 model Template {
