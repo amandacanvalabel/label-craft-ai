@@ -123,11 +123,32 @@ model Subscriber {
 
   payments  Payment[]
   models    SubscriberModel[]
+  folders   Folder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("subscribers")
+}
+
+model Folder {
+  id           String   @id @default(cuid())
+  name         String
+  color        String   @default("#2563eb")
+
+  parentId String?
+  parent   Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderTree")
+
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  models SubscriberModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("folders")
 }
 
 model Plan {
@@ -251,6 +272,9 @@ model SubscriberModel {
 
   subscriberId String
   subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -26,7 +26,13 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const { name, canvasData, thumbnail } = await req.json();
+  const { name, canvasData, thumbnail, folderId } = await req.json();
+
+  // Mover para pasta: valida que a pasta é do próprio assinante (folderId null = "Sem pasta").
+  if (folderId) {
+    const folder = await prisma.folder.findFirst({ where: { id: folderId, subscriberId: session.id }, select: { id: true } });
+    if (!folder) return NextResponse.json({ error: "Pasta inválida" }, { status: 400 });
+  }
 
   const updated = await prisma.subscriberModel.updateMany({
     where: { id, subscriberId: session.id },
@@ -34,6 +40,7 @@ export async function PATCH(
       ...(name ? { name: name.trim() } : {}),
       ...(canvasData !== undefined ? { canvasData } : {}),
       ...(typeof thumbnail === "string" ? { thumbnail } : {}),
+      ...(folderId !== undefined ? { folderId: folderId || null } : {}),
     },
   });
 

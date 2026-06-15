@@ -19,8 +19,14 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, canvasData, thumbnail } = await req.json();
+  const { name, canvasData, thumbnail, folderId } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
+
+  // Pasta opcional — valida que pertence ao assinante.
+  if (folderId) {
+    const folder = await prisma.folder.findFirst({ where: { id: folderId, subscriberId: session.id }, select: { id: true } });
+    if (!folder) return NextResponse.json({ error: "Pasta inválida" }, { status: 400 });
+  }
 
   // Limite de rótulos salvos do plano (cobrança avançada).
   if (session.role === "SUBSCRIBER") {
@@ -38,6 +44,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       canvasData: canvasData ?? {},
       ...(typeof thumbnail === "string" ? { thumbnail } : {}),
+      ...(folderId ? { folderId } : {}),
       subscriberId: session.id,
     },
   });

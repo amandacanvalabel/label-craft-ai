@@ -15,12 +15,20 @@ import {
   HiOutlinePhoto,
   HiOutlineClipboardDocument,
   HiOutlineArrowPath,
+  HiOutlineFolder,
+  HiOutlineFolderPlus,
+  HiOutlineFolderArrowDown,
+  HiOutlineSquaresPlus,
 } from "react-icons/hi2";
+import { toast } from "sonner";
 import PageHeader from "@/components/admin/PageHeader";
 import Badge from "@/components/admin/Badge";
 import Modal from "@/components/admin/Modal";
 import FormField, { Input, Select, Textarea, Button } from "@/components/admin/FormField";
 import { cn } from "@/lib/utils";
+
+interface FolderT { id: string; name: string; color: string; parentId: string | null; count: number }
+const FOLDER_COLORS = ["#2563eb", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"];
 
 interface CanvasData {
   category: string;
@@ -41,9 +49,10 @@ interface LabelModel {
   description: string;
   img: string;
   aiModel: string;
+  folderId: string | null;
 }
 
-function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: string; updatedAt: string }, index: number): LabelModel {
+function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: string; updatedAt: string; folderId?: string | null }, index: number): LabelModel {
   const data = (m.canvasData ?? {}) as Partial<CanvasData>;
   return {
     id: m.id,
@@ -56,6 +65,7 @@ function toLabel(m: { id: string; name: string; canvasData: unknown; createdAt: 
     description: data.description ?? "",
     img: data.img ?? "📋",
     aiModel: data.aiModel ?? "—",
+    folderId: m.folderId ?? null,
   };
 }
 
@@ -90,6 +100,16 @@ export default function ModelosSalvosPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Pastas
+  const [folders, setFolders] = useState<FolderT[]>([]);
+  const [folderFilter, setFolderFilter] = useState<"all" | "none" | string>("all");
+  const [folderSearch, setFolderSearch] = useState("");
+  const [folderModal, setFolderModal] = useState<null | { editing?: FolderT; parentId?: string | null }>(null);
+  const [folderForm, setFolderForm] = useState<{ name: string; color: string }>({ name: "", color: FOLDER_COLORS[0] });
+  const [folderDelete, setFolderDelete] = useState<FolderT | null>(null);
+  const [movingModel, setMovingModel] = useState<LabelModel | null>(null);
+  const [savingFolder, setSavingFolder] = useState(false);
+
   const fetchModels = useCallback(async () => {
     setLoading(true);
     try {
@@ -104,13 +124,67 @@ export default function ModelosSalvosPage() {
     }
   }, []);
 
-  useEffect(() => { fetchModels(); }, [fetchModels]);
+  const fetchFolders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/folders");
+      if (res.ok) setFolders(await res.json());
+    } catch { /* keep current */ }
+  }, []);
+
+  useEffect(() => { fetchModels(); fetchFolders(); }, [fetchModels, fetchFolders]);
 
   const filtered = models.filter((m) => {
     const matchSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.code.toLowerCase().includes(search.toLowerCase());
     const matchCategory = categoryFilter === "Todos" || m.category === categoryFilter;
-    return matchSearch && matchCategory;
+    const matchFolder = folderFilter === "all" ? true : folderFilter === "none" ? !m.folderId : m.folderId === folderFilter;
+    return matchSearch && matchCategory && matchFolder;
   });
+
+  const noFolderCount = models.filter((m) => !m.folderId).length;
+  const topFolders = folders.filter((f) => !f.parentId && f.name.toLowerCase().includes(folderSearch.toLowerCase()));
+  const subFoldersOf = (id: string) => folders.filter((f) => f.parentId === id);
+
+  const saveFolder = async () => {
+    if (!folderForm.name.trim()) { toast.error("Dê um nome à pasta"); return; }
+    setSavingFolder(true);
+    try {
+      if (folderModal?.editing) {
+        const res = await fetch(`/api/folders/${folderModal.editing.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: folderForm.name, color: folderForm.color }),
+        });
+        if (!res.ok) { toast.error((await res.json()).error ?? "Erro ao salvar"); return; }
+      } else {
+        const res = await fetch("/api/folders", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: folderForm.name, color: folderForm.color, parentId: folderModal?.parentId ?? null }),
+        });
+        if (!res.ok) { toast.error((await res.json()).error ?? "Erro ao criar pasta"); return; }
+      }
+      setFolderModal(null);
+      await fetchFolders();
+    } finally {
+      setSavingFolder(false);
+    }
+  };
+
+  const deleteFolder = async (f: FolderT) => {
+    await fetch(`/api/folders/${f.id}`, { method: "DELETE" });
+    if (folderFilter === f.id) setFolderFilter("all");
+    setFolderDelete(null);
+    await Promise.all([fetchFolders(), fetchModels()]);
+  };
+
+  const moveModel = async (folderId: string | null) => {
+    if (!movingModel) return;
+    await fetch(`/api/models/${movingModel.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId: folderId ?? null }),
+    });
+    setMovingModel(null);
+    await Promise.all([fetchModels(), fetchFolders()]);
+    toast.success("Rótulo movido");
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -180,6 +254,68 @@ export default function ModelosSalvosPage() {
         }
       />
 
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Sidebar de pastas */}
+        <aside className="lg:w-64 shrink-0">
+          <div className="bg-white dark:bg-[#12121a] rounded-2xl border border-border/40 dark:border-white/8 shadow-sm p-3">
+            <div className="flex items-center justify-between px-1 mb-2">
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Pastas</h3>
+              <button onClick={() => { setFolderForm({ name: "", color: FOLDER_COLORS[0] }); setFolderModal({}); }} title="Nova pasta" className="w-7 h-7 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors">
+                <HiOutlineFolderPlus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="relative mb-2">
+              <HiOutlineMagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} placeholder="Buscar pasta..." className="w-full pl-8 pr-2 py-1.5 text-xs bg-muted/40 dark:bg-white/5 border border-border/40 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground" />
+            </div>
+            <div className="space-y-0.5 max-h-[60vh] overflow-y-auto">
+              <button onClick={() => setFolderFilter("all")} className={cn("w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors", folderFilter === "all" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 dark:hover:bg-white/5")}>
+                <HiOutlineSquaresPlus className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left truncate">Todos os rótulos</span>
+                <span className="text-[10px] opacity-70">{models.length}</span>
+              </button>
+              <button onClick={() => setFolderFilter("none")} className={cn("w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors", folderFilter === "none" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 dark:hover:bg-white/5")}>
+                <HiOutlineFolder className="w-4 h-4 shrink-0" />
+                <span className="flex-1 text-left truncate">Sem pasta</span>
+                <span className="text-[10px] opacity-70">{noFolderCount}</span>
+              </button>
+
+              {topFolders.map((f) => (
+                <div key={f.id}>
+                  <div className={cn("group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors", folderFilter === f.id ? "bg-primary/10" : "hover:bg-muted/50 dark:hover:bg-white/5")}>
+                    <button onClick={() => setFolderFilter(f.id)} className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: f.color }} />
+                      <span className={cn("text-xs font-medium truncate", folderFilter === f.id ? "text-primary" : "text-foreground")}>{f.name}</span>
+                    </button>
+                    <span className="text-[10px] text-muted-foreground group-hover:hidden">{f.count}</span>
+                    <div className="hidden group-hover:flex items-center gap-0.5">
+                      <button title="Nova subpasta" onClick={() => { setFolderForm({ name: "", color: f.color }); setFolderModal({ parentId: f.id }); }} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-primary"><HiOutlineFolderPlus className="w-3.5 h-3.5" /></button>
+                      <button title="Renomear" onClick={() => { setFolderForm({ name: f.name, color: f.color }); setFolderModal({ editing: f }); }} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-primary"><HiOutlinePencilSquare className="w-3.5 h-3.5" /></button>
+                      <button title="Excluir" onClick={() => setFolderDelete(f)} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-red-500"><HiOutlineTrash className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                  {subFoldersOf(f.id).map((sf) => (
+                    <div key={sf.id} className={cn("group flex items-center gap-1.5 pl-7 pr-2 py-1.5 rounded-lg transition-colors", folderFilter === sf.id ? "bg-primary/10" : "hover:bg-muted/50 dark:hover:bg-white/5")}>
+                      <button onClick={() => setFolderFilter(sf.id)} className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: sf.color }} />
+                        <span className={cn("text-xs truncate", folderFilter === sf.id ? "text-primary font-medium" : "text-muted-foreground")}>{sf.name}</span>
+                      </button>
+                      <span className="text-[10px] text-muted-foreground group-hover:hidden">{sf.count}</span>
+                      <div className="hidden group-hover:flex items-center gap-0.5">
+                        <button title="Renomear" onClick={() => { setFolderForm({ name: sf.name, color: sf.color }); setFolderModal({ editing: sf }); }} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-primary"><HiOutlinePencilSquare className="w-3.5 h-3.5" /></button>
+                        <button title="Excluir" onClick={() => setFolderDelete(sf)} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-red-500"><HiOutlineTrash className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {folders.length === 0 && <p className="text-[11px] text-muted-foreground px-2 py-3 text-center">Crie pastas para organizar seus rótulos.</p>}
+            </div>
+          </div>
+        </aside>
+
+        {/* Conteúdo */}
+        <div className="flex-1 min-w-0">
       {/* Toolbar */}
       <motion.div
         className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6"
@@ -275,6 +411,9 @@ export default function ModelosSalvosPage() {
                       <button onClick={() => openEdit(model)} className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-white dark:hover:bg-black/60 transition-all shadow-sm">
                         <HiOutlinePencilSquare className="w-3.5 h-3.5" />
                       </button>
+                      <button onClick={() => setMovingModel(model)} title="Mover para pasta" className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-white dark:hover:bg-black/60 transition-all shadow-sm">
+                        <HiOutlineFolderArrowDown className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => setDeleteConfirm(model.id)} className="w-7 h-7 rounded-lg bg-white/80 dark:bg-black/40 backdrop-blur-sm flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 transition-all shadow-sm">
                         <HiOutlineTrash className="w-3.5 h-3.5" />
                       </button>
@@ -341,6 +480,9 @@ export default function ModelosSalvosPage() {
                     <button onClick={() => openEdit(model)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all">
                       <HiOutlinePencilSquare className="w-4 h-4" />
                     </button>
+                    <button onClick={() => setMovingModel(model)} title="Mover para pasta" className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all">
+                      <HiOutlineFolderArrowDown className="w-4 h-4" />
+                    </button>
                     <button onClick={() => setDeleteConfirm(model.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all">
                       <HiOutlineTrash className="w-4 h-4" />
                     </button>
@@ -363,6 +505,9 @@ export default function ModelosSalvosPage() {
           </p>
         </div>
       )}
+
+        </div>
+      </div>
 
       {/* Detail Modal */}
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected?.name || ""} subtitle={selected?.code} size="md">
@@ -461,6 +606,79 @@ export default function ModelosSalvosPage() {
         }
       >
         <p className="text-sm text-muted-foreground">Tem certeza que deseja excluir este modelo? O rótulo será removido permanentemente.</p>
+      </Modal>
+
+      {/* Folder Create/Edit Modal */}
+      <Modal
+        isOpen={!!folderModal}
+        onClose={() => setFolderModal(null)}
+        title={folderModal?.editing ? "Renomear pasta" : folderModal?.parentId ? "Nova subpasta" : "Nova pasta"}
+        subtitle={folderModal?.parentId && !folderModal?.editing ? "Subpastas são um recurso do plano Profissional" : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setFolderModal(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={saveFolder} disabled={savingFolder}>
+              {savingFolder ? "Salvando..." : folderModal?.editing ? "Salvar" : "Criar"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Nome da pasta" required>
+            <Input value={folderForm.name} onChange={(e) => setFolderForm({ ...folderForm, name: e.target.value })} placeholder="Ex: Cosméticos 2026" autoFocus />
+          </FormField>
+          <FormField label="Cor">
+            <div className="flex flex-wrap gap-2">
+              {FOLDER_COLORS.map((c) => (
+                <button key={c} onClick={() => setFolderForm({ ...folderForm, color: c })} className={cn("w-8 h-8 rounded-lg transition-transform", folderForm.color === c ? "ring-2 ring-offset-2 ring-offset-background ring-foreground/40 scale-110" : "hover:scale-105")} style={{ background: c }} aria-label={c} />
+              ))}
+            </div>
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* Folder Delete Confirm */}
+      <Modal
+        isOpen={!!folderDelete}
+        onClose={() => setFolderDelete(null)}
+        title="Excluir pasta"
+        subtitle="Os rótulos não são apagados"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setFolderDelete(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={() => folderDelete && deleteFolder(folderDelete)}>
+              <HiOutlineTrash className="w-4 h-4" />Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Excluir a pasta <b className="text-foreground">{folderDelete?.name}</b>? Os rótulos dentro dela voltam para &quot;Sem pasta&quot;{folderDelete && subFoldersOf(folderDelete.id).length > 0 ? " e as subpastas também serão removidas" : ""}.
+        </p>
+      </Modal>
+
+      {/* Move to Folder Modal */}
+      <Modal
+        isOpen={!!movingModel}
+        onClose={() => setMovingModel(null)}
+        title="Mover para pasta"
+        subtitle={movingModel?.name}
+        size="sm"
+      >
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+          <button onClick={() => moveModel(null)} className={cn("w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors", !movingModel?.folderId ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/50 dark:hover:bg-white/5 text-foreground")}>
+            <HiOutlineFolder className="w-4 h-4" /> Sem pasta
+          </button>
+          {folders.map((f) => (
+            <button key={f.id} onClick={() => moveModel(f.id)} className={cn("w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors", movingModel?.folderId === f.id ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/50 dark:hover:bg-white/5 text-foreground")}>
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ background: f.color }} />
+              <span className={cn("truncate", f.parentId && "text-muted-foreground")}>{f.parentId ? "↳ " : ""}{f.name}</span>
+            </button>
+          ))}
+          {folders.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pasta criada ainda.</p>}
+        </div>
       </Modal>
     </div>
   );
