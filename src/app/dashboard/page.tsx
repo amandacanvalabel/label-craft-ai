@@ -194,21 +194,25 @@ export default function DashboardPage() {
               {data.recentModels.map((model, i) => (
                 <motion.div
                   key={model.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 dark:bg-white/[0.02] hover:bg-muted/40 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: 0.45 + i * 0.05 }}
                 >
-                  <div className="w-11 h-11 rounded-xl bg-muted/50 dark:bg-white/5 flex items-center justify-center text-xl shrink-0">
-                    {model.img}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{model.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{model.category} · {timeAgo(model.createdAt)}</p>
-                  </div>
-                  <Badge variant={model.status === "approved" ? "success" : model.status === "review" ? "warning" : "default"} dot>
-                    {STATUS_LABEL[model.status] ?? model.status}
-                  </Badge>
+                  <Link
+                    href={`/dashboard/estudio-ia?id=${model.id}`}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 dark:bg-white/[0.02] hover:bg-muted/40 dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-muted/50 dark:bg-white/5 flex items-center justify-center text-xl shrink-0">
+                      {model.img}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{model.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{model.category} · {timeAgo(model.createdAt)}</p>
+                    </div>
+                    <Badge variant={model.status === "approved" ? "success" : model.status === "review" ? "warning" : "default"} dot>
+                      {STATUS_LABEL[model.status] ?? model.status}
+                    </Badge>
+                  </Link>
                 </motion.div>
               ))}
             </div>
