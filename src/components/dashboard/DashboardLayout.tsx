@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import AnnouncementBanner from "./AnnouncementBanner";
+import SupportWidget from "./SupportWidget";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface DashboardLayoutProps {
@@ -97,6 +98,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
           {children}
         </div>
       </motion.main>
+      {role === "SUBSCRIBER" && <SupportWidget />}
     </div>
   );
 };

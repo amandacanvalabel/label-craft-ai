@@ -69,6 +69,18 @@ enum TeamStatus {
   ACTIVE
 }
 
+enum TicketStatus {
+  AI
+  HUMAN
+  RESOLVED
+}
+
+enum SupportRole {
+  USER
+  ASSISTANT
+  AGENT
+}
+
 // ==================== MODELS ====================
 
 model Admin {
@@ -143,11 +155,45 @@ model Subscriber {
   folders   Folder[]
   teamMembersOwned TeamMember[] @relation("TeamOwner")
   teamMemberships  TeamMember[] @relation("TeamMembership")
+  supportTickets   SupportTicket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("subscribers")
+}
+
+model SupportTicket {
+  id      String       @id @default(cuid())
+  subject String
+  status  TicketStatus @default(AI)
+
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  messages SupportMessage[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id             String      @id @default(cuid())
+  role           SupportRole
+  content        String
+  attachmentUrl  String?
+  attachmentName String?
+  readByUser     Boolean     @default(true) // false = resposta (IA/atendente) ainda não vista
+
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("support_messages")
 }
 
 model TeamMember {

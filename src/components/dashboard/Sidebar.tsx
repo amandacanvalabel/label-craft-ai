@@ -16,6 +16,7 @@ import {
   HiOutlineBookmarkSquare,
   HiOutlineRectangleGroup,
   HiOutlineMegaphone,
+  HiOutlineLifebuoy,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -33,6 +34,7 @@ const adminItems: SidebarItem[] = [
   { label: "Planos", href: "/admin/planos", icon: HiOutlineCreditCard },
   { label: "Modelos IA", href: "/admin/modelos-ia", icon: HiOutlineCpuChip },
   { label: "Avisos", href: "/admin/avisos", icon: HiOutlineMegaphone },
+  { label: "Suporte", href: "/admin/suporte", icon: HiOutlineLifebuoy },
   { label: "Relatórios", href: "/admin/relatorios", icon: HiOutlineChartBarSquare },
   { label: "Configurações", href: "/admin/configuracoes", icon: HiOutlineCog6Tooth },
 ];
