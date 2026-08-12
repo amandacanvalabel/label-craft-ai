@@ -7,6 +7,7 @@ import {
   createPayment,
   getPixQrCode,
   type AsaasBillingType,
+  type AsaasCustomer,
 } from "@/lib/asaas";
 import { validateCoupon, redeemCoupon } from "@/lib/coupon";
 import bcrypt from "bcryptjs";
@@ -29,7 +30,9 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Validação básica
-    if (!name || !email || !cpfOrCnpj || !password || !planName || !paymentMethod) {
+    // OBS: paymentMethod NÃO é exigido aqui, pois planos gratuitos não têm pagamento.
+    // Para planos pagos ele é validado mais abaixo, depois de sabermos o preço.
+    if (!name || !email || !cpfOrCnpj || !password || !planName) {
       return NextResponse.json(
         { error: "Campos obrigatórios faltando" },
         { status: 400 }
@@ -60,28 +63,36 @@ export async function POST(req: NextRequest) {
       appliedCoupon = v.code ?? null;
     }
 
+    // Plano gratuito (preço 0) — ou cupom de 100% de desconto.
+    // Nesse caso NÃO devemos criar cobrança no Asaas: o gateway rejeita
+    // valor 0 com o erro "O parâmetro value deve ser informado".
+    const isFreeCheckout = price <= 0;
+
+    // Para planos pagos o método de pagamento é obrigatório.
+    if (!isFreeCheckout && !paymentMethod) {
+      return NextResponse.json(
+        { error: "Método de pagamento é obrigatório" },
+        { status: 400 }
+      );
+    }
+
     // Verificar se subscriber já existe
     let subscriber = await prisma.subscriber.findUnique({
       where: { email },
     });
 
-    // Mapear método de pagamento para Asaas
-    const billingTypeMap: Record<string, AsaasBillingType> = {
-      pix: "PIX",
-      card: "CREDIT_CARD",
-      boleto: "BOLETO",
-    };
-    const billingType = billingTypeMap[paymentMethod];
-
-    // Criar ou buscar cliente no Asaas
-    let asaasCustomer = await findCustomerByEmail(email);
-    if (!asaasCustomer) {
-      asaasCustomer = await createCustomer({
-        name,
-        email,
-        cpfCnpj: cpfOrCnpj,
-        phone,
-      });
+    // Criar/buscar cliente no Asaas SOMENTE para planos pagos.
+    let asaasCustomer: AsaasCustomer | null = null;
+    if (!isFreeCheckout) {
+      asaasCustomer = await findCustomerByEmail(email);
+      if (!asaasCustomer) {
+        asaasCustomer = await createCustomer({
+          name,
+          email,
+          cpfCnpj: cpfOrCnpj,
+          phone,
+        });
+      }
     }
 
     // Criar subscriber no DB se não existir
@@ -94,7 +105,7 @@ export async function POST(req: NextRequest) {
           cpfOrCnpj: cpfOrCnpj.replace(/\D/g, ""),
           phone,
           password: hashedPassword,
-          asaasCustomerId: asaasCustomer.id,
+          asaasCustomerId: asaasCustomer?.id ?? null,
           planId: plan.id,
         },
       });
@@ -103,15 +114,66 @@ export async function POST(req: NextRequest) {
       await prisma.subscriber.update({
         where: { id: subscriber.id },
         data: {
-          asaasCustomerId: asaasCustomer.id,
+          ...(asaasCustomer ? { asaasCustomerId: asaasCustomer.id } : {}),
           planId: plan.id,
         },
       });
     }
 
-    // Criar cobrança no Asaas
+    // ==================== FLUXO GRATUITO ====================
+    // Sem passar pelo Asaas: registra um pagamento confirmado de valor 0,
+    // já ativa a conta e autentica o usuário direto no dashboard.
+    if (isFreeCheckout) {
+      const freePayment = await prisma.payment.create({
+        data: {
+          amount: 0,
+          method: "PIX", // placeholder — nenhum valor é cobrado neste fluxo
+          status: "CONFIRMED",
+          couponCode: appliedCoupon,
+          subscriberId: subscriber.id,
+          planId: plan.id,
+        },
+      });
+
+      if (appliedCoupon) await redeemCoupon(appliedCoupon);
+
+      const token = await signToken({
+        id: subscriber.id,
+        email: subscriber.email,
+        name: subscriber.name,
+        role: "SUBSCRIBER",
+      });
+
+      const cookieStore = await cookies();
+      cookieStore.set("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60,
+        path: "/",
+      });
+
+      return NextResponse.json({
+        paymentId: freePayment.id,
+        status: "CONFIRMED",
+        method: "free",
+        authenticated: true,
+        redirectTo: "/dashboard",
+      });
+    }
+
+    // ==================== FLUXO PAGO ====================
+    // Mapear método de pagamento para Asaas
+    const billingTypeMap: Record<string, AsaasBillingType> = {
+      pix: "PIX",
+      card: "CREDIT_CARD",
+      boleto: "BOLETO",
+    };
+    const billingType = billingTypeMap[paymentMethod];
+
+    // Criar cobrança no Asaas (asaasCustomer sempre existe no fluxo pago)
     const paymentData: Parameters<typeof createPayment>[0] = {
-      customerId: asaasCustomer.id,
+      customerId: asaasCustomer!.id,
       value: price,
       billingType,
       description: `Assinatura CanvaLabel - Plano ${planName} (${billingPeriod === "annual" ? "Anual" : "Mensal"})`,
