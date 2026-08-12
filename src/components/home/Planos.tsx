@@ -163,6 +163,10 @@ const Planos = () => {
       ? plan.promotionalPrice
       : plan.price;
 
+  // Plano gratuito: preço final igual a zero. Nesse caso o checkout não passa
+  // por pagamento, então pulamos a etapa de método de pagamento.
+  const isFreePlan = (plan: DBPlan | null) => !!plan && getPrice(plan) <= 0;
+
   const resetModal = useCallback(() => {
     setSelectedPlan(null);
     setPaymentMethod(null);
@@ -309,9 +313,12 @@ const Planos = () => {
     }
   };
 
-  // Step indicators
-  const stepLabels = ["Método", "Dados", "Pagamento"];
-  const stepIndex = step === "method" ? 0 : step === "userdata" ? 1 : 2;
+  // Step indicators — no plano grátis só existe a etapa de dados.
+  const freeFlow = isFreePlan(selectedPlan);
+  const stepLabels = freeFlow ? ["Dados"] : ["Método", "Dados", "Pagamento"];
+  const stepIndex = freeFlow
+    ? 0
+    : step === "method" ? 0 : step === "userdata" ? 1 : 2;
 
   return (
     <>
@@ -470,7 +477,8 @@ const Planos = () => {
                       onClick={() => {
                         setSelectedPlan(plan);
                         setPaymentMethod(null);
-                        setStep("method");
+                        // Plano grátis pula direto para o cadastro (sem método de pagamento).
+                        setStep(getPrice(plan) <= 0 ? "userdata" : "method");
                         setError("");
                       }}
                       className={cn(
@@ -480,7 +488,7 @@ const Planos = () => {
                           : "bg-foreground/5 text-foreground hover:bg-foreground/10 border border-border py-3.5 rounded-xl"
                       )}
                     >
-                      Assinar agora
+                      {getPrice(plan) <= 0 ? "Começar grátis" : "Assinar agora"}
                     </button>
 
                     {/* Features */}
@@ -540,7 +548,11 @@ const Planos = () => {
                 )}
                 {step !== "method" && step !== "processing" && step !== "success" && (
                   <button
-                    onClick={() => setStep(step === "payment" ? "userdata" : "method")}
+                    onClick={() => {
+                      // No fluxo grátis não há etapa de método: voltar reinicia a seleção.
+                      if (freeFlow) { resetModal(); return; }
+                      setStep(step === "payment" ? "userdata" : "method");
+                    }}
                     className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                   >
                     <HiOutlineArrowLeft className="w-5 h-5" />
@@ -552,25 +564,31 @@ const Planos = () => {
                 </h3>
                 <p className="text-white/80 text-sm mt-1">
                   {step === "method" && "Selecione a forma de pagamento"}
-                  {step === "userdata" && "Preencha seus dados para continuar"}
+                  {step === "userdata" && (freeFlow ? "Crie sua conta gratuita" : "Preencha seus dados para continuar")}
                   {step === "processing" && "Processando seu pagamento..."}
                   {step === "payment" && paymentMethod === "pix" && "Escaneie o QR Code ou copie o código"}
                   {step === "payment" && paymentMethod === "boleto" && "Acesse o boleto para pagamento"}
                   {step === "success" && "Bem-vindo ao CanvaLabel!"}
                 </p>
                 {step !== "success" && (
-                  <div className="mt-3 flex items-end gap-1">
-                    {couponInfo && (
-                      <span className="text-lg font-semibold line-through text-white/50 mr-1">
-                        R$ {getPrice(selectedPlan).toFixed(2).replace(".", ",")}
+                  freeFlow ? (
+                    <div className="mt-3 flex items-end gap-1">
+                      <span className="text-3xl font-extrabold">Grátis</span>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex items-end gap-1">
+                      {couponInfo && (
+                        <span className="text-lg font-semibold line-through text-white/50 mr-1">
+                          R$ {getPrice(selectedPlan).toFixed(2).replace(".", ",")}
+                        </span>
+                      )}
+                      <span className="text-3xl font-extrabold">
+                        R$ {(couponInfo ? couponInfo.finalAmount : getPrice(selectedPlan)).toFixed(2).replace(".", ",")}
                       </span>
-                    )}
-                    <span className="text-3xl font-extrabold">
-                      R$ {(couponInfo ? couponInfo.finalAmount : getPrice(selectedPlan)).toFixed(2).replace(".", ",")}
-                    </span>
-                    <span className="text-white/70 text-sm mb-0.5">/mês</span>
-                    {couponInfo && <span className="ml-2 mb-0.5 px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[11px] font-semibold">{couponInfo.label}</span>}
-                  </div>
+                      <span className="text-white/70 text-sm mb-0.5">/mês</span>
+                      {couponInfo && <span className="ml-2 mb-0.5 px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 text-[11px] font-semibold">{couponInfo.label}</span>}
+                    </div>
+                  )
                 )}
 
                 {/* Step indicators */}
@@ -871,7 +889,8 @@ const Planos = () => {
                         </div>
                       )}
 
-                      {/* Cupom de desconto */}
+                      {/* Cupom de desconto — não se aplica ao plano grátis */}
+                      {!freeFlow && (
                       <div>
                         <label className="text-xs font-medium text-muted-foreground mb-1 block">Cupom de desconto</label>
                         <div className="flex gap-2">
@@ -893,12 +912,15 @@ const Planos = () => {
                         {couponErr && <p className="text-xs text-red-500 mt-1.5">{couponErr}</p>}
                         {couponInfo && <p className="text-xs text-emerald-600 mt-1.5">Cupom {couponInfo.label} aplicado — você economiza R$ {couponInfo.discount.toFixed(2).replace(".", ",")}</p>}
                       </div>
+                      )}
 
                       <button
                         onClick={handleSubmitUserData}
                         className="w-full py-4 rounded-2xl font-semibold text-sm gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer transition-all duration-300"
                       >
-                        {paymentMethod === "pix"
+                        {freeFlow
+                          ? "Criar conta grátis"
+                          : paymentMethod === "pix"
                           ? "Gerar QR Code PIX"
                           : paymentMethod === "card"
                           ? "Pagar agora"
@@ -907,7 +929,9 @@ const Planos = () => {
 
                       <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1">
                         <HiOutlineShieldCheck className="w-3.5 h-3.5" />
-                        Seus dados estão protegidos e o pagamento é seguro via Asaas.
+                        {freeFlow
+                          ? "Seus dados estão protegidos. Nenhuma cobrança será feita."
+                          : "Seus dados estão protegidos e o pagamento é seguro via Asaas."}
                       </p>
                     </motion.div>
                   )}
