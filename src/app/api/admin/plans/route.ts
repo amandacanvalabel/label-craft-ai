@@ -23,6 +23,10 @@ export async function GET() {
         promotionalPrice: true,
         isActive: true,
         benefits: true,
+        monthlyAiCredits: true,
+        monthlyImageCredits: true,
+        maxLabels: true,
+        storageMb: true,
         _count: { select: { subscribers: true } },
       },
     }),
@@ -45,6 +49,10 @@ export async function GET() {
     promotionalPrice: p.promotionalPrice,
     isActive: p.isActive,
     benefits: p.benefits,
+    monthlyAiCredits: p.monthlyAiCredits,
+    monthlyImageCredits: p.monthlyImageCredits,
+    maxLabels: p.maxLabels,
+    storageMb: p.storageMb,
     subscriberCount: p._count.subscribers,
     totalRevenue: revenueMap.get(p.id) ?? 0,
   }));
@@ -66,6 +74,8 @@ export async function POST(req: NextRequest) {
     name: string; description?: string; type: string;
     price: number; promotionalPrice?: number | null;
     isActive: boolean; benefits: string[];
+    monthlyAiCredits?: number; monthlyImageCredits?: number;
+    maxLabels?: number; storageMb?: number;
   };
 
   if (!body.name?.trim()) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
@@ -79,6 +89,10 @@ export async function POST(req: NextRequest) {
       promotionalPrice: body.promotionalPrice || null,
       isActive: body.isActive,
       benefits: body.benefits ?? [],
+      ...(body.monthlyAiCredits !== undefined && { monthlyAiCredits: body.monthlyAiCredits }),
+      ...(body.monthlyImageCredits !== undefined && { monthlyImageCredits: body.monthlyImageCredits }),
+      ...(body.maxLabels !== undefined && { maxLabels: body.maxLabels }),
+      ...(body.storageMb !== undefined && { storageMb: body.storageMb }),
     },
   });
 
