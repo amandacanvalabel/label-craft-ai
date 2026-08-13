@@ -16,6 +16,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     name?: string; description?: string; type?: string;
     price?: number; promotionalPrice?: number | null;
     isActive?: boolean; benefits?: string[];
+    monthlyAiCredits?: number; monthlyImageCredits?: number;
+    maxLabels?: number; storageMb?: number;
   };
 
   const updated = await prisma.plan.update({
@@ -28,6 +30,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.promotionalPrice !== undefined && { promotionalPrice: body.promotionalPrice || null }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
       ...(body.benefits !== undefined && { benefits: body.benefits }),
+      ...(body.monthlyAiCredits !== undefined && { monthlyAiCredits: body.monthlyAiCredits }),
+      ...(body.monthlyImageCredits !== undefined && { monthlyImageCredits: body.monthlyImageCredits }),
+      ...(body.maxLabels !== undefined && { maxLabels: body.maxLabels }),
+      ...(body.storageMb !== undefined && { storageMb: body.storageMb }),
     },
   });
 
