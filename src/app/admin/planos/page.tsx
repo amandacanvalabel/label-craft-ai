@@ -32,6 +32,10 @@ interface Plan {
   promotionalPrice: number | null;
   isActive: boolean;
   benefits: string[];
+  monthlyAiCredits: number;
+  monthlyImageCredits: number;
+  maxLabels: number;
+  storageMb: number;
   subscriberCount: number;
   totalRevenue: number;
 }
@@ -62,6 +66,8 @@ const emptyForm = {
   name: "", description: "", type: "MONTHLY",
   price: 0, promotionalPrice: null as number | null,
   isActive: true, benefits: [] as string[],
+  // Limites do plano (-1 = ilimitado). Padrões para um plano novo.
+  monthlyAiCredits: 50, monthlyImageCredits: 10, maxLabels: 20, storageMb: 100,
 };
 
 const Skeleton = ({ className }: { className?: string }) => (
@@ -111,6 +117,10 @@ export default function PlanosPage() {
       promotionalPrice: plan.promotionalPrice,
       isActive: plan.isActive,
       benefits: [...plan.benefits],
+      monthlyAiCredits: plan.monthlyAiCredits,
+      monthlyImageCredits: plan.monthlyImageCredits,
+      maxLabels: plan.maxLabels,
+      storageMb: plan.storageMb,
     });
     setBenefitInput("");
     setModalOpen(true);
@@ -391,6 +401,24 @@ export default function PlanosPage() {
           <FormField label="Status">
             <Toggle checked={form.isActive} onChange={(v) => setForm((f) => ({ ...f, isActive: v }))} label={form.isActive ? "Plano ativo e visível" : "Plano inativo"} />
           </FormField>
+
+          <div className="pt-2 border-t border-border/40">
+            <p className="text-xs font-semibold text-muted-foreground mb-3">Limites do plano <span className="font-normal">(use -1 para ilimitado)</span></p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Máximo de rótulos" hint="Quantos rótulos o assinante pode salvar">
+                <Input type="number" step="1" min="-1" value={form.maxLabels} onChange={(e) => setForm((f) => ({ ...f, maxLabels: Number(e.target.value) }))} />
+              </FormField>
+              <FormField label="Armazenamento (MB)">
+                <Input type="number" step="1" min="-1" value={form.storageMb} onChange={(e) => setForm((f) => ({ ...f, storageMb: Number(e.target.value) }))} />
+              </FormField>
+              <FormField label="Créditos de IA / mês" hint="Gerações de texto/design por mês">
+                <Input type="number" step="1" min="-1" value={form.monthlyAiCredits} onChange={(e) => setForm((f) => ({ ...f, monthlyAiCredits: Number(e.target.value) }))} />
+              </FormField>
+              <FormField label="Créditos de imagem / mês" hint="Gerações de imagem por mês">
+                <Input type="number" step="1" min="-1" value={form.monthlyImageCredits} onChange={(e) => setForm((f) => ({ ...f, monthlyImageCredits: Number(e.target.value) }))} />
+              </FormField>
+            </div>
+          </div>
 
           <FormField label="Benefícios" hint="Pressione Enter ou clique + para adicionar">
             <div className="flex gap-2">
