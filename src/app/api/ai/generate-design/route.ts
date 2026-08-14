@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { checkCredit, consumeCredit } from "@/lib/usage";
 
-// Interpretação do prompt livre por IA real → "briefing de design" que alimenta
-// o motor de geração editável (templates + paleta). A IA NÃO posiciona elementos
-// (isso quebraria a edição); ela escolhe estilo, template e cores, e o motor
-// monta os Elements editáveis. Mantém WYSIWYG e edição livre no editor.
+// Interpretação do prompt + REFERÊNCIAS VISUAIS por IA real (visão) → "briefing
+// de design" que alimenta o motor de geração editável (templates + paleta) e
+// também um "artPrompt" para a geração da imagem-base (a "cara" do rótulo).
+//
+// Antes: só o texto do prompt ia para um modelo fraco (gpt-4o-mini), e as
+// imagens de referência NUNCA chegavam à IA (viravam só paleta de cor local).
+// Agora: usamos gpt-4o com VISÃO — a IA realmente "vê" as referências e traduz
+// estilo, composição, tipografia e cores para o briefing. A IA continua não
+// posicionando elementos (isso quebraria a edição): ela escolhe estilo, template
+// e cores, e o motor monta os Elements editáveis. Mantém WYSIWYG e edição livre.
+
+export const runtime = "nodejs";
+export const maxDuration = 45;
 
 const STYLE_AXES = [
   "formal", "denso", "quente", "retro", "ornamental",
@@ -29,15 +38,21 @@ function okAxis(v: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+// Só aceitamos data URLs de imagem (as referências enviadas pelo usuário).
+function isImageDataUrl(v: unknown): v is string {
+  return typeof v === "string" && /^data:image\/(png|jpe?g|webp);base64,/i.test(v);
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   try {
-    const { prompt, product, fields } = (await req.json()) as {
+    const { prompt, product, fields, refs } = (await req.json()) as {
       prompt: string;
       product?: string;
       fields?: Record<string, string>;
+      refs?: string[];
     };
 
     if (!prompt?.trim()) {
@@ -62,20 +77,15 @@ export async function POST(req: NextRequest) {
       fields?.volume ? `Volume: "${fields.volume}".` : "",
     ].filter(Boolean).join(" ");
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        temperature: 0.5,
-        max_tokens: 700,
-        messages: [
-          {
-            role: "system",
-            content: `Você é diretor de arte especializado em rótulos de cosméticos no Brasil. A partir da descrição livre do usuário, defina a direção visual do rótulo. ${ctx}
+    // Até 3 referências, apenas data URLs válidas (segurança: nunca buscar URL externa).
+    const images = Array.isArray(refs) ? refs.filter(isImageDataUrl).slice(0, 3) : [];
+    const hasRefs = images.length > 0;
 
-Templates disponíveis (escolha o mais adequado à descrição):
+    const systemContent = `Você é diretor de arte especializado em rótulos de alimentos e cosméticos no Brasil. A partir da descrição do usuário${hasRefs ? " E das imagens de referência anexadas" : ""}, defina a direção visual do rótulo. ${ctx}
+
+${hasRefs ? `IMPORTANTE: analise de verdade as imagens de referência — extraia a paleta de cores predominante, o clima/estética (ex.: vintage, clean, luxuoso, natural), o estilo tipográfico e a composição. O briefing deve refletir fielmente essas referências combinadas com o texto do usuário. Quando o usuário e a referência conflitarem, priorize o pedido explícito do texto.` : ""}
+
+Templates disponíveis (escolha o mais adequado):
 ${TEMPLATES.map((t) => `- "${t.id}": ${t.name}`).join("\n")}
 
 Eixos de estilo (0 a 1, onde 0.5 é neutro):
@@ -86,19 +96,38 @@ Responda SEMPRE com JSON válido nesta estrutura exata:
   "templateId": "<um dos ids acima>",
   "style": { "formal": 0.5, "denso": 0.5, "quente": 0.5, "retro": 0.5, "ornamental": 0.5, "feminino": 0.5, "luxo": 0.5, "vibrante": 0.5, "natural": 0.5, "sofisticado": 0.5 },
   "palette": { "bg": "#hex", "primary": "#hex", "secondary": "#hex", "accent": "#hex", "text": "#hex" },
-  "palettes": [ { "name": "Variação quente", "roles": { "bg":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","text":"#hex" } } ],
+  "palettes": [ { "name": "Variação", "roles": { "bg":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","text":"#hex" } } ],
   "copy": { "nome": "", "oque": "", "ativos": "", "volume": "" },
+  "artPrompt": "Descrição visual rica, em português, do FUNDO/arte da frente do rótulo (cores, texturas, motivos, clima, estilo tipográfico), fiel ao pedido e às referências, para gerar a imagem-base. NÃO descreva textos legais nem tabela nutricional.",
   "note": "1 frase explicando a direção escolhida"
 }
 
 Regras:
-- Cores SEMPRE em hex de 6 dígitos (#rrggbb). "bg" é o fundo do rótulo; "primary" o texto principal; "accent" o destaque; "secondary" textos de apoio; "text" corpo de texto. Garanta contraste legível entre bg e primary/text.
-- "palettes": forneça de 1 a 3 paletas alternativas coerentes para o usuário escolher.
-- "copy": preencha SOMENTE o que o usuário descreveu explicitamente; caso contrário deixe "". Não invente nome de marca/produto.
-- "style": traduza fielmente os adjetivos do usuário para os eixos.
-- Não escreva nada fora do JSON.`,
-          },
-          { role: "user", content: prompt.trim() },
+- Cores SEMPRE em hex de 6 dígitos (#rrggbb). "bg" é o fundo; "primary" o texto principal; "accent" o destaque; "secondary" apoio; "text" corpo. Garanta contraste legível entre bg e primary/text.
+- "palettes": de 1 a 3 paletas alternativas coerentes.
+- "copy": preencha SOMENTE o que o usuário descreveu explicitamente; senão deixe "". Não invente nome de marca/produto.
+- "style": traduza fielmente os adjetivos do usuário${hasRefs ? " e o clima das referências" : ""}.
+- "artPrompt": 2 a 4 frases, concreto e visual.
+- Não escreva nada fora do JSON.`;
+
+    // Conteúdo do usuário: texto + imagens (visão). detail "low" reduz custo.
+    const userContent: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string; detail: "low" } }
+    > = [{ type: "text", text: prompt.trim() }];
+    images.forEach((url) => userContent.push({ type: "image_url", image_url: { url, detail: "low" } }));
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        temperature: 0.4,
+        max_tokens: 900,
+        messages: [
+          { role: "system", content: systemContent },
+          { role: "user", content: userContent },
         ],
       }),
     });
@@ -151,6 +180,8 @@ Regras:
       volume: str(rawCopy.volume),
     };
 
+    const artPrompt = str(raw.artPrompt);
+
     if (session.role === "SUBSCRIBER") await consumeCredit(session.id, "ai");
 
     return NextResponse.json({
@@ -159,6 +190,7 @@ Regras:
       palette,
       palettes,
       copy,
+      artPrompt,
       note: typeof raw.note === "string" ? raw.note : "",
     });
   } catch (error) {
