@@ -5,6 +5,7 @@ import DemonstrationCentral from "@/components/home/DemonstrationCentral";
 import Planos from "@/components/home/Planos";
 import Avaliacoes from "@/components/home/Avaliacoes";
 import GaleriaExemplos from "@/components/home/GaleriaExemplos";
+import JsonLd from "@/components/home/JsonLd";
 import Footer from "@/components/home/Footer";
 import TrackPageView from "@/components/home/TrackPageView";
 import { getSession } from "@/lib/auth";
@@ -37,6 +38,7 @@ const HomePage = async () => {
 
   return (
     <>
+      <JsonLd />
       <TrackPageView />
       <Header />
       <HeroHome />
