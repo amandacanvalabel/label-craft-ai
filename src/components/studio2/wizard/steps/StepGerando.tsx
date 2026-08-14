@@ -5,6 +5,7 @@ import { useStudioStore } from "../../store/useStudioStore";
 import { stepIdx } from "../../data/steps";
 import { analyzeReferences } from "../../generate/analyze";
 import { fetchAiBrief } from "../../generate/aiBrief";
+import { fetchAiImage } from "../../generate/aiImage";
 
 // Porte de RENDER.gerando — animação de etapas + geração assíncrona.
 export default function StepGerando() {
@@ -22,9 +23,9 @@ export default function StepGerando() {
   const steps = [
     "Analisando informações do produto",
     hasPrompt ? "Interpretando sua descrição" : "Lendo as imagens de referência",
-    hasRefs ? "Extraindo paleta de cores das referências" : "Montando o layout da frente",
+    hasRefs ? "Lendo as referências com visão (IA)" : "Definindo a direção visual",
+    "Desenhando a arte da frente com IA",
     "Organizando os parágrafos do verso",
-    "Gerando código de barras e QR Code",
     "Criando variações de design para você escolher",
   ];
 
@@ -34,6 +35,9 @@ export default function StepGerando() {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+
+    // Limpa qualquer fundo IA de uma geração anterior antes de recomeçar.
+    patch("ai", { aiBackground: null });
 
     // Navega para "variacoes" só quando animação E geração terminarem — assim a
     // chamada de IA (que pode demorar mais que a animação) sempre é refletida.
@@ -53,8 +57,9 @@ export default function StepGerando() {
         const analysis = await analyzeReferences(refs);
         setAnalysis(analysis);
       }
-      // IA real interpreta o prompt → briefing de design (template + paleta +
-      // cópia). Null = sem chave/offline/erro: cai no parsing heurístico.
+      // IA real (visão) interpreta prompt + referências → briefing de design
+      // (template + paleta + cópia + artPrompt). Null = sem chave/offline/erro:
+      // cai no parsing heurístico.
       const brief = await fetchAiBrief(useStudioStore.getState());
       if (brief) {
         patch("ai", { brief });
@@ -67,6 +72,22 @@ export default function StepGerando() {
         });
         if (Object.keys(fill).length) patch("frente", fill);
       }
+
+      // "Cara" do rótulo pela IA (imagem-base baseada no prompt + referências).
+      // Roda em paralelo — NÃO travamos a navegação por ela. Quando chegar,
+      // injetamos como fundo e reaplicamos a variação atual. Falha vira null e
+      // o rótulo segue sem fundo IA (motor editável normal).
+      if (hasPrompt || hasRefs) {
+        fetchAiImage(useStudioStore.getState())
+          .then((img) => {
+            if (!img) return;
+            patch("ai", { aiBackground: img });
+            const st = useStudioStore.getState();
+            st.applyVariation(st.ai.chosenVariation ?? 0);
+          })
+          .catch(() => {});
+      }
+
       generateVariationsNow();
       applyVariation(0);
       genDone = true;
