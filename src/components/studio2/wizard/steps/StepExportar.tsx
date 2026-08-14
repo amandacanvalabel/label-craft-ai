@@ -1,18 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useStudioStore } from "../../store/useStudioStore";
 import { stepIdx } from "../../data/steps";
 import { getMaterialLabel, isMaterialComplete } from "../../data/materials";
 import { exportPDF } from "../../export/pdf";
 import { exportPNG } from "../../export/png";
 import { toast } from "../../ui/Toast";
+import { useCanExport } from "../../hooks/useCanExport";
 import Svg from "../../ui/Svg";
 import PreviewModal from "../../editor/PreviewModal";
 
 // Porte de RENDER.exportar — exportação final.
 export default function StepExportar() {
   const go = useStudioStore((s) => s.go);
+  const router = useRouter();
+  const canExport = useCanExport();
   const [busy, setBusy] = useState<"" | "pdf" | "png">("");
   const [preview, setPreview] = useState(false);
 
@@ -22,13 +26,20 @@ export default function StepExportar() {
   const faces = Object.keys(facesMap || {});
   const matComplete = isMaterialComplete(material);
 
+  const locked = canExport === false; // plano grátis / sem plano
+  const loading = canExport === null; // ainda verificando o plano
+
+  const goUpgrade = () => router.push("/dashboard/meu-plano");
+
   const doPDF = async () => {
+    if (locked) { goUpgrade(); return; }
     setBusy("pdf");
     try { const f = await exportPDF(useStudioStore.getState()); toast(`PDF gerado: ${f}`); }
     catch (e) { toast("Erro no PDF: " + (e as Error).message); }
     finally { setBusy(""); }
   };
   const doPNG = async () => {
+    if (locked) { goUpgrade(); return; }
     setBusy("png");
     try { const f = await exportPNG(useStudioStore.getState()); toast(`PNG salvo: ${f}`); }
     catch (e) { toast("Erro no PNG: " + (e as Error).message); }
@@ -55,15 +66,31 @@ export default function StepExportar() {
         </div>
       )}
 
+      {locked && (
+        <div className="note warn" style={{ marginTop: 16 }}>
+          <Svg paths='<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' sw={2.2} />
+          <p><b>Exportação disponível nos planos pagos.</b> No plano gratuito você pode criar e visualizar seus rótulos, mas o download do PDF/PNG é liberado ao assinar um plano.</p>
+        </div>
+      )}
+
       <div className="ex-cards" style={{ display: "flex", gap: 14, marginTop: 22, flexWrap: "wrap" }}>
-        <button className="btn btn-primary" disabled={!!busy} onClick={doPDF}>
-          <Svg paths='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>' sw={2.2} />
-          {busy === "pdf" ? "Gerando PDF…" : "Baixar PDF técnico"}
-        </button>
-        <button className="btn btn-ghost" disabled={!!busy} onClick={doPNG}>
-          <Svg paths='<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>' sw={2.2} />
-          {busy === "png" ? "Gerando PNG…" : "Baixar PNG (face atual)"}
-        </button>
+        {locked ? (
+          <button className="btn btn-primary" onClick={goUpgrade}>
+            <Svg paths='<path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/>' sw={2.2} />
+            Fazer upgrade para exportar
+          </button>
+        ) : (
+          <>
+            <button className="btn btn-primary" disabled={!!busy || loading} onClick={doPDF}>
+              <Svg paths='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>' sw={2.2} />
+              {busy === "pdf" ? "Gerando PDF…" : loading ? "Verificando…" : "Baixar PDF técnico"}
+            </button>
+            <button className="btn btn-ghost" disabled={!!busy || loading} onClick={doPNG}>
+              <Svg paths='<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>' sw={2.2} />
+              {busy === "png" ? "Gerando PNG…" : loading ? "Verificando…" : "Baixar PNG (face atual)"}
+            </button>
+          </>
+        )}
         <button className="btn btn-ghost" onClick={() => setPreview(true)}>
           <Svg paths='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' sw={2.2} />
           Ver preview
