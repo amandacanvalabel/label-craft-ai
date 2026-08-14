@@ -9303,6 +9303,8 @@ const state = {
     briefingVector: null,    // vetor de estilo final (para debug)
     variations: [],          // 4 variações geradas (template+paleta)
     chosenVariation: 0,      // índice escolhido pelo usuário
+    brief: null,             // briefing da IA real (visão): {templateId, style, palette, palettes, copy, artPrompt}
+    aiBackground: null,      // arte ("cara") gerada pela IA (data URL) — fundo da frente
   },
 
   // Conteúdo gerado pela IA — preenchido na etapa 'gerando'
@@ -19445,14 +19447,39 @@ RENDER.gerando = () => {
     </div>
   </div></div>`;
 
-  // Em paralelo à animação: analisa as referências e gera variações
+  // Limpa qualquer resultado de IA de uma geração anterior
+  state.ai.brief = null;
+  state.ai.aiBackground = null;
+
+  // Coordenação: só navega quando a animação E a geração terminarem — assim as
+  // variações já aparecem com a arte da IA (que demora mais que a animação).
+  let animDone = false, genDone = false, navigated = false;
+  const maybeGo = ()=>{
+    if(animDone && genDone && !navigated){
+      navigated = true;
+      go(stepIdx('variacoes'));
+    }
+  };
+
+  // Em paralelo à animação: análise + IA real (briefing de visão + arte) + variações
   (async ()=>{
     if(hasRefs){
       state.ai.analysis = await analyzeReferences(refsArr);
       state.ai.extractedPalette = state.ai.analysis.palette;
     }
+    // IA REAL só para alimento (é o fluxo que a pessoa pediu). Precisa de prompt
+    // ou referências para valer a pena chamar.
+    if(isAlimento && (hasPrompt || hasRefs)){
+      const brief = await fetchAiFoodBrief(promptTxt, refsArr, state.alimento);
+      if(brief) state.ai.brief = brief;
+      // Arte ("cara") do rótulo — melhor esforço; se falhar, segue sem fundo IA.
+      const img = await fetchAiFoodImage(promptTxt, refsArr, state.alimento);
+      if(img) state.ai.aiBackground = img;
+    }
     generateVariations();
     applyVariation(0);
+    genDone = true;
+    maybeGo();
   })();
 
   let i=0;
@@ -19469,7 +19496,8 @@ RENDER.gerando = () => {
       rows[i].querySelector('.gs-ico').innerHTML = '<div class="spin"></div>';
       i++; setTimeout(tick, 520);
     } else {
-      setTimeout(()=>go(stepIdx('variacoes')), 380);
+      animDone = true;
+      maybeGo();
     }
   };
   setTimeout(tick, 350);
@@ -20111,6 +20139,17 @@ function generateLabelAlimento(opts){
     const innerW = faceW - 2*padX;
 
     let yTop = y0 + safe + 2;
+
+    // 0. FUNDO IA (arte "cara" gerada pela IA) — camada de baixo, cobre a face
+    //    inteira. Os textos obrigatórios, lupas e tabela ficam por cima e
+    //    editáveis. Só entra quando a IA gerou a arte com sucesso.
+    if(state.ai.aiBackground){
+      add(faceId, 'image', {
+        name: 'Fundo IA (referência)',
+        x: x0, y: y0, w: faceW, h: faceH,
+        src: state.ai.aiBackground, fit: 'cover',
+      });
+    }
 
     // 1. LUPAS ALTO EM (sempre no topo se houver)
     if(lupas.length > 0){
@@ -21399,9 +21438,21 @@ RENDER.variacoes = () => {
       ${vars.map((v,i)=>{
         const swatches = ['bg','primary','accent','secondary'].map(k=>
           `<div class="vp" style="background:${v.palette[k]}"></div>`).join('');
+        // Quando a IA gerou a arte, mostramos a arte de verdade em cada variação
+        // (com um leve tom da paleta pra diferenciá-las). Sem arte, cai na
+        // miniatura de template.
+        const thumb = state.ai.aiBackground
+          ? `<div style="position:relative;width:100%;height:100%;overflow:hidden">
+               <img src="${state.ai.aiBackground}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" alt="arte gerada pela IA">
+               <div style="position:absolute;inset:0;background:${v.palette.accent};opacity:.10;mix-blend-mode:multiply"></div>
+               <div style="position:absolute;left:0;right:0;bottom:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.5))">
+                 <div style="font-weight:800;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.65);line-height:1.1">${(state.frente.nome||'').slice(0,22)}</div>
+               </div>
+             </div>`
+          : renderMiniLabel(v);
         return `<button class="vcard ${i===chosen?'sel':''}" data-var="${i}">
           <div class="vchk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="vthumb" style="background:${v.palette.bg}">${renderMiniLabel(v)}</div>
+          <div class="vthumb" style="background:${v.palette.bg}">${thumb}</div>
           <div class="vname">${v.templateName}</div>
           <div class="vdesc">Paleta: ${v.paletteSource}</div>
           <div class="vpalette">${swatches}</div>
@@ -21523,9 +21574,84 @@ function buildBriefingVector(){
   return { vec, promptColors: parsed.colors };
 }
 
+/* ====== IA REAL (mesma origem /api/ai/*) ======
+   Diferente do resto do gerador (heurístico/local), estas funções chamam a IA
+   de verdade: uma com VISÃO para interpretar o prompt + as imagens de
+   referência (briefing de design) e outra para gerar a ARTE ("cara") do rótulo.
+   Falham de forma graciosa (retornam null) — nesse caso o gerador cai no fluxo
+   local de templates, sem quebrar. */
+async function fetchAiFoodBrief(promptTxt, refs, a){
+  try{
+    const res = await fetch('/api/ai/generate-design', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        prompt: promptTxt,
+        product: 'alimento',
+        fields: {
+          nome: state.frente.nome || a.marca || '',
+          oque: a.designacao || '',
+          volume: a.peso_liquido ? (a.peso_liquido + (a.categoria === 'liquido' ? 'mL' : 'g')) : '',
+        },
+        refs: (refs || []).slice(0, 3),
+      }),
+    });
+    if(!res.ok) return null;
+    const d = await res.json();
+    if(!d || !d.templateId || !d.palette || !d.style) return null;
+    return d;
+  }catch(e){ return null; }
+}
+async function fetchAiFoodImage(promptTxt, refs, a){
+  try{
+    const w = (state.rotulo && state.rotulo.w) || 70;
+    const h = (state.rotulo && state.rotulo.h) || 90;
+    const res = await fetch('/api/ai/generate-image', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        productName: state.frente.nome || a.marca || '',
+        productType: 'alimento',
+        volumagem: a.peso_liquido ? (a.peso_liquido + (a.categoria === 'liquido' ? 'mL' : 'g')) : '',
+        moodKeywords: promptTxt || '',
+        artPrompt: (state.ai.brief && state.ai.brief.artPrompt) || '',
+        refs: (refs || []).slice(0, 3),
+        ratio: h > 0 ? w / h : 0.78,
+      }),
+    });
+    if(!res.ok) return null;
+    const d = await res.json();
+    return d && d.imageBase64 && d.imageBase64.startsWith('data:image/') ? d.imageBase64 : null;
+  }catch(e){ return null; }
+}
+
 function generateVariations(){
   const { vec: brief, promptColors } = buildBriefingVector();
   state.ai.briefingVector = brief;
+
+  // Caminho IA real: se houver briefing da IA (visão), a 1ª variação é a
+  // recomendação dela (template + paleta escolhidos a partir do prompt e das
+  // referências) e as demais usam as paletas alternativas sugeridas. Tudo
+  // continua editável (montado pelo motor de templates).
+  const aiBrief = state.ai.brief;
+  if(aiBrief){
+    const rankedAi = TEMPLATES.map(t => ({
+      tpl: t, distance: vectorDistance(brief, t.style || makeVector()),
+    })).sort((a,b) => a.distance - b.distance);
+    const aiTpl = TEMPLATES.find(t => t.id === aiBrief.templateId) || rankedAi[0].tpl;
+    const out = [];
+    out.push(buildVariation(aiTpl, { name:'Recomendação da IA', roles: aiBrief.palette }));
+    (aiBrief.palettes || []).forEach(p => {
+      if(out.length < 4) out.push(buildVariation(aiTpl, { name: p.name, roles: p.roles }));
+    });
+    for(const r of rankedAi){
+      if(out.length >= 4) break;
+      if(r.tpl.id === aiTpl.id) continue;
+      out.push(buildVariation(r.tpl, { name: r.tpl.name, roles: aiBrief.palette }));
+    }
+    while(out.length < 4) out.push(buildVariation(aiTpl, { name: aiTpl.name, roles: aiTpl.palette }));
+    state.ai.variations = out.slice(0, 4);
+    state.ai.chosenVariation = 0;
+    return;
+  }
 
   // 1. Ordena templates por menor distância ao vetor do briefing
   const ranked = TEMPLATES.map(t => ({
@@ -22637,7 +22763,7 @@ function paintStaticEl(d, el, pxPerMm, opts){
   } else if(el.type === 'image' && el.src){
     const img = document.createElement('img');
     img.src = el.src;
-    img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block';
+    img.style.cssText = `width:100%;height:100%;object-fit:${el.fit==='cover'?'cover':'contain'};display:block`;
     d.appendChild(img);
   } else if(el.type === 'shape'){
     // Reusa a função do editor que gera o SVG dinamicamente
@@ -24598,7 +24724,7 @@ function edPaintEl(d, el, ppm){
     i.style.cssText = `position:absolute;left:0;top:50%;width:100%;height:${el.sw*ppm}px;transform:translateY(-50%);background:${el.stroke}`;
     d.appendChild(i);
   } else if(el.type==='image'){
-    if(el.src) d.style.background = `center/contain no-repeat url(${el.src})`;
+    if(el.src) d.style.background = `center/${el.fit==='cover'?'cover':'contain'} no-repeat url(${el.src})`;
     else {
       d.style.background = 'repeating-conic-gradient(#e8e8ec 0% 25%,#dadadf 0% 50%) 0/16px 16px';
       d.style.display = 'grid'; d.style.placeItems = 'center';
