@@ -21,7 +21,7 @@ const HeroHome = () => {
         >
           <span className="inline-flex items-center gap-2 gradient-primary-soft text-primary text-sm font-semibold px-5 py-2 rounded-full border border-primary/10">
             <HiOutlineSparkles className="w-4 h-4" />
-            Geração de rótulos com Inteligência Artificial
+            Rótulos ANVISA para alimentos e cosméticos, com IA
           </span>
         </motion.div>
 
@@ -32,8 +32,9 @@ const HeroHome = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Crie rótulos profissionais{" "}
-          <span className="gradient-text">em minutos</span>, não em dias
+          Crie rótulos de{" "}
+          <span className="gradient-text">alimentos e cosméticos</span> em
+          conformidade com a ANVISA
         </motion.h1>
 
         {/* Subtitle */}
@@ -43,8 +44,10 @@ const HeroHome = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          Em conformidade com as normas da ANVISA, pronto para impressão e com
-          design que destaca seu produto na prateleira.
+          Gere a <b className="text-foreground/80 font-semibold">tabela nutricional</b>, os
+          selos obrigatórios (lupa de advertência e alérgenos) e o layout do seu
+          rótulo com IA. Mais de <b className="text-foreground/80 font-semibold">1.000 alimentos
+          cadastrados</b> e exportação em alta resolução, pronta para a gráfica.
         </motion.p>
 
         {/* CTAs */}
@@ -75,9 +78,9 @@ const HeroHome = () => {
           transition={{ duration: 0.7, delay: 0.5 }}
         >
           {[
-            { value: "10k+", label: "Rótulos criados" },
-            { value: "99%", label: "Em conformidade" },
-            { value: "2min", label: "Tempo médio" },
+            { value: "+1.000", label: "Alimentos na base nutricional" },
+            { value: "ANVISA", label: "IN 75/2020 · RDC 429/2020 · RDC 26/2015" },
+            { value: "2 min", label: "Do briefing ao PDF pronto" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="text-3xl sm:text-4xl font-extrabold gradient-text">
