@@ -99,6 +99,8 @@ Responda SEMPRE com JSON válido nesta estrutura exata:
   "palettes": [ { "name": "Variação", "roles": { "bg":"#hex","primary":"#hex","secondary":"#hex","accent":"#hex","text":"#hex" } } ],
   "copy": { "nome": "", "oque": "", "ativos": "", "volume": "" },
   "artPrompt": "Descrição visual rica, em português, do FUNDO/arte da frente do rótulo (cores, texturas, motivos, clima, estilo tipográfico), fiel ao pedido e às referências, para gerar a imagem-base. NÃO descreva textos legais nem tabela nutricional.",
+  "illustration": "Descreva em 1 frase a ILUSTRAÇÃO principal, isolada, que representa o produto (ex.: 'morangos frescos maduros com folhas verdes', 'espiga de trigo dourada'), no estilo escolhido. Sem texto, sem moldura, sem fundo.",
+  "ornament": "Descreva em 1 frase o ORNAMENTO/moldura decorativa que combina com o estilo (ex.: 'moldura oval botânica art nouveau com ramos finos', 'borda de folhas de louro clássica'). Só o traçado do ornamento, sem texto e sem fundo.",
   "note": "1 frase explicando a direção escolhida"
 }
 
@@ -181,6 +183,8 @@ Regras:
     };
 
     const artPrompt = str(raw.artPrompt);
+    const illustration = str(raw.illustration);
+    const ornament = str(raw.ornament);
 
     if (session.role === "SUBSCRIBER") await consumeCredit(session.id, "ai");
 
@@ -191,6 +195,8 @@ Regras:
       palettes,
       copy,
       artPrompt,
+      illustration,
+      ornament,
       note: typeof raw.note === "string" ? raw.note : "",
     });
   } catch (error) {
