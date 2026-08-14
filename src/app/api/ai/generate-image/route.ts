@@ -107,7 +107,7 @@ Requisitos:
       form.append("prompt", prompt);
       form.append("size", size);
       form.append("n", "1");
-      form.append("quality", "high");
+      form.append("quality", "medium");
       images.forEach((url, i) => form.append("image[]", dataUrlToBlob(url), `ref${i}.png`));
 
       response = await fetch("https://api.openai.com/v1/images/edits", {
@@ -119,7 +119,7 @@ Requisitos:
       response = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size, n: 1, quality: "high" }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size, n: 1, quality: "medium" }),
       });
     }
 
