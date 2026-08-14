@@ -55,6 +55,7 @@ export interface El {
 
   // image
   src?: string;
+  fit?: "cover" | "contain"; // como a imagem preenche a caixa (padrão: contain)
 
   // barcode
   code?: string;
@@ -182,6 +183,8 @@ export interface AiBrief {
   palette: Palette;
   palettes: { name: string; roles: Palette }[];
   copy: { nome: string; oque: string; ativos: string; volume: string };
+  // Descrição visual rica para gerar a imagem-base ("cara" do rótulo).
+  artPrompt?: string;
   note: string;
 }
 
@@ -193,6 +196,9 @@ export interface AiState {
   variations: Variation[];
   chosenVariation: number;
   brief: AiBrief | null;
+  // Imagem-base gerada por IA (data URL) usada como fundo da frente. Fica no
+  // state para o motor reinjetar a cada variação escolhida. null = sem fundo IA.
+  aiBackground?: string | null;
 }
 
 export interface Variation {
