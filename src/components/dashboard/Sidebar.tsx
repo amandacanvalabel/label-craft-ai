@@ -12,6 +12,7 @@ import {
   HiOutlineCpuChip,
   HiOutlineChartBarSquare,
   HiOutlineCog6Tooth,
+  HiOutlinePhoto,
   HiOutlineSparkles,
   HiOutlineBookmarkSquare,
   HiOutlineRectangleGroup,
@@ -36,6 +37,7 @@ const adminItems: SidebarItem[] = [
   { label: "Avisos", href: "/admin/avisos", icon: HiOutlineMegaphone },
   { label: "Suporte", href: "/admin/suporte", icon: HiOutlineLifebuoy },
   { label: "Relatórios", href: "/admin/relatorios", icon: HiOutlineChartBarSquare },
+  { label: "Galeria", href: "/admin/galeria", icon: HiOutlinePhoto },
   { label: "Configurações", href: "/admin/configuracoes", icon: HiOutlineCog6Tooth },
 ];
 
