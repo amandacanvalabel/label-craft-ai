@@ -9,6 +9,8 @@ import {
   HiOutlineBolt,
   HiOutlineArrowDownTray,
   HiOutlineCube,
+  HiOutlineTableCells,
+  HiOutlineExclamationTriangle,
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
 } from "react-icons/hi2";
@@ -16,9 +18,9 @@ import {
 const benefits = [
   {
     icon: HiOutlineSparkles,
-    title: "IA Generativa",
+    title: "Rótulos com IA",
     description:
-      "Gere rótulos completos com inteligência artificial. Textos, tabelas nutricionais e layouts em segundos.",
+      "Descreva seu produto e a IA monta o layout, os textos e a estrutura do rótulo em segundos — para alimentos e cosméticos.",
     color: "from-blue-500 to-cyan-400",
     bg: "bg-blue-50",
   },
@@ -26,41 +28,57 @@ const benefits = [
     icon: HiOutlineShieldCheck,
     title: "Conformidade ANVISA",
     description:
-      "Validação automática em tempo real. Todos os elementos obrigatórios verificados antes da exportação.",
+      "Validação automática das normas: IN 75/2020, RDC 429/2020 e RDC 26/2015. O revisor checa cada item obrigatório antes de exportar.",
     color: "from-emerald-500 to-teal-400",
     bg: "bg-emerald-50",
   },
   {
-    icon: HiOutlinePaintBrush,
-    title: "Editor Profissional",
+    icon: HiOutlineTableCells,
+    title: "Tabela nutricional automática",
     description:
-      "Editor visual completo tipo Canva com ferramentas avançadas de design, camadas e tipografia.",
-    color: "from-violet-500 to-purple-400",
-    bg: "bg-violet-50",
-  },
-  {
-    icon: HiOutlineBolt,
-    title: "Templates Prontos",
-    description:
-      "Centenas de modelos editáveis para alimentos, bebidas, cosméticos, farmacêuticos e mais.",
+      "Calcule a tabela nutricional pela receita ou pelos valores, no padrão do Anexo IX da IN 75/2020. Mais de 1.000 alimentos cadastrados (TACO/USDA).",
     color: "from-amber-500 to-orange-400",
     bg: "bg-amber-50",
   },
   {
-    icon: HiOutlineArrowDownTray,
-    title: "Exportação HD",
+    icon: HiOutlineExclamationTriangle,
+    title: "Selos obrigatórios e lupa",
     description:
-      "Exporte em alta resolução (300 DPI) com perfil CMYK pronto para enviar direto para a gráfica.",
+      "Gera os selos frontais “ALTO EM” (lupa preta), as advertências de alérgenos e “contém glúten” automaticamente, conforme RDC 429/2020 e RDC 26/2015.",
     color: "from-rose-500 to-pink-400",
     bg: "bg-rose-50",
   },
   {
-    icon: HiOutlineCube,
-    title: "Mockup 3D",
+    icon: HiOutlinePaintBrush,
+    title: "Editor profissional + modelos",
     description:
-      "Visualize seu rótulo aplicado no produto em 3D antes de imprimir. Impressione seus clientes.",
+      "Editor visual completo (tipo Canva) com camadas, tipografia e modelos prontos para alimentos, bebidas e cosméticos.",
+    color: "from-violet-500 to-purple-400",
+    bg: "bg-violet-50",
+  },
+  {
+    icon: HiOutlineArrowDownTray,
+    title: "Pronto para a gráfica",
+    description:
+      "Exporte em alta resolução (300 DPI), com sangria e marcas de corte — o PDF técnico sai pronto para impressão.",
+    color: "from-teal-500 to-emerald-400",
+    bg: "bg-teal-50",
+  },
+  {
+    icon: HiOutlineCube,
+    title: "Preview realista",
+    description:
+      "Veja o rótulo aplicado no frasco ou na embalagem antes de imprimir, com simulação de acabamentos.",
     color: "from-sky-500 to-blue-400",
     bg: "bg-sky-50",
+  },
+  {
+    icon: HiOutlineBolt,
+    title: "Alimentos e cosméticos",
+    description:
+      "Uma plataforma para os dois mundos: rotulagem de alimentos (tabela nutricional e lupa) e de cosméticos, sempre no padrão da ANVISA.",
+    color: "from-indigo-500 to-blue-400",
+    bg: "bg-indigo-50",
   },
 ];
 
@@ -106,12 +124,14 @@ const BeneficiosCarrousel = () => {
               Benefícios
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              Tudo que você precisa em{" "}
-              <span className="gradient-text">um só lugar</span>
+              Tudo para rotular{" "}
+              <span className="gradient-text">alimentos e cosméticos</span>{" "}
+              conforme a ANVISA
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-xl">
-              Da criação à impressão, nossa plataforma cuida de cada etapa do
-              processo de rotulagem.
+              Tabela nutricional automática, selos obrigatórios e a lupa “ALTO
+              EM”, alérgenos e exportação pronta para a gráfica — tudo em
+              conformidade com a IN 75/2020 e a RDC 429/2020.
             </p>
           </div>
 
