@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useStudioStore } from "../store/useStudioStore";
+import { useCanExport } from "../hooks/useCanExport";
 import ElementView from "./ElementView";
 import { toast } from "../ui/Toast";
 import Svg from "../ui/Svg";
@@ -14,6 +16,9 @@ export default function PreviewModal({ onClose }: { onClose: () => void }) {
   const setPreview = useStudioStore((s) => s.setPreview);
   const stageRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const canExport = useCanExport();
+  const locked = canExport === false; // plano grátis / sem plano
 
   const faces = Object.keys(editor.faces || {});
   const L = editor.label;
@@ -24,6 +29,11 @@ export default function PreviewModal({ onClose }: { onClose: () => void }) {
   const scale = Math.min(slotW / L.w, 460 / L.h, 4);
 
   const download = async () => {
+    if (locked) {
+      toast("Exportação disponível apenas em planos pagos.");
+      router.push("/dashboard/meu-plano");
+      return;
+    }
     if (!stageRef.current) return;
     setBusy(true);
     try {
@@ -104,10 +114,17 @@ export default function PreviewModal({ onClose }: { onClose: () => void }) {
           <div className="pv-info">Os efeitos visuais simulam o resultado final. Aprove com prova física antes da impressão.</div>
           <div className="pv-actions">
             <button className="btn btn-ghost" onClick={onClose}>Fechar</button>
-            <button className="btn btn-primary" onClick={download} disabled={busy}>
-              <Svg paths='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>' sw={2.4} width={14} height={14} />
-              {busy ? "Gerando..." : "Baixar PNG"}
-            </button>
+            {locked ? (
+              <button className="btn btn-primary" onClick={() => router.push("/dashboard/meu-plano")}>
+                <Svg paths='<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' sw={2.4} width={14} height={14} />
+                Exportar (planos pagos)
+              </button>
+            ) : (
+              <button className="btn btn-primary" onClick={download} disabled={busy}>
+                <Svg paths='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>' sw={2.4} width={14} height={14} />
+                {busy ? "Gerando..." : "Baixar PNG"}
+              </button>
+            )}
           </div>
         </div>
       </div>
