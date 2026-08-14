@@ -64,7 +64,8 @@ export default function ElementView({ el, ppm, selected, finish, editing, onComm
     content = <div style={{ position: "absolute", left: 0, top: "50%", width: "100%", height: (el.sw || 0) * ppm, transform: "translateY(-50%)", background: el.stroke }} />;
   } else if (el.type === "image") {
     if (el.src) {
-      style.background = `center/contain no-repeat url(${el.src})`;
+      const fit = el.fit === "cover" ? "cover" : "contain";
+      style.background = `center/${fit} no-repeat url(${el.src})`;
     } else {
       style.background = "repeating-conic-gradient(#e8e8ec 0% 25%,#dadadf 0% 50%) 0/16px 16px";
       style.display = "grid";
