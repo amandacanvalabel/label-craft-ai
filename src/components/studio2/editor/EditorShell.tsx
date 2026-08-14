@@ -58,12 +58,23 @@ export default function EditorShell() {
     toast(r.ok ? `Projeto "${r.name}" salvo` : "Não foi possível salvar: " + (r.error || ""));
   };
 
-  // Autosave a cada 30s quando já existe projeto e há mudanças.
+  // Salvamento automático a cada 15s.
+  // CRIA o rótulo na primeira vez (assim nada se perde se o usuário sair sem
+  // clicar em "Salvar") e ATUALIZA nas vezes seguintes. Só grava quando há
+  // conteúdo de verdade (algum elemento em alguma face) e mudanças não salvas.
   useEffect(() => {
-    const t = setInterval(() => {
+    let inFlight = false;
+    const t = setInterval(async () => {
+      if (inFlight) return;
       const st = useStudioStore.getState();
-      if (st.projectId && st.dirty) saveProject({ silent: true });
-    }, 30000);
+      const hasContent = Object.values(st.editor?.faces || {}).some(
+        (els) => Array.isArray(els) && els.length > 0
+      );
+      if (st.dirty && hasContent) {
+        inFlight = true;
+        try { await saveProject({ silent: true }); } finally { inFlight = false; }
+      }
+    }, 15000);
     return () => clearInterval(t);
   }, []);
 
