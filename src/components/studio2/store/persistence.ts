@@ -35,12 +35,30 @@ export interface SaveResult {
   error?: string;
 }
 
+// Evita salvamentos concorrentes (autosave + botão "Salvar" ao mesmo tempo),
+// o que poderia criar o mesmo rótulo duas vezes antes do id ser definido.
+let saveInFlight: Promise<SaveResult> | null = null;
+
 // Salva o projeto. Cria (POST) se novo, atualiza (PATCH) se já tem id.
 export async function saveProject(opts: { silent?: boolean } = {}): Promise<SaveResult> {
+  if (saveInFlight) return saveInFlight;
+  saveInFlight = doSaveProject(opts);
+  try {
+    return await saveInFlight;
+  } finally {
+    saveInFlight = null;
+  }
+}
+
+async function doSaveProject(opts: { silent?: boolean } = {}): Promise<SaveResult> {
   const st = useStudioStore.getState();
   const name = st.editor.docname?.trim() || st.projectName || "Rótulo";
   const canvasData = serializeStudioState(st);
-  const thumbnail = opts.silent ? undefined : await makeThumbnail(st);
+  // Sempre gera miniatura ao CRIAR (mesmo em autosave silencioso), para o rótulo
+  // aparecer com imagem em "Modelos salvos". Nas atualizações silenciosas, pula
+  // a miniatura para não pesar.
+  const needThumbnail = !opts.silent || !st.projectId;
+  const thumbnail = needThumbnail ? await makeThumbnail(st) : undefined;
 
   try {
     if (st.projectId) {
