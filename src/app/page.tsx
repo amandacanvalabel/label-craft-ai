@@ -4,13 +4,19 @@ import BeneficiosCarrousel from "@/components/home/BeneficiosCarrousel";
 import DemonstrationCentral from "@/components/home/DemonstrationCentral";
 import Planos from "@/components/home/Planos";
 import Avaliacoes from "@/components/home/Avaliacoes";
+import GaleriaExemplos from "@/components/home/GaleriaExemplos";
 import Footer from "@/components/home/Footer";
 import TrackPageView from "@/components/home/TrackPageView";
 import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
+import { getGalleryImages } from "@/lib/gallery";
 
 const HomePage = async () => {
-  const [settings, session] = await Promise.all([getSiteSettings(), getSession()]);
+  const [settings, session, galleryImages] = await Promise.all([
+    getSiteSettings(),
+    getSession(),
+    getGalleryImages(),
+  ]);
   const canBypassMaintenance = session?.role === "ADMIN";
 
   if (settings.maintenanceMode && !canBypassMaintenance) {
@@ -36,6 +42,7 @@ const HomePage = async () => {
       <HeroHome />
       <BeneficiosCarrousel />
       <DemonstrationCentral />
+      <GaleriaExemplos images={galleryImages} />
       <Planos />
       <Avaliacoes />
       <Footer />
