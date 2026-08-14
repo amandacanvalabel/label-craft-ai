@@ -9303,8 +9303,9 @@ const state = {
     briefingVector: null,    // vetor de estilo final (para debug)
     variations: [],          // 4 variações geradas (template+paleta)
     chosenVariation: 0,      // índice escolhido pelo usuário
-    brief: null,             // briefing da IA real (visão): {templateId, style, palette, palettes, copy, artPrompt}
-    aiBackground: null,      // arte ("cara") gerada pela IA (data URL) — fundo da frente
+    brief: null,             // briefing da IA real (visão): {templateId, style, palette, palettes, copy, artPrompt, illustration, ornament}
+    aiBackground: null,      // (legado) arte de fundo única — não usado no modo "peças separadas"
+    aiAssets: { illustration: null, ornament: null }, // peças transparentes editáveis geradas pela IA
   },
 
   // Conteúdo gerado pela IA — preenchido na etapa 'gerando'
@@ -19450,6 +19451,7 @@ RENDER.gerando = () => {
   // Limpa qualquer resultado de IA de uma geração anterior
   state.ai.brief = null;
   state.ai.aiBackground = null;
+  state.ai.aiAssets = { illustration: null, ornament: null };
 
   // Coordenação: só navega quando a animação E a geração terminarem — assim as
   // variações já aparecem com a arte da IA (que demora mais que a animação).
@@ -19472,9 +19474,10 @@ RENDER.gerando = () => {
     if(isAlimento && (hasPrompt || hasRefs)){
       const brief = await fetchAiFoodBrief(promptTxt, refsArr, state.alimento);
       if(brief) state.ai.brief = brief;
-      // Arte ("cara") do rótulo — melhor esforço; se falhar, segue sem fundo IA.
-      const img = await fetchAiFoodImage(promptTxt, refsArr, state.alimento);
-      if(img) state.ai.aiBackground = img;
+      // Peças transparentes (ilustração + ornamento) — melhor esforço; se falhar,
+      // segue sem elas (fluxo de templates continua funcionando).
+      const assets = await fetchAiFoodAssets(promptTxt, refsArr, state.alimento);
+      if(assets) state.ai.aiAssets = assets;
     }
     generateVariations();
     applyVariation(0);
@@ -20140,14 +20143,25 @@ function generateLabelAlimento(opts){
 
     let yTop = y0 + safe + 2;
 
-    // 0. FUNDO IA (arte "cara" gerada pela IA) — camada de baixo, cobre a face
-    //    inteira. Os textos obrigatórios, lupas e tabela ficam por cima e
-    //    editáveis. Só entra quando a IA gerou a arte com sucesso.
-    if(state.ai.aiBackground){
+    // 0. PEÇAS DA IA (ilustração + ornamento) — cada uma é uma CAMADA EDITÁVEL
+    //    separada (mover, redimensionar, trocar, apagar), com fundo transparente.
+    //    Ficam nas camadas de baixo; textos/lupas/tabela entram por cima.
+    const aiAssets = state.ai.aiAssets || {};
+    if(aiAssets.ornament){
       add(faceId, 'image', {
-        name: 'Fundo IA (referência)',
-        x: x0, y: y0, w: faceW, h: faceH,
-        src: state.ai.aiBackground, fit: 'cover',
+        name: 'Moldura IA',
+        x: x0 + padX * 0.5, y: y0 + faceH * 0.18,
+        w: faceW - padX, h: faceH * 0.58,
+        src: aiAssets.ornament, fit: 'contain',
+      });
+    }
+    if(aiAssets.illustration){
+      const iw = innerW * 0.62, ih = faceH * 0.30;
+      add(faceId, 'image', {
+        name: 'Ilustração IA',
+        x: x0 + (faceW - iw) / 2, y: y0 + faceH * 0.24,
+        w: iw, h: ih,
+        src: aiAssets.illustration, fit: 'contain',
       });
     }
 
@@ -21438,15 +21452,16 @@ RENDER.variacoes = () => {
       ${vars.map((v,i)=>{
         const swatches = ['bg','primary','accent','secondary'].map(k=>
           `<div class="vp" style="background:${v.palette[k]}"></div>`).join('');
-        // Quando a IA gerou a arte, mostramos a arte de verdade em cada variação
-        // (com um leve tom da paleta pra diferenciá-las). Sem arte, cai na
-        // miniatura de template.
-        const thumb = state.ai.aiBackground
-          ? `<div style="position:relative;width:100%;height:100%;overflow:hidden">
-               <img src="${state.ai.aiBackground}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" alt="arte gerada pela IA">
-               <div style="position:absolute;inset:0;background:${v.palette.accent};opacity:.10;mix-blend-mode:multiply"></div>
-               <div style="position:absolute;left:0;right:0;bottom:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.5))">
-                 <div style="font-weight:800;font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.65);line-height:1.1">${(state.frente.nome||'').slice(0,22)}</div>
+        // Quando a IA gerou as peças (ilustração/ornamento), compomos elas sobre
+        // a paleta de cada variação. Sem peças, cai na miniatura de template.
+        const asAssets = state.ai.aiAssets || {};
+        const hasAiArt = asAssets.illustration || asAssets.ornament;
+        const thumb = hasAiArt
+          ? `<div style="position:relative;width:100%;height:100%;overflow:hidden;background:${v.palette.bg}">
+               ${asAssets.ornament ? `<img src="${asAssets.ornament}" style="position:absolute;left:5%;top:8%;width:90%;height:74%;object-fit:contain">` : ''}
+               ${asAssets.illustration ? `<img src="${asAssets.illustration}" style="position:absolute;left:20%;top:14%;width:60%;height:46%;object-fit:contain">` : ''}
+               <div style="position:absolute;left:0;right:0;bottom:0;padding:8px 10px;background:linear-gradient(transparent,${v.palette.bg})">
+                 <div style="font-weight:800;font-size:12px;color:${v.palette.primary};line-height:1.1">${(state.frente.nome||'').slice(0,22)}</div>
                </div>
              </div>`
           : renderMiniLabel(v);
@@ -21601,26 +21616,40 @@ async function fetchAiFoodBrief(promptTxt, refs, a){
     return d;
   }catch(e){ return null; }
 }
-async function fetchAiFoodImage(promptTxt, refs, a){
-  try{
-    const w = (state.rotulo && state.rotulo.w) || 70;
-    const h = (state.rotulo && state.rotulo.h) || 90;
-    const res = await fetch('/api/ai/generate-image', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        productName: state.frente.nome || a.marca || '',
-        productType: 'alimento',
-        volumagem: a.peso_liquido ? (a.peso_liquido + (a.categoria === 'liquido' ? 'mL' : 'g')) : '',
-        moodKeywords: promptTxt || '',
-        artPrompt: (state.ai.brief && state.ai.brief.artPrompt) || '',
-        refs: (refs || []).slice(0, 3),
-        ratio: h > 0 ? w / h : 0.78,
-      }),
-    });
-    if(!res.ok) return null;
-    const d = await res.json();
-    return d && d.imageBase64 && d.imageBase64.startsWith('data:image/') ? d.imageBase64 : null;
-  }catch(e){ return null; }
+// Gera PEÇAS SEPARADAS com fundo transparente (ilustração + ornamento), cada
+// uma entra como elemento editável independente no editor. Roda em paralelo.
+async function fetchAiFoodAssets(promptTxt, refs, a){
+  const brief = state.ai.brief || {};
+  const nome = state.frente.nome || a.marca || '';
+  const estilo = (brief.artPrompt || promptTxt || '').trim();
+  const illoDesc = (brief.illustration || (nome ? ('ilustração que representa o produto "' + nome + '"') : 'ilustração do ingrediente/tema principal do produto')).trim();
+  const ornDesc  = (brief.ornament || 'moldura/borda decorativa elegante compatível com o estilo').trim();
+  const w = (state.rotulo && state.rotulo.w) || 70;
+  const h = (state.rotulo && state.rotulo.h) || 90;
+
+  const oneAsset = async (assetPrompt, ratio) => {
+    try{
+      const res = await fetch('/api/ai/generate-image', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          productType: 'alimento',
+          assetPrompt: assetPrompt + (estilo ? (' Estilo: ' + estilo) : ''),
+          transparent: true,
+          refs: (refs || []).slice(0, 3),
+          ratio,
+        }),
+      });
+      if(!res.ok) return null;
+      const d = await res.json();
+      return d && d.imageBase64 && d.imageBase64.startsWith('data:image/') ? d.imageBase64 : null;
+    }catch(e){ return null; }
+  };
+
+  const [illustration, ornament] = await Promise.all([
+    oneAsset('Ilustração isolada: ' + illoDesc + '.', 1),
+    oneAsset('Ornamento/moldura decorativa isolada (apenas o traçado do ornamento): ' + ornDesc + '.', h > 0 ? w / h : 0.78),
+  ]);
+  return { illustration, ornament };
 }
 
 function generateVariations(){
