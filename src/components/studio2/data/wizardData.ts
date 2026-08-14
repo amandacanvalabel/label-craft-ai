@@ -7,13 +7,16 @@ export interface ProdutoCat {
   desc: string;
   ic: string;
   soon: boolean;
+  // Se preenchido, clicar na categoria abre esta URL (ex.: ferramenta externa)
+  // em vez de seguir o fluxo normal do assistente.
+  href?: string;
 }
 
 export const PRODUTO_CATS: ProdutoCat[] = [
   { id: "cosmetico", name: "Cosmético", desc: "Shampoo, condicionador, máscara, leave-in, cremes e mais.", ic: '<path d="M9 2h6v3H9zM7 8h10l-1 13H8z"/><path d="M7 8a3 3 0 0 1 3-3M17 8a3 3 0 0 0-3-3"/>', soon: false },
   { id: "bebidas", name: "Bebidas", desc: "Cervejas, sucos, kombuchas e bebidas artesanais.", ic: '<path d="M6 3h12l-1 7a5 5 0 0 1-10 0zM9 21h6M12 16v5"/>', soon: true },
   { id: "suplementos", name: "Suplementos", desc: "Cápsulas, pós e suplementos alimentares.", ic: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/>', soon: true },
-  { id: "alimento", name: "Alimento", desc: "Conservas, molhos, doces e produtos artesanais.", ic: '<path d="M5 3v18M5 9h4M9 3v18M15 3c-2 0-3 2-3 5s1 5 3 5v8"/>', soon: true },
+  { id: "alimento", name: "Alimento", desc: "Tabela nutricional, alérgenos e rotulagem frontal (ANVISA).", ic: '<path d="M5 3v18M5 9h4M9 3v18M15 3c-2 0-3 2-3 5s1 5 3 5v8"/>', soon: false, href: "/canvalabel-alimentos.html" },
   { id: "limpeza", name: "Limpeza", desc: "Detergentes, desinfetantes e produtos de higiene.", ic: '<path d="M3 21h18M6 21V8l4-5h4l4 5v13M10 3v5h4V3"/>', soon: true },
 ];
 
