@@ -58,7 +58,27 @@ export function generateLabel(state: StudioState, opts: GenerateOptions = {}): P
       options,
       add: (type: ElementType, props: Partial<El>) => arr.push(mkEl(uid, type, props)),
     };
-    if (options.front) tpl.layoutFront(ctx);
+    if (options.front) {
+      tpl.layoutFront(ctx);
+      // Híbrido: se a IA gerou a "cara" do rótulo, ela substitui o fundo sólido
+      // da frente. Fica no fundo (mesma posição do "Fundo da frente"); os textos
+      // e a tabela do template continuam por cima e editáveis.
+      const aiBg = state.ai?.aiBackground;
+      if (aiBg) {
+        const img = mkEl(uid, "image", {
+          name: "Fundo IA (referência)",
+          x: region.x,
+          y: region.y,
+          w: region.w,
+          h: region.h,
+          src: aiBg,
+          fit: "cover",
+        });
+        const bgIdx = arr.findIndex((e) => e.name === "Fundo da frente");
+        if (bgIdx >= 0) arr.splice(bgIdx, 1, img);
+        else arr.unshift(img);
+      }
+    }
     if (options.back) tpl.layoutBack(ctx);
     if (options.foldAt != null) {
       arr.push(
