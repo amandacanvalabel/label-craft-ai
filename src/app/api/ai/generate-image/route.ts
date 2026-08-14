@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
       artPrompt?: string;
       refs?: string[];
       ratio?: number;
+      // Modo "peça isolada": gera SÓ um elemento (ilustração ou ornamento) com
+      // fundo transparente, para entrar como camada editável separada no editor.
+      assetPrompt?: string;
+      transparent?: boolean;
     };
 
     if (session.role === "SUBSCRIBER") {
@@ -88,8 +92,19 @@ export async function POST(req: NextRequest) {
     const images = Array.isArray(body.refs) ? body.refs.filter(isImageDataUrl).slice(0, 3) : [];
     const hasRefs = images.length > 0;
     const size = pickSize(body.ratio);
+    const asset = body.assetPrompt?.trim() || "";
+    const wantTransparent = body.transparent === true || asset.length > 0;
 
-    const prompt = `Arte de FRENTE de rótulo de ${productType} "${productName}"${brandName ? ` da marca "${brandName}"` : ""}, vista plana (flat), para impressão.
+    const prompt = asset
+      // Peça isolada (ilustração ou ornamento) — fundo transparente, sem texto.
+      ? `${asset}
+${hasRefs ? "Inspire-se na paleta, clima e estilo das imagens de referência anexadas, sem copiá-las. " : ""}Requisitos ESTRITOS:
+- FUNDO 100% TRANSPARENTE (PNG com alpha), sem cenário, sem retângulo de fundo, sem sombra dura.
+- Apenas o elemento isolado, centralizado, arte plana (flat), com margem de respiro nas bordas.
+- SEM QUALQUER TEXTO, letras, números, marca, tabela ou código de barras.
+- Alta resolução, pronta para composição em um editor de rótulos.`
+      // Arte de rótulo completa (modo antigo, fundo opaco).
+      : `Arte de FRENTE de rótulo de ${productType} "${productName}"${brandName ? ` da marca "${brandName}"` : ""}, vista plana (flat), para impressão.
 ${art ? `Direção visual: ${art} ` : `Estilo/estética: ${mood}. `}${ativos ? `Elementos em destaque: ${ativos}. ` : ""}${volumagem ? `Volume: ${volumagem}. ` : ""}
 ${hasRefs ? "Inspire-se nas imagens de referência anexadas (paleta, clima, texturas e estilo), sem copiá-las literalmente. " : ""}
 Requisitos:
@@ -108,6 +123,10 @@ Requisitos:
       form.append("size", size);
       form.append("n", "1");
       form.append("quality", "medium");
+      if (wantTransparent) {
+        form.append("background", "transparent");
+        form.append("output_format", "png");
+      }
       images.forEach((url, i) => form.append("image[]", dataUrlToBlob(url), `ref${i}.png`));
 
       response = await fetch("https://api.openai.com/v1/images/edits", {
@@ -116,10 +135,15 @@ Requisitos:
         body: form,
       });
     } else {
+      const genBody: Record<string, unknown> = { model: "gpt-image-1", prompt, size, n: 1, quality: "medium" };
+      if (wantTransparent) {
+        genBody.background = "transparent";
+        genBody.output_format = "png";
+      }
       response = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size, n: 1, quality: "medium" }),
+        body: JSON.stringify(genBody),
       });
     }
 
