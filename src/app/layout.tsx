@@ -43,13 +43,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const RootLayout = async ({ children }: Readonly<{ children: React.ReactNode }>) => {
   const settings = await getSiteSettings();
-  const initialDark = settings.defaultTheme === "dark";
+  // TEMPORÁRIO: site travado no modo claro (o modo escuro será reconstruído
+  // depois). Ignoramos tema salvo / preferência do sistema e forçamos claro.
+  const initialDark = false;
   const themeScript = `
     (() => {
-      const stored = localStorage.getItem("theme");
-      const theme = stored || ${JSON.stringify(settings.defaultTheme)};
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && prefersDark));
+      document.documentElement.classList.remove("dark");
     })();
   `;
   const cssVars = {
