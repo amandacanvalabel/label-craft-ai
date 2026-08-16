@@ -52,12 +52,9 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   }, [router]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme") as "light" | "dark" | "system" | null;
-    const theme = stored || siteSettings.defaultTheme || "light";
-    // O painel abre em modo CLARO por padrão (mais legível) e NÃO segue
-    // automaticamente o tema escuro do sistema operacional. Só fica escuro se o
-    // usuário escolher explicitamente "dark" no botão de tema (fica salvo).
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    // TEMPORÁRIO: site travado no modo claro. Forçamos remover o modo escuro
+    // (o modo escuro será reconstruído depois). Ignora tema salvo/sistema.
+    document.documentElement.classList.remove("dark");
   }, [siteSettings.defaultTheme]);
 
   if (loading) {
