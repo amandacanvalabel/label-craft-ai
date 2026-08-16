@@ -2,13 +2,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ==================== DESIGN SYSTEM ====================
-   IMPORTANTE: usamos @theme (SEM `inline`) de propósito. Com `@theme inline` o
-   Tailwind "congela" as cores dentro das classes (ex.: .text-foreground vira
-   color:#0a0a0a fixo), então o modo escuro NÃO troca a cor do texto — ficava
-   preto sobre fundo preto. Sem `inline`, as classes usam var(--color-...), que
-   o bloco .dark abaixo sobrescreve corretamente. */
-@theme {
+/* ==================== DESIGN SYSTEM ==================== */
+@theme inline {
   --color-background: #ffffff;
   --color-foreground: #0a0a0a;
   --color-muted: #f5f5f7;
@@ -56,6 +51,27 @@
   --color-glass: rgba(10, 10, 15, 0.7);
   --color-glass-border: rgba(255, 255, 255, 0.12);
 }
+
+/* ============ CORREÇÃO DO MODO ESCURO — SOMENTE NO PAINEL ============
+   O tema usa `@theme inline`, que "congela" as cores das classes do Tailwind
+   (ex.: .text-foreground = #0a0a0a fixo). Por isso, no escuro, o texto do painel
+   não trocava de cor e ficava preto sobre fundo preto.
+   Corrigimos forçando as cores de texto APENAS dentro do painel (.dash-root),
+   onde os fundos têm variante escura. A landing (home) NÃO é afetada — ela foi
+   desenhada para o modo claro (cards e rodapé com fundo claro fixo), então lá o
+   texto continua escuro e legível, como antes. */
+.dark .dash-root .text-foreground { color: #f6f8fc; }
+.dark .dash-root .text-card-foreground { color: #f6f8fc; }
+.dark .dash-root .text-muted-foreground { color: #c4ccd8; }
+.dark .dash-root .text-foreground\/80 { color: rgba(246, 248, 252, 0.8); }
+.dark .dash-root .text-foreground\/70 { color: rgba(246, 248, 252, 0.72); }
+.dark .dash-root .text-foreground\/60 { color: rgba(246, 248, 252, 0.64); }
+.dark .dash-root .text-foreground\/50 { color: rgba(246, 248, 252, 0.56); }
+.dark .dash-root .text-foreground\/40 { color: rgba(246, 248, 252, 0.48); }
+.dark .dash-root .text-muted-foreground\/60 { color: rgba(196, 204, 216, 0.64); }
+.dark .dash-root .text-muted-foreground\/50 { color: rgba(196, 204, 216, 0.56); }
+.dark .dash-root .text-muted-foreground\/40 { color: rgba(196, 204, 216, 0.5); }
+.dark .dash-root .text-muted-foreground\/30 { color: rgba(196, 204, 216, 0.44); }
 
 /* ==================== BASE STYLES ==================== */
 body {
