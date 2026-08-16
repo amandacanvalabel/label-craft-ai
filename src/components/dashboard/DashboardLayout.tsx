@@ -82,7 +82,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   if (fullscreen) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] dark:bg-[#0a0a0f] transition-colors duration-300">
+    <div className="dash-root min-h-screen bg-[#f5f7fa] dark:bg-[#0a0a0f] transition-colors duration-300">
       <Sidebar
         role={role}
         expanded={sidebarExpanded}
