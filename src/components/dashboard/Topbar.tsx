@@ -261,17 +261,11 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
   const [notifications, setNotifications] = useState<Notif[]>([]);
   const [lastRead, setLastRead] = useState<number>(0);
 
-  // Initialize dark mode from localStorage
+  // TEMPORÁRIO: site travado no modo claro. Forçamos claro e ignoramos o tema
+  // salvo/sistema (o modo escuro será reconstruído depois).
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldBeDark = stored === "dark" || (stored === "system" && prefersDark) || (!stored && prefersDark);
-    setIsDark(shouldBeDark);
-    if (shouldBeDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    setIsDark(false);
+    document.documentElement.classList.remove("dark");
   }, []);
 
   // Load avatar + plan info from /api/auth/me (single request)
@@ -449,12 +443,15 @@ const Topbar = ({ user, sidebarExpanded }: TopbarProps) => {
           onClick={toggleFullscreen}
         />
 
-        {/* Dark/Light */}
-        <TopbarButton
-          icon={isDark ? HiOutlineSun : HiOutlineMoon}
-          active={isDark}
-          onClick={toggleDark}
-        />
+        {/* Dark/Light — TEMPORARIAMENTE OCULTO (site travado no modo claro).
+            Usamos `false &&` (em vez de apagar) pra reativar fácil depois. */}
+        {false && (
+          <TopbarButton
+            icon={isDark ? HiOutlineSun : HiOutlineMoon}
+            active={isDark}
+            onClick={toggleDark}
+          />
+        )}
 
         {/* Language */}
         <div className="relative">
