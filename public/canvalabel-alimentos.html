@@ -18019,7 +18019,7 @@ RENDER['nutricional-alimento'] = () => {
         <div class="fld">
           <label>Peso total dos ingredientes</label>
           <div style="padding:11px 0;color:#64748b;font-family:var(--display)">
-            ${itens.reduce((s, i) => s + (parseFloat(i.qt) || 0), 0)} ${unidade}
+            <span id="nutriPesoTotal">${itens.reduce((s, i) => s + (parseFloat(i.qt) || 0), 0)}</span> ${unidade}
             <span style="font-size:11.5px;color:#94a3b8;display:block;margin-top:2px">
               ${itens.length === 0
                 ? 'Nenhum ingrediente'
@@ -18258,6 +18258,7 @@ RENDER['nutricional-alimento'] = () => {
       state.alimento.receita.itens[idx].qt = parseFloat(inp.value) || 0;
       recalcReceitaToState();
       updateNutriPreview();
+      updateNutriPesoTotal();
       renderFoot();
     };
   });
@@ -18433,6 +18434,15 @@ function updateNutriPreview(){
     </div>`;
   }
   side.innerHTML = `<div class="nutri-side-title">Preview da tabela</div>${preview}`;
+}
+
+/* Atualiza só o "Peso total dos ingredientes" (sem re-renderizar o form,
+   preserva o foco no input de quantidade que está sendo digitado). */
+function updateNutriPesoTotal(){
+  const el = document.getElementById('nutriPesoTotal');
+  if(!el) return;
+  const itens = (state.alimento.receita && state.alimento.receita.itens) || [];
+  el.textContent = itens.reduce((s, i) => s + (parseFloat(i.qt) || 0), 0);
 }
 
 /* Atualiza só o box de alérgenos+declarações */
@@ -23744,6 +23754,9 @@ const EDICONS = {
   image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21"/>',
   barcode:'<path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14" stroke-width="1.7"/>',
   qr:'<rect x="3" y="3" width="7" height="7" rx="0.5"/><rect x="14" y="3" width="7" height="7" rx="0.5"/><rect x="3" y="14" width="7" height="7" rx="0.5"/><rect x="5.5" y="5.5" width="2" height="2" fill="currentColor" stroke="none"/><rect x="16.5" y="5.5" width="2" height="2" fill="currentColor" stroke="none"/><rect x="5.5" y="16.5" width="2" height="2" fill="currentColor" stroke="none"/><path d="M14 14h2v2M18 14v2M21 18v-2h-2M14 21h2v-3M21 21h-3"/>',
+  // === Edição de imagem ===
+  mascara:'<rect x="3" y="3" width="13" height="13" rx="1.5"/><circle cx="15.5" cy="15.5" r="5.5"/>',
+  borracha:'<path d="M5 15.5 14 6.5l3.5 3.5L8.5 19H6z"/><path d="M4 21h16"/><path d="M11 9.5l3.5 3.5"/>',
   // === Específicos pra alimento ===
   tabelaNutri:'<rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16" x2="21" y2="16"/><line x1="11" y1="8" x2="11" y2="20"/><line x1="16" y1="8" x2="16" y2="20"/>',
   lupaAltoEm:'<circle cx="10" cy="10" r="6"/><line x1="14.5" y1="14.5" x2="20" y2="20"/><text x="6.5" y="13" font-size="6" font-weight="700" fill="currentColor" stroke="none">!</text>',
@@ -24243,6 +24256,297 @@ function getMultiBBox(){
   return { x:minX, y:minY, w:maxX-minX, h:maxY-minY };
 }
 
+/* ============================================================
+   FERRAMENTAS DE IMAGEM — Máscara (recortar em forma) e Borracha
+   (apagar com pincel). As duas atuam na IMAGEM SELECIONADA e geram
+   um novo PNG com transparência, trocando el.src. Assim o resultado
+   funciona igual no editor (background-image) e no PDF (<img>), sem
+   precisar mexer em cada tela de render.
+============================================================ */
+
+/* Retorna o elemento de imagem selecionado (com src) ou null + aviso. */
+function edSelectedImage(){
+  const el = elById(E().sel);
+  if(!el || el.type !== 'image' || !el.src){
+    toast('Selecione uma imagem primeiro');
+    return null;
+  }
+  return el;
+}
+
+/* Carrega um data URL/URL num <img> e resolve quando estiver pronto. */
+function edLoadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    try { img.crossOrigin = 'anonymous'; } catch(_){}
+    img.src = src;
+  });
+}
+
+/* Desenha `img` cobrindo (cover) o retângulo (0,0,cw,ch). */
+function edDrawCover(ctx, img, cw, ch){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const scale = Math.max(cw/iw, ch/ih);
+  const dw = iw*scale, dh = ih*scale;
+  ctx.drawImage(img, (cw-dw)/2, (ch-dh)/2, dw, dh);
+}
+
+/* Formas disponíveis para máscara (ids especiais + chaves do SHAPE_LIB). */
+const MASCARA_FORMAS = [
+  { id:'circulo',     nome:'Círculo' },
+  { id:'elipse',      nome:'Oval' },
+  { id:'arredondado', nome:'Arredondado' },
+  { id:'heart',       nome:'Coração' },
+  { id:'star5',       nome:'Estrela' },
+  { id:'hexagon',     nome:'Hexágono' },
+  { id:'octagon',     nome:'Octógono' },
+  { id:'diamond',     nome:'Losango' },
+  { id:'triangle',    nome:'Triângulo' },
+  { id:'flower',      nome:'Flor' },
+];
+
+/* Preenche o caminho da forma no canvas cw×ch (usa fillStyle/composite atuais). */
+function edMascaraPath(ctx, formaId, cw, ch){
+  if(formaId === 'circulo'){
+    const r = Math.min(cw, ch)/2;
+    ctx.beginPath(); ctx.arc(cw/2, ch/2, r, 0, Math.PI*2); ctx.fill();
+    return;
+  }
+  if(formaId === 'elipse'){
+    ctx.beginPath(); ctx.ellipse(cw/2, ch/2, cw/2, ch/2, 0, 0, Math.PI*2); ctx.fill();
+    return;
+  }
+  if(formaId === 'arredondado'){
+    const r = Math.min(cw, ch) * 0.14, w = cw, h = ch;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.arcTo(w, 0, w, h, r);
+    ctx.arcTo(w, h, 0, h, r);
+    ctx.arcTo(0, h, 0, 0, r);
+    ctx.arcTo(0, 0, w, 0, r);
+    ctx.closePath(); ctx.fill();
+    return;
+  }
+  const shape = SHAPE_LIB[formaId];
+  if(shape && shape.path){
+    ctx.save();
+    ctx.scale(cw/100, ch/100); // paths do SHAPE_LIB usam viewBox 0 0 100 100
+    ctx.fill(new Path2D(shape.path));
+    ctx.restore();
+  } else {
+    ctx.beginPath(); ctx.rect(0, 0, cw, ch); ctx.fill();
+  }
+}
+
+/* Gera o PNG com a máscara aplicada e devolve o dataURL. */
+async function edBuildMascara(el, formaId){
+  const img = await edLoadImage(el.src);
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const boxAR = (el.w > 0 && el.h > 0) ? el.w/el.h : iw/ih;
+  let cw, ch;
+  if(boxAR >= 1){ ch = Math.min(1600, ih); cw = Math.round(ch*boxAR); }
+  else { cw = Math.min(1600, iw); ch = Math.round(cw/boxAR); }
+  cw = Math.max(2, cw); ch = Math.max(2, ch);
+  const canvas = document.createElement('canvas');
+  canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  edDrawCover(ctx, img, cw, ch);            // 1) imagem cobre a caixa
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = '#000';
+  edMascaraPath(ctx, formaId, cw, ch);       // 2) mantém só dentro da forma
+  return canvas.toDataURL('image/png');
+}
+
+const _CHECKER_BG = 'background-image:linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0';
+
+/* ---------- Modal: MÁSCARA ---------- */
+function openMascaraModal(){
+  const el = edSelectedImage();
+  if(!el) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+  document.body.appendChild(overlay);
+  let pendingSrc = null;
+
+  overlay.innerHTML = `<div class="modal" style="width:720px;max-width:94vw;max-height:88vh">
+    <div class="modal-head">
+      <h3>Máscara — recortar <span style="color:var(--accent)">imagem</span> em forma</h3>
+      <button class="x" id="mkClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body" style="display:grid;grid-template-columns:1fr 250px;gap:18px;padding:18px 24px">
+      <div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Prévia</div>
+        <div style="${_CHECKER_BG};border:1px solid var(--line);border-radius:12px;height:300px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+          <img id="mkPreview" alt="prévia" src="${el.src}" style="max-width:100%;max-height:100%;object-fit:contain">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Formato</div>
+        <div id="mkFormas" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:300px;overflow:auto"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="mkCancel">Cancelar</button>
+      <button class="btn btn-primary" id="mkApply" disabled>Aplicar máscara</button>
+    </div>
+  </div>`;
+
+  overlay.querySelector('#mkFormas').innerHTML = MASCARA_FORMAS.map(f => {
+    const shape = SHAPE_LIB[f.id];
+    let svg;
+    if(shape) svg = `<svg viewBox="0 0 100 100" width="34" height="34"><path d="${shape.path}" fill="currentColor"/></svg>`;
+    else if(f.id === 'circulo') svg = `<svg viewBox="0 0 100 100" width="34" height="34"><circle cx="50" cy="50" r="46" fill="currentColor"/></svg>`;
+    else if(f.id === 'elipse') svg = `<svg viewBox="0 0 100 100" width="34" height="34"><ellipse cx="50" cy="50" rx="46" ry="32" fill="currentColor"/></svg>`;
+    else svg = `<svg viewBox="0 0 100 100" width="34" height="34"><rect x="6" y="6" width="88" height="88" rx="18" fill="currentColor"/></svg>`;
+    return `<button class="mk-forma" data-forma="${f.id}" type="button" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;border:1.5px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;color:var(--ink-soft);transition:.13s">${svg}<span style="font-size:11px;font-weight:600">${f.nome}</span></button>`;
+  }).join('');
+
+  const preview = overlay.querySelector('#mkPreview');
+  const applyBtn = overlay.querySelector('#mkApply');
+
+  overlay.querySelectorAll('.mk-forma').forEach(b => {
+    b.onclick = async () => {
+      overlay.querySelectorAll('.mk-forma').forEach(x => { x.style.borderColor = 'var(--line)'; x.style.color = 'var(--ink-soft)'; });
+      b.style.borderColor = 'var(--accent)'; b.style.color = 'var(--accent)';
+      try {
+        pendingSrc = await edBuildMascara(el, b.dataset.forma);
+        preview.src = pendingSrc;
+        applyBtn.disabled = false;
+      } catch(e){ toast('Não consegui processar essa imagem'); }
+    };
+  });
+
+  function close(){ overlay.remove(); }
+  overlay.onclick = e => { if(e.target === overlay) close(); };
+  overlay.querySelector('#mkClose').onclick = close;
+  overlay.querySelector('#mkCancel').onclick = close;
+  applyBtn.onclick = () => {
+    if(!pendingSrc) return;
+    el.src = pendingSrc;
+    el.fit = 'contain';
+    edPush(); edRender();
+    toast('Máscara aplicada');
+    close();
+  };
+}
+
+/* ---------- Modal: BORRACHA ---------- */
+function openBorrachaModal(){
+  const el = edSelectedImage();
+  if(!el) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-bg';
+  document.body.appendChild(overlay);
+
+  overlay.innerHTML = `<div class="modal" style="width:760px;max-width:94vw;max-height:90vh">
+    <div class="modal-head">
+      <h3>Borracha — apagar partes da <span style="color:var(--accent)">imagem</span></h3>
+      <button class="x" id="brClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body" style="padding:16px 24px">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink-soft)">Pincel
+          <input id="brSize" type="range" min="8" max="220" value="48" style="width:140px">
+          <span id="brSizeVal" style="font-variant-numeric:tabular-nums;min-width:40px">48 px</span>
+        </label>
+        <button class="btn btn-ghost" id="brUndo" type="button" style="padding:7px 12px">↶ Desfazer</button>
+        <button class="btn btn-ghost" id="brReset" type="button" style="padding:7px 12px">Restaurar</button>
+        <span style="font-size:12px;color:var(--ink-faint)">Arraste sobre a imagem para apagar.</span>
+      </div>
+      <div id="brStage" style="${_CHECKER_BG};border:1px solid var(--line);border-radius:12px;max-height:56vh;overflow:auto;display:flex;align-items:center;justify-content:center;position:relative;padding:10px">
+        <canvas id="brCanvas" style="max-width:100%;touch-action:none;cursor:crosshair;display:block"></canvas>
+        <div id="brRing" style="position:fixed;pointer-events:none;border:2px solid var(--accent);border-radius:50%;transform:translate(-50%,-50%);display:none;z-index:5"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="brCancel">Cancelar</button>
+      <button class="btn btn-primary" id="brApply">Aplicar</button>
+    </div>
+  </div>`;
+
+  const canvas = overlay.querySelector('#brCanvas');
+  const ctx = canvas.getContext('2d');
+  const ring = overlay.querySelector('#brRing');
+  let brush = 48, hist = [], hIdx = -1, drawing = false, last = null;
+
+  edLoadImage(el.src).then(img => {
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const long = Math.max(iw, ih), cap = 1600, scale = long > cap ? cap/long : 1;
+    canvas.width = Math.max(2, Math.round(iw*scale));
+    canvas.height = Math.max(2, Math.round(ih*scale));
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    pushHist();
+  }).catch(() => toast('Não consegui carregar a imagem'));
+
+  function pushHist(){
+    hist = hist.slice(0, hIdx+1);
+    hist.push(canvas.toDataURL('image/png'));
+    if(hist.length > 16) hist.shift();
+    hIdx = hist.length - 1;
+  }
+  function restore(dataUrl){
+    return edLoadImage(dataUrl).then(im => {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(im, 0, 0, canvas.width, canvas.height);
+    });
+  }
+  function toCanvas(cx, cy){
+    const r = canvas.getBoundingClientRect();
+    return { x: (cx - r.left) * (canvas.width / r.width), y: (cy - r.top) * (canvas.height / r.height) };
+  }
+  function scaleFactor(){
+    const r = canvas.getBoundingClientRect();
+    return r.width ? canvas.width / r.width : 1;
+  }
+  function erAt(p){
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath(); ctx.arc(p.x, p.y, brush/2, 0, Math.PI*2); ctx.fill();
+  }
+  function erLine(a, b){
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = brush; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    drawing = true; last = toCanvas(e.clientX, e.clientY); erAt(last);
+  });
+  canvas.addEventListener('pointermove', e => {
+    const sizeScreen = brush / scaleFactor();
+    ring.style.display = 'block';
+    ring.style.width = sizeScreen + 'px'; ring.style.height = sizeScreen + 'px';
+    ring.style.left = e.clientX + 'px'; ring.style.top = e.clientY + 'px';
+    if(!drawing) return;
+    const p = toCanvas(e.clientX, e.clientY); erLine(last, p); last = p;
+  });
+  canvas.addEventListener('pointerleave', () => { ring.style.display = 'none'; });
+  function endStroke(){ if(drawing){ drawing = false; pushHist(); } }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+
+  const sizeInput = overlay.querySelector('#brSize');
+  const sizeVal = overlay.querySelector('#brSizeVal');
+  sizeInput.oninput = () => { brush = +sizeInput.value; sizeVal.textContent = brush + ' px'; };
+  overlay.querySelector('#brUndo').onclick = () => { if(hIdx > 0){ hIdx--; restore(hist[hIdx]); } };
+  overlay.querySelector('#brReset').onclick = () => { if(hist.length){ hIdx = 0; hist = hist.slice(0, 1); restore(hist[0]); } };
+
+  function close(){ overlay.remove(); }
+  overlay.onclick = e => { if(e.target === overlay) close(); };
+  overlay.querySelector('#brClose').onclick = close;
+  overlay.querySelector('#brCancel').onclick = close;
+  overlay.querySelector('#brApply').onclick = () => {
+    el.src = canvas.toDataURL('image/png');
+    edPush(); edRender();
+    toast('Imagem editada');
+    close();
+  };
+}
+
 /* ---------- Setup ---------- */
 function buildEditor(){
   // toolbar de ferramentas
@@ -24256,6 +24560,8 @@ function buildEditor(){
     {id:'image',label:'Imagem',sep:true},
     {id:'barcode',label:'Cód.Barras'},
     {id:'qr',label:'QR Code'},
+    {id:'mascara',label:'Máscara',sep:true},
+    {id:'borracha',label:'Borracha'},
   ];
   // Botões adicionais quando o produto é alimento
   if(state.produto === 'alimento'){
@@ -24274,6 +24580,8 @@ function buildEditor(){
     b.onclick = ()=>{
       if(t.id==='image'){ pickFile((d)=>edAdd('image',{src:d})); return; }
       if(t.id==='shapeGallery'){ openShapeGallery(); return; }
+      if(t.id==='mascara'){ openMascaraModal(); return; }
+      if(t.id==='borracha'){ openBorrachaModal(); return; }
       if(t.id==='tabelaNutri'){ insertTabelaNutriToCanvas(); return; }
       if(t.id==='lupaAltoEm'){ insertLupaAltoEmToCanvas(); return; }
       edAdd(t.id);
@@ -27873,8 +28181,11 @@ initRouter();
 <script>
 /* ================================================================
    BOOTSTRAP CanvaLabel — abre a página DIRETO na ferramenta de
-   Alimentos (cadastro do alimento + tabela nutricional + ANVISA),
-   pulando landing/login. Injetado por cima do protótipo completo.
+   Alimentos, pulando landing/login. Injetado por cima do protótipo
+   completo.
+   Abre no passo "Rótulo" (tipo + tamanho do rótulo), que é a primeira
+   coisa que o usuário precisa preencher. Antes abria em 'dados-alimento'
+   e pulava o tamanho do rótulo — por isso o campo não aparecia.
 ================================================================ */
 (function(){
   function boot(){
@@ -27885,7 +28196,7 @@ initRouter();
       if (typeof showLayer === 'function') showLayer('app');
       try { if (state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
       if (typeof go === 'function' && typeof stepIdx === 'function') {
-        var i = stepIdx('dados-alimento');
+        var i = stepIdx('rotulo');
         if (i >= 0) go(i);
       }
     }catch(e){ console.error('[boot alimentos]', e); }
