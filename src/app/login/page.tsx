@@ -44,11 +44,18 @@ const LoginPage = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Implementar chamada à API de recuperação de senha
-    setTimeout(() => {
+    try {
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+    } catch {
+      /* silencioso de propósito: não revelamos se o e-mail existe */
+    } finally {
       setIsLoading(false);
       setForgotSent(true);
-    }, 1500);
+    }
   };
 
   return (
