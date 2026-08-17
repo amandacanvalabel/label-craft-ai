@@ -10,6 +10,7 @@ import {
   type AsaasCustomer,
 } from "@/lib/asaas";
 import { validateCoupon, redeemCoupon } from "@/lib/coupon";
+import { sendWelcomeEmail, sendPlanConfirmationEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
@@ -95,6 +96,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Guarda se é conta nova (para enviar o e-mail de boas-vindas só uma vez).
+    const isNewAccount = !subscriber;
+
     // Criar subscriber no DB se não existir
     if (!subscriber) {
       const hashedPassword = await bcrypt.hash(password, 12);
@@ -136,6 +140,14 @@ export async function POST(req: NextRequest) {
       });
 
       if (appliedCoupon) await redeemCoupon(appliedCoupon);
+
+      // E-mails (melhor esforço — não quebram o cadastro se falharem).
+      try {
+        if (isNewAccount) await sendWelcomeEmail(subscriber.email, subscriber.name, plan.name);
+        await sendPlanConfirmationEmail(subscriber.email, subscriber.name, plan.name, 0);
+      } catch (e) {
+        console.error("[checkout] falha ao enviar e-mail (grátis)", e);
+      }
 
       const token = await signToken({
         id: subscriber.id,
@@ -218,6 +230,19 @@ export async function POST(req: NextRequest) {
     });
 
     if (appliedCoupon) await redeemCoupon(appliedCoupon);
+
+    // E-mails (melhor esforço). Boas-vindas em conta nova; confirmação quando o
+    // pagamento já sai confirmado (ex.: cartão). Em PIX/boleto a confirmação
+    // acontece depois — o comprovante do Asaas cobre esse caso por enquanto.
+    const pagamentoConfirmado =
+      asaasPayment.status === "CONFIRMED" || asaasPayment.status === "RECEIVED";
+    try {
+      if (isNewAccount) await sendWelcomeEmail(subscriber.email, subscriber.name, plan.name);
+      if (pagamentoConfirmado)
+        await sendPlanConfirmationEmail(subscriber.email, subscriber.name, plan.name, price);
+    } catch (e) {
+      console.error("[checkout] falha ao enviar e-mail (pago)", e);
+    }
 
     // Resultado baseado no método de pagamento
     const result: Record<string, unknown> = {
