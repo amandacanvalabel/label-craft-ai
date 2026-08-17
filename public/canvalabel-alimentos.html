@@ -19640,14 +19640,15 @@ RENDER.gerando = () => {
       state.ai.analysis = await analyzeReferences(refsArr);
       state.ai.extractedPalette = state.ai.analysis.palette;
     }
-    // IA REAL só para alimento (é o fluxo que a pessoa pediu). Precisa de prompt
-    // ou referências para valer a pena chamar.
-    if(isAlimento && (hasPrompt || hasRefs)){
-      const brief = await fetchAiFoodBrief(promptTxt, refsArr, state.alimento);
+    // IA REAL de arte — agora para alimento E cosmético (mesmo padrão). Precisa
+    // de prompt ou referências para valer a pena chamar.
+    if(hasPrompt || hasRefs){
+      const prodData = isAlimento ? state.alimento : (state.frente || {});
+      const brief = await fetchAiFoodBrief(promptTxt, refsArr, prodData);
       if(brief) state.ai.brief = brief;
       // Peças transparentes (ilustração + ornamento) — melhor esforço; se falhar,
       // segue sem elas (fluxo de templates continua funcionando).
-      const assets = await fetchAiFoodAssets(promptTxt, refsArr, state.alimento);
+      const assets = await fetchAiFoodAssets(promptTxt, refsArr, prodData);
       if(assets) state.ai.aiAssets = assets;
     }
     generateVariations();
@@ -20233,6 +20234,29 @@ function generateLabel(opts){
   } else if(faceCfg.kind === 'dual'){
     buildFace('frente', {x:0, y:0, w:W, h:H}, {front:true});
     buildFace('verso',  {x:0, y:0, w:W, h:H}, {back:true});
+  }
+
+  // ===== Peças da IA (ilustração + ornamento) — MESMO padrão do alimento =====
+  // Antes o cosmético ignorava a arte da IA. Agora entram como camadas de fundo
+  // editáveis na FRENTE (atrás dos textos que o template já posicionou).
+  const aiAssets = state.ai.aiAssets || {};
+  if(aiAssets.illustration || aiAssets.ornament){
+    let frontFace = null, fx0 = 0, fW = W;
+    if(faceCfg.kind === 'unified'){ frontFace = 'unico'; fx0 = 0; fW = W/2; }
+    else if(faceCfg.kind === 'front' || faceCfg.kind === 'dual'){ frontFace = 'frente'; fx0 = 0; fW = W; }
+    if(frontFace && state.editor.faces[frontFace]){
+      const padX = safe + 1;
+      const innerW = fW - 2 * padX;
+      const bg = [];
+      if(aiAssets.ornament){
+        bg.push(mkEl('image', { name:'Moldura IA', x: fx0 + padX * 0.5, y: H * 0.18, w: fW - padX, h: H * 0.58, src: aiAssets.ornament, fit:'contain' }));
+      }
+      if(aiAssets.illustration){
+        const iw = innerW * 0.62, ih = H * 0.30;
+        bg.push(mkEl('image', { name:'Ilustração IA', x: fx0 + (fW - iw) / 2, y: H * 0.24, w: iw, h: ih, src: aiAssets.illustration, fit:'contain' }));
+      }
+      state.editor.faces[frontFace].unshift(...bg); // no início = atrás dos textos
+    }
   }
 
   edHistory = []; edHIndex = -1;
@@ -21960,15 +21984,16 @@ function buildBriefingVector(){
    Falham de forma graciosa (retornam null) — nesse caso o gerador cai no fluxo
    local de templates, sem quebrar. */
 async function fetchAiFoodBrief(promptTxt, refs, a){
+  a = a || {};
   try{
     const res = await fetch('/api/ai/generate-design', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         prompt: promptTxt,
-        product: 'alimento',
+        product: state.produto || 'alimento',
         fields: {
-          nome: state.frente.nome || a.marca || '',
-          oque: a.designacao || '',
+          nome: (state.frente && state.frente.nome) || a.marca || '',
+          oque: a.designacao || (state.frente && state.frente.oque) || '',
           volume: a.peso_liquido ? (a.peso_liquido + (a.categoria === 'liquido' ? 'mL' : 'g')) : '',
         },
         refs: (refs || []).slice(0, 3),
@@ -21983,8 +22008,9 @@ async function fetchAiFoodBrief(promptTxt, refs, a){
 // Gera PEÇAS SEPARADAS com fundo transparente (ilustração + ornamento), cada
 // uma entra como elemento editável independente no editor. Roda em paralelo.
 async function fetchAiFoodAssets(promptTxt, refs, a){
+  a = a || {};
   const brief = state.ai.brief || {};
-  const nome = state.frente.nome || a.marca || '';
+  const nome = (state.frente && state.frente.nome) || a.marca || '';
   const estilo = (brief.artPrompt || promptTxt || '').trim();
   const illoDesc = (brief.illustration || (nome ? ('ilustração que representa o produto "' + nome + '"') : 'ilustração do ingrediente/tema principal do produto')).trim();
   const ornDesc  = (brief.ornament || 'moldura/borda decorativa elegante compatível com o estilo').trim();
@@ -21996,7 +22022,7 @@ async function fetchAiFoodAssets(promptTxt, refs, a){
       const res = await fetch('/api/ai/generate-image', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          productType: 'alimento',
+          productType: state.produto || 'alimento',
           assetPrompt: assetPrompt + (estilo ? (' Estilo: ' + estilo) : ''),
           transparent: true,
           refs: (refs || []).slice(0, 3),
@@ -28546,14 +28572,25 @@ initRouter();
 (function(){
   function boot(){
     try{
-      if (typeof setSession === 'function') {
+      // Sessão atual (se houver). NÃO sobrescreve o login da pessoa: antes o
+      // bootstrap chamava setSession(ferramenta@...) em TODA carga, o que trocava
+      // a conta de quem tinha acabado de logar e forçava sempre um rótulo novo
+      // (escondendo a tela inicial com os projetos salvos).
+      var sess = (typeof getSession === 'function') ? getSession() : null;
+      var isAuto = !sess || (sess && sess.email === 'ferramenta@canvalabel.com.br');
+      if (!sess && typeof setSession === 'function') {
         setSession({ email: 'ferramenta@canvalabel.com.br', nome: 'CanvaLabel', em: Date.now() });
       }
       if (typeof showLayer === 'function') showLayer('app');
-      try { if (state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
-      if (typeof go === 'function' && typeof stepIdx === 'function') {
-        var i = stepIdx('rotulo');
-        if (i >= 0) go(i);
+      // Só joga DIRETO no fluxo de alimentos para visitante anônimo (sessão
+      // automática). Se a pessoa logou com a conta dela, respeita: mostra a tela
+      // normal do app (com os projetos salvos), sem forçar um rótulo em branco.
+      if (isAuto) {
+        try { if (state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
+        if (typeof go === 'function' && typeof stepIdx === 'function') {
+          var i = stepIdx('rotulo');
+          if (i >= 0) go(i);
+        }
       }
     }catch(e){ console.error('[boot alimentos]', e); }
   }
