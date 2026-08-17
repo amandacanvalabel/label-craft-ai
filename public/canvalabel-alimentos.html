@@ -9274,6 +9274,8 @@ const state = {
     // Pode ser preenchida manualmente ou importada da calculadora
     ingredientes: [],        // [{nome}, ...] — para o validador
     alergenos: [],           // [string, ...] — alérgenos a destacar no rótulo
+    selos: {},               // { [id]: true } — selos escolhidos (dietéticos, nutricionais, reciclagem, registro)
+    selosInit: false,        // se já aplicamos as sugestões automáticas uma vez
 
     // ===== Modo de cálculo nutricional (etapa 'nutricional-alimento') =====
     // 'receita' — usuário lista ingredientes da base + quantidade + rendimento
@@ -9763,6 +9765,15 @@ function applyRealPlansToDisplay(){
     PLAN_LIMITS[tier].price = fmtPreco(priceNum);
     if(Array.isArray(rp.benefits) && rp.benefits.length) PLAN_LIMITS[tier].benefits = rp.benefits.slice();
     if(rp.description) PLAN_LIMITS[tier].description = rp.description;
+    // Limites reais do banco (-1 = ilimitado → Infinity). Só sobrescreve os
+    // campos que a API mandar, então se a rota /api/plans ainda não devolver
+    // esses campos, nada quebra (mantém os limites embutidos).
+    const lim = PLAN_LIMITS[tier].limits;
+    const conv = v => (v === -1 || v === null ? Infinity : v);
+    if(rp.maxLabels !== undefined)           lim.rotulosPorMes = conv(rp.maxLabels);
+    if(rp.monthlyAiCredits !== undefined)    lim.iaGeracoes    = conv(rp.monthlyAiCredits);
+    if(rp.monthlyImageCredits !== undefined) lim.iaImagens     = conv(rp.monthlyImageCredits);
+    if(rp.storageMb !== undefined)           lim.storageMB     = conv(rp.storageMb);
   });
 }
 
@@ -17045,6 +17056,7 @@ const STEPS = [
   // 'prompt-alimento' substitui 'refs/resumo' do fluxo cosmético
   {id:'dados-alimento',     label:'Dados do alimento'},
   {id:'nutricional-alimento', label:'Informações nutricionais'},
+  {id:'selos-alimento',     label:'Selos'},
   {id:'prompt-alimento',    label:'IA · prompt e referências'},
   // === Fluxo de cosmético (legado) ===
   {id:'verso',    label:'Verso'},
@@ -17067,7 +17079,7 @@ const STEPS = [
 const STEP_GROUPS = [
   { id:'briefing',  label:'Briefing',   sub:'Produto e formato',     stepIds:['produto','rotulo'] },
   { id:'conteudo',  label:'Conteúdo',   sub:'Informações do rótulo',
-    stepIds:['dados-alimento','nutricional-alimento','verso','selos','frente'] },
+    stepIds:['dados-alimento','nutricional-alimento','selos-alimento','verso','selos','frente'] },
   { id:'geracao',   label:'Geração',    sub:'IA cria seu rótulo',
     stepIds:['prompt-alimento','refs','resumo','gerando','variacoes'] },
   { id:'edicao',    label:'Edição',     sub:'Ajustes finais',        stepIds:['editor'] },
@@ -17269,7 +17281,7 @@ function renderFoot(){
   //   - cosmético: verso → selos → frente → refs → resumo
   //   - alimento:  dados-alimento → nutricional-alimento → prompt-alimento
   // ============================================================
-  const FLOW_ALIMENTO  = ['produto','rotulo','dados-alimento','nutricional-alimento','prompt-alimento','gerando','variacoes','editor','material','acabamentos','exportar'];
+  const FLOW_ALIMENTO  = ['produto','rotulo','dados-alimento','nutricional-alimento','selos-alimento','prompt-alimento','gerando','variacoes','editor','material','acabamentos','exportar'];
   const FLOW_COSMETICO = ['produto','rotulo','verso','selos','frente','refs','resumo','gerando','variacoes','editor','material','acabamentos','exportar'];
   const currentFlow = (state.produto === 'alimento') ? FLOW_ALIMENTO : FLOW_COSMETICO;
 
@@ -17297,6 +17309,8 @@ function renderFoot(){
   if(id === 'dados-alimento'){
     nextLabel = 'Avançar para nutricional';
   } else if(id === 'nutricional-alimento'){
+    nextLabel = 'Avançar para selos';
+  } else if(id === 'selos-alimento'){
     nextLabel = 'Avançar para IA';
   } else if(id === 'prompt-alimento'){
     nextLabel = 'Gerar rótulo com IA';
@@ -20235,6 +20249,190 @@ function generateLabel(opts){
    Recebe paleta e fontes do template escolhido — usa o mesmo
    sistema de variações de cosmético, só muda o conteúdo.
 ============================================================ */
+/* ============================================================
+   SELOS DE ALIMENTOS — badges vetoriais parametrizados
+   Cada selo vira uma imagem SVG (elemento editável no canvas).
+   Grupos: dietéticos/restrições, nutricionais, segurança/registro,
+   e reciclagem (reaproveita MATERIAIS_RECICLAGEM). Tudo opcional.
+============================================================ */
+const SELO_GLYPHS = {
+  leaf:'<path d="M6 20c0-8 5-14 14-14 0 9-6 14-14 14z" fill="currentColor" stroke="none"/><path d="M8 18C11 14 15 11 19 9" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  ban:'<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.4"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2.4"/>',
+  check:'<path d="M4 12l5 5L20 6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  alert:'<path d="M12 3l10 17H2z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.1" fill="currentColor" stroke="none"/>',
+  shield:'<path d="M12 2l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V5z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5L16 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  flag:'<path d="M5 21V4h13l-2.5 4L18 12H5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>',
+};
+function _seloEsc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function seloBadgeSVG(seal){
+  const color = seal.color || '#15803d';
+  const glyph = SELO_GLYPHS[seal.glyph] || '';
+  const lines = [seal.l1, seal.l2, seal.l3].filter(Boolean);
+  let ty, fs = 13;
+  if(lines.length === 1){ ty = [66]; fs = 15; }
+  else if(lines.length === 2){ ty = [62, 76]; }
+  else { ty = [58, 71, 84]; fs = 11.5; }
+  const glyphG = glyph ? `<g transform="translate(38,20)" color="${color}">${glyph}</g>` : '';
+  const texts = lines.map((l,i)=>`<text x="50" y="${ty[i]}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="${fs}" fill="${color}" letter-spacing="0.3">${_seloEsc(l)}</text>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="47" fill="#ffffff" stroke="${color}" stroke-width="3.5"/>
+    <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="1" opacity="0.45"/>
+    ${glyphG}${texts}</svg>`;
+}
+function seloRecicloSVG(code, color){
+  color = color || '#15803d'; code = String(code);
+  const numeric = /^[0-9]+$/.test(code);
+  const fs = numeric ? 22 : (code.length <= 3 ? 15 : 12);
+  const arrow = (rot)=>`<g transform="rotate(${rot} 50 50)"><path d="M32 27 L55 27 L55 21 L69 31 L55 41 L55 35 L32 35 Z" fill="${color}"/></g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="47" fill="#ffffff" stroke="${color}" stroke-width="3.5"/>
+    ${arrow(0)}${arrow(120)}${arrow(240)}
+    <text x="50" y="${50 + fs*0.35}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="${fs}" fill="${color}">${_seloEsc(code)}</text></svg>`;
+}
+
+const _SC = { G:'#15803d', BLUE:'#1d4ed8', AMBER:'#b45309', RED:'#b91c1c', PURP:'#7c3aed', TEAL:'#0f766e', BROWN:'#92400e' };
+const SELOS_ALIMENTO = [
+  { id:'dieteticos', label:'Dietéticos e restrições', items:[
+    { id:'vegano',        nome:'Vegano',            l1:'VEGANO',   glyph:'leaf', color:_SC.G },
+    { id:'vegetariano',   nome:'Vegetariano',       l1:'VEGETA-', l2:'RIANO', glyph:'leaf', color:_SC.G },
+    { id:'sem_gluten',    nome:'Sem glúten',        l1:'SEM', l2:'GLÚTEN', glyph:'ban', color:_SC.AMBER },
+    { id:'contem_gluten', nome:'Contém glúten',     l1:'CONTÉM', l2:'GLÚTEN', glyph:'alert', color:_SC.RED },
+    { id:'sem_lactose',   nome:'Sem lactose',       l1:'SEM', l2:'LACTOSE', glyph:'ban', color:_SC.BLUE },
+    { id:'zero_lactose',  nome:'Zero lactose',      l1:'ZERO', l2:'LACTOSE', glyph:'ban', color:_SC.BLUE },
+    { id:'sem_ovos',      nome:'Sem ovos',          l1:'SEM', l2:'OVOS', glyph:'ban', color:_SC.PURP },
+    { id:'sem_leite',     nome:'Sem leite',         l1:'SEM', l2:'LEITE', glyph:'ban', color:_SC.BLUE },
+  ]},
+  { id:'nutricionais', label:'Nutricionais e qualidade', items:[
+    { id:'organico',           nome:'Orgânico',              l1:'ORGÂ-', l2:'NICO', glyph:'leaf', color:_SC.G },
+    { id:'zero_acucar',        nome:'Zero açúcar',           l1:'ZERO', l2:'AÇÚCAR', glyph:'ban', color:_SC.TEAL },
+    { id:'sem_adicao_acucar',  nome:'Sem açúcar adicionado', l1:'SEM AÇÚCAR', l2:'ADICIONADO', glyph:'ban', color:_SC.TEAL },
+    { id:'integral',           nome:'Integral',              l1:'INTE-', l2:'GRAL', glyph:'check', color:_SC.BROWN },
+    { id:'fonte_fibras',       nome:'Fonte de fibras',       l1:'FONTE DE', l2:'FIBRAS', glyph:'check', color:_SC.BROWN },
+    { id:'natural',            nome:'100% natural',          l1:'100%', l2:'NATURAL', glyph:'leaf', color:_SC.G },
+    { id:'sem_corantes',       nome:'Sem corantes',          l1:'SEM', l2:'CORANTES', glyph:'ban', color:_SC.TEAL },
+    { id:'sem_conservantes',   nome:'Sem conservantes',      l1:'SEM', l2:'CONSERV.', glyph:'ban', color:_SC.TEAL },
+  ]},
+  { id:'seguranca', label:'Segurança e registro', items:[
+    { id:'sif',                  nome:'S.I.F. (inspeção federal)', l1:'S.I.F.', glyph:'shield', color:_SC.RED },
+    { id:'mapa',                 nome:'Registro MAPA',             l1:'MAPA',   glyph:'shield', color:_SC.G },
+    { id:'industria_brasileira', nome:'Indústria Brasileira',      l1:'INDÚSTRIA', l2:'BRASILEIRA', glyph:'flag', color:_SC.G },
+  ]},
+];
+const SELOS_ALIMENTO_MAP = {};
+SELOS_ALIMENTO.forEach(g => g.items.forEach(it => { SELOS_ALIMENTO_MAP[it.id] = it; }));
+
+/* SVG de um selo por id (reciclagem = 'rec_<code>'). */
+function seloAlimentoSVGById(id){
+  if(id.indexOf('rec_') === 0){
+    const code = id.slice(4);
+    const m = MATERIAIS_RECICLAGEM.find(x => x.code === code);
+    return seloRecicloSVG(code);
+  }
+  const it = SELOS_ALIMENTO_MAP[id];
+  return it ? seloBadgeSVG(it) : '';
+}
+
+/* Sugere selos com base nos ingredientes/alérgenos/valores (não ativa sozinho —
+   o usuário confirma). Usa a base de alérgenos do CalcNutricional. */
+function sugerirSelosAlimento(){
+  const a = state.alimento;
+  const sug = [];
+  const itens = (a.receita && a.receita.itens) || [];
+  const temIngredientes = itens.length > 0;
+  // Junta os alérgenos de cada ingrediente da receita
+  const alergSet = new Set();
+  let semDados = false;
+  if(temIngredientes && typeof CalcNutricional !== 'undefined'){
+    itens.forEach(it => {
+      const ing = CalcNutricional.getById(it.id);
+      if(!ing || !Array.isArray(ing.alergenos)){ semDados = true; return; }
+      ing.alergenos.forEach(x => alergSet.add(x));
+    });
+  }
+  // Também considera alérgenos declarados manualmente
+  (a.alergenos || []).forEach(x => alergSet.add(String(x).toLowerCase()));
+
+  if(temIngredientes && !semDados){
+    if(alergSet.has('gluten')) sug.push('contem_gluten');
+    else sug.push('sem_gluten');
+    if(!alergSet.has('leite')) sug.push('sem_lactose');
+    if(!alergSet.has('ovo'))   sug.push('sem_ovos');
+  }
+  // Açúcar adicionado zero → sugere "sem açúcar adicionado"
+  const v = a.v100 || {};
+  const temValores = (v.energia || 0) > 0 || (v.carbo || 0) > 0;
+  if(temValores && (v.acucarA || 0) === 0) sug.push('sem_adicao_acucar');
+  return sug;
+}
+
+/* ============================================================
+   ETAPA — SELOS DO ALIMENTO
+============================================================ */
+RENDER['selos-alimento'] = () => {
+  const a = state.alimento;
+  if(!a.selos) a.selos = {};
+  const sel = a.selos;
+  const sug = sugerirSelosAlimento();
+  const sugPendentes = sug.filter(id => !sel[id]);
+
+  const chip = (it, extra) => {
+    const on = !!sel[it.id];
+    const svg = (extra && extra.reciclo) ? seloRecicloSVG(it.code) : seloBadgeSVG(it);
+    const isSug = sug.includes(it.id);
+    return `<button type="button" class="chip" data-seloa="${it.id}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 8px;border:2px solid ${on?'var(--accent)':'var(--line)'};border-radius:12px;background:${on?'var(--accent-soft)':'var(--panel)'};cursor:pointer;position:relative;width:104px">
+      <span style="width:52px;height:52px">${svg}</span>
+      <span style="font-size:11px;font-weight:600;color:var(--ink-soft);text-align:center;line-height:1.15">${it.nome || it.name}</span>
+      ${on ? '<span style="position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;display:grid;place-items:center">✓</span>' : ''}
+      ${(isSug && !on) ? '<span style="position:absolute;top:6px;left:6px;font-size:8.5px;font-weight:700;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:5px;text-transform:uppercase;letter-spacing:.03em">sugerido</span>' : ''}
+    </button>`;
+  };
+
+  const grupos = SELOS_ALIMENTO.map(g => `
+    <div class="section-h">${g.label}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      ${g.items.map(it => chip(it)).join('')}
+    </div>
+  `).join('');
+
+  const reciclaChips = MATERIAIS_RECICLAGEM.map(m => chip({ id:'rec_'+m.code, code:m.code, name:m.name }, { reciclo:true })).join('');
+
+  let html = `<div class="screen">
+    <div class="eyebrow">Passo · Selos e certificações</div>
+    <h1 class="scr">Quais <span class="hl">selos</span> aparecem no rótulo?</h1>
+    <p class="scr-sub">Cada selo vira um ícone vetorial editável no design — depois você posiciona livremente na frente ou no verso. Tudo aqui é opcional.</p>
+
+    ${sugPendentes.length ? `
+    <div class="note" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg>
+      <div style="flex:1;min-width:180px">Com base nos seus ingredientes, sugerimos: <b>${sugPendentes.map(id => (SELOS_ALIMENTO_MAP[id]?.nome)||id).join(', ')}</b>. Confira se fazem sentido antes de usar (atenção a contaminação cruzada).</div>
+      <button type="button" id="aplicarSugestoes" class="btn btn-primary" style="padding:8px 14px;font-size:13px">Adicionar sugeridos</button>
+    </div>` : ''}
+
+    ${grupos}
+
+    <div class="section-h">Reciclagem / material da embalagem</div>
+    <p class="scr-sub" style="margin-bottom:12px;font-size:12.5px">Marque o(s) material(is) da sua embalagem — pode ter mais de um (ex.: pote + tampa).</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">${reciclaChips}</div>
+
+    <div class="note teal" style="margin-top:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+    <p><b>Importante:</b> os selos são declarações do fabricante. Só use "Vegano", "Sem Glúten", "Sem Lactose" etc. se o produto realmente atende ao requisito, considerando também a contaminação cruzada na sua produção.</p></div>
+  </div>`;
+  $('#screen').innerHTML = html;
+
+  $$('[data-seloa]').forEach(b => b.onclick = () => {
+    const id = b.dataset.seloa;
+    if(sel[id]) delete sel[id]; else sel[id] = true;
+    RENDER['selos-alimento'](); renderFoot();
+  });
+  const apl = $('#aplicarSugestoes');
+  if(apl) apl.onclick = () => {
+    sugPendentes.forEach(id => { sel[id] = true; });
+    a.selosInit = true;
+    RENDER['selos-alimento'](); renderFoot();
+  };
+};
+
 function generateLabelAlimento(opts){
   opts = opts || {};
   const W = Math.max(30, state.rotulo.w || 70);
@@ -20484,8 +20682,8 @@ function generateLabelAlimento(opts){
     if(a.validade) lvParts.push(`Val.: ${a.validade}`);
     const hasLV = lvParts.length > 0;
 
-    // Conservação: max 1 linha (trunca com "..." se exceder)
-    const nLinesConsMax = 1;
+    // Conservação: max 2 linhas (trunca com "..." se exceder)
+    const nLinesConsMax = 2;
     let conservacaoStr = a.conservacao || '';
     let nLinesCons = 0;
     if(conservacaoStr){
@@ -20499,8 +20697,8 @@ function generateLabelAlimento(opts){
       }
     }
 
-    // Fabricante: max 2 linhas
-    const nLinesFabMax = 2;
+    // Fabricante: max 3 linhas
+    const nLinesFabMax = 3;
     const fabParts = [];
     if(a.fabricante) fabParts.push(a.fabricante);
     if(a.cnpj) fabParts.push(`CNPJ ${a.cnpj}`);
@@ -20519,6 +20717,33 @@ function generateLabelAlimento(opts){
       }
     }
 
+    // Origem (país) + Registro MS — linha curta, sempre visível
+    const origemParts = [];
+    if(a.pais && a.pais.trim()){
+      origemParts.push(a.pais.trim().toLowerCase() === 'brasil'
+        ? 'Indústria Brasileira'
+        : ('Origem: ' + a.pais.trim()));
+    }
+    if(a.registro_ms && a.registro_ms.trim()) origemParts.push('Reg. MS: ' + a.registro_ms.trim());
+    const origemStr = origemParts.join('  ·  ');
+    const hOrigem = origemStr ? tMeta * 0.7 : 0;
+
+    // Modo de preparo — máx 2 linhas
+    const nLinesPrepMax = 2;
+    let prepStr = (a.instrucoes_preparo || '').trim();
+    if(prepStr) prepStr = 'MODO DE PREPARO: ' + prepStr;
+    let nLinesPrep = 0;
+    if(prepStr){
+      const calc = Math.ceil(prepStr.length / charsPerLineMeta);
+      if(calc > nLinesPrepMax){
+        prepStr = prepStr.slice(0, nLinesPrepMax * charsPerLineMeta - 3) + '...';
+        nLinesPrep = nLinesPrepMax;
+      } else {
+        nLinesPrep = calc;
+      }
+    }
+    const hPrep = nLinesPrep ? nLinesPrep * tMeta * 0.7 : 0;
+
     // ---- Calcula altura total necessária para textos ----
     // Multiplicador 0.7 = altura visual real de uma linha (size * 0.7 em mm)
     const hIngTitulo  = ingListStr ? tSec  * 0.7   : 0;
@@ -20530,135 +20755,80 @@ function generateLabelAlimento(opts){
     const hFabricante = nLinesFab  ? nLinesFab * tMeta * 0.7 : 0;
 
     // Soma gaps entre seções não-vazias
-    const blocos = [hIngTitulo+hIngLista, hAlerg, hDecl, hLV, hConservacao, hFabricante].filter(h => h > 0);
+    const blocos = [hIngTitulo+hIngLista, hAlerg, hDecl, hLV, hConservacao, hFabricante, hOrigem, hPrep].filter(h => h > 0);
     const gapsTotal = Math.max(0, blocos.length - 1) * gapLin + gapSec;
 
     const hTextos = blocos.reduce((s, h) => s + h, 0) + gapsTotal;
 
     // ============================================================
-    // RENDERIZA EM 2 PASSOS:
-    //   PASSO 1 — Ancora dados administrativos NO FUNDO (lote → cons → fab)
-    //             Calcula yC_bottom = topo da região administrativa
-    //   PASSO 2 — Top-down: tabela → ingredientes → alérgenos → declarações
-    //             Tabela usa o espaço restante entre y0+padY e yC_bottom
-    // Garante que admin SEMPRE aparece e nunca invade códigos.
+    // LAYOUT — fluxo ÚNICO de cima pra baixo, com auto-ajuste.
+    // A tabela nutricional é obrigatória e tem PRIORIDADE (tamanho mínimo
+    // legível — IN 75/2020). Se o conteúdo não couber, primeiro reduzimos a
+    // fonte dos textos; só depois encolhemos a tabela (até um mínimo). Como
+    // tudo é empilhado top-down acima dos códigos, NÃO há sobreposição.
     // ============================================================
+    const hasV100 = a.v100 && (a.v100.energia > 0 || a.v100.carbo > 0 || a.v100.sodio > 0);
+    const availH = yCodes - gapSec - (y0 + padY);
 
-    // --- PASSO 1: calcula posição do Y final da região administrativa ---
-    // Lista os elementos do rodapé com suas alturas, do mais baixo (Fab)
-    // até o mais alto (Lote). Renderiza de baixo pra cima.
-    const adminItems = [];
-    if(fabParts.length > 0){
-      adminItems.push({
-        name:'Fabricante / CNPJ / Endereço / SAC',
-        text: fabStr, h: hFabricante,
-        size: tMeta, weight: 400, italic: false, lh: 1.3,
-      });
-    }
-    if(conservacaoStr){
-      adminItems.push({
-        name:'Conservação',
-        text: conservacaoStr, h: hConservacao,
-        size: tMeta, weight: 400, italic: true, lh: 1.3,
-      });
-    }
-    if(hasLV){
-      adminItems.push({
-        name:'Lote / Fabricação / Validade',
-        text: lvParts.join('  ·  '), h: hLV,
-        size: tMeta, weight: 600, italic: false, lh: 1.2,
-      });
-    }
+    // Monta os blocos de texto (ordem de prioridade topo→base) para um dado
+    // fator de escala de fonte. Reaproveita as strings já preparadas acima.
+    const montarBlocos = (fscale) => {
+      const zSec = tSec * fscale, zBody = tBody * fscale, zMeta = tMeta * fscale, zAlerg = tAlerg * fscale;
+      const cplBody = Math.max(20, Math.floor(wL / (zBody * 0.16)));
+      const cplMeta = Math.max(30, Math.floor(wL / (zMeta * 0.16)));
+      const lh = (size) => size * 0.7;
+      const nl = (str, cpl) => str ? Math.max(1, Math.ceil((str.length + 1) / cpl)) : 0;
+      const blocks = [];
+      if(ingListStr){
+        blocks.push({ name:'Ingredientes (título)', text:'INGREDIENTES', size:zSec, weight:700, lh:1, ls:0.5, h:lh(zSec) });
+        blocks.push({ name:'Ingredientes (lista)', text:ingListStr + '.', size:zBody, weight:400, lh:1.3, h:nl(ingListStr + '.', cplBody) * lh(zBody) });
+      }
+      if(hasAlerg)  blocks.push({ name:'Alérgenos', text:alergStr, size:zAlerg, weight:800, lh:1.2, h:nl(alergStr, cplBody) * lh(zAlerg) });
+      if(hasDecl)   blocks.push({ name:'Declarações obrigatórias', text:declText, size:zBody, weight:700, lh:1.2, h:nl(declText, cplBody) * lh(zBody) });
+      if(hasLV)     blocks.push({ name:'Lote / Fabricação / Validade', text:lvParts.join('  ·  '), size:zMeta, weight:600, lh:1.2, h:lh(zMeta) });
+      if(origemStr) blocks.push({ name:'Origem / Registro', text:origemStr, size:zMeta, weight:600, lh:1.2, h:lh(zMeta) });
+      if(prepStr)   blocks.push({ name:'Modo de preparo', text:prepStr, size:zMeta, weight:400, lh:1.3, h:nl(prepStr, cplMeta) * lh(zMeta) });
+      if(conservacaoStr) blocks.push({ name:'Conservação', text:conservacaoStr, size:zMeta, weight:400, italic:true, lh:1.3, h:nl(conservacaoStr, cplMeta) * lh(zMeta) });
+      if(fabParts.length) blocks.push({ name:'Fabricante / CNPJ / Endereço / SAC', text:fabStr, size:zMeta, weight:400, lh:1.3, h:nl(fabStr, cplMeta) * lh(zMeta) });
+      const totalTexto = blocks.reduce((s,b)=>s+b.h, 0) + blocks.length * gapLin;
+      return { blocks, totalTexto };
+    };
 
-    // Renderiza bottom-up — yB começa em yLimite e sobe a cada item
-    let yB = yLimite;
-    for(let i = 0; i < adminItems.length; i++){
-      const item = adminItems[i];
-      yB -= item.h;
-      add(faceId, 'text', {
-        name: item.name,
-        x: xL, y: yB, w: wL, h: item.h,
-        text: item.text,
-        size: item.size, family: fonts.body || 'Inter',
-        weight: item.weight, color: ink, align: 'left',
-        italic: item.italic, lh: item.lh, ls: 0,
-      });
-      if(i < adminItems.length - 1) yB -= gapLin;
-    }
-    // yB agora é o topo da região administrativa
-    const yTopoBottom = yB - gapSec;
-
-    // --- PASSO 2: tabela usa EXATAMENTE o sobrante (sem mínimo forçado)
-    // pra garantir que nunca sobreponha o conteúdo bottom-up.
-    const hEssenciais = hIngTitulo + hIngLista + (hasAlerg ? hAlerg + gapLin : 0) + (hasDecl ? hDecl + gapLin : 0);
-    const espacoPraTabelaReal = yTopoBottom - (y0 + padY) - hEssenciais - gapSec;
-    let tabelaW = wL * 0.65;
+    // Tabela alvo / mínima
+    const MIN_TAB_W = Math.min(wL, 34);
+    const TARGET_TAB_W = Math.min(wL, 48);
+    let tabelaW = hasV100 ? TARGET_TAB_W : 0;
     let tabelaH = tabelaW * 0.91;
-    if(tabelaH > espacoPraTabelaReal){
-      tabelaH = Math.max(0, espacoPraTabelaReal);
-      tabelaW = tabelaH > 0 ? tabelaH / 0.91 : 0;
+
+    // Passo 1: reduz a fonte (até 0.72) tentando caber tabela alvo + textos
+    let fscale = 1, r = montarBlocos(fscale);
+    const cabe = () => (hasV100 ? tabelaH + gapSec : 0) + r.totalTexto <= availH;
+    while(!cabe() && fscale > 0.72){ fscale -= 0.06; r = montarBlocos(fscale); }
+    // Passo 2: se ainda não cabe, encolhe a tabela (até o mínimo legível)
+    if(hasV100 && !cabe()){
+      tabelaH = Math.max(MIN_TAB_W * 0.91, availH - gapSec - r.totalTexto);
+      tabelaW = tabelaH / 0.91;
+      if(tabelaW < MIN_TAB_W){ tabelaW = MIN_TAB_W; tabelaH = MIN_TAB_W * 0.91; }
     }
     if(tabelaW > wL){ tabelaW = wL; tabelaH = tabelaW * 0.91; }
 
     // ============================================================
-    // RENDERIZA TOP-DOWN
+    // RENDERIZA TOP-DOWN (empilhado, sem sobreposição)
     // ============================================================
     let yC = y0 + padY;
-
-    // === TABELA NUTRICIONAL ===
-    const hasV100 = a.v100 && (a.v100.energia > 0 || a.v100.carbo > 0 || a.v100.sodio > 0);
     if(hasV100){
       const tabelaSvg = renderTabelaNutricionalSVG(a, fonts, ink);
-      addSvgAsImage(faceId, {
-        name:'Tabela nutricional',
-        x: xL + (wL - tabelaW) / 2,
-        y: yC, w: tabelaW, h: tabelaH,
-      }, tabelaSvg);
+      addSvgAsImage(faceId, { name:'Tabela nutricional', x: xL + (wL - tabelaW) / 2, y: yC, w: tabelaW, h: tabelaH }, tabelaSvg);
       yC += tabelaH + gapSec;
     }
-
-    // === INGREDIENTES ===
-    if(ingListStr){
+    r.blocks.forEach(b => {
       add(faceId, 'text', {
-        name:'Ingredientes (título)',
-        x: xL, y: yC, w: wL, h: tSec * 0.7,
-        text:'INGREDIENTES',
-        size: tSec, family: fonts.body || 'Inter',
-        weight: 700, color: ink, align: 'left', lh: 1, ls: 0.5,
+        name: b.name, x: xL, y: yC, w: wL, h: b.h,
+        text: b.text, size: b.size, family: fonts.body || 'Inter',
+        weight: b.weight, color: ink, align: 'left', italic: !!b.italic, lh: b.lh, ls: b.ls || 0,
       });
-      yC += tSec * 0.7;
-      add(faceId, 'text', {
-        name:'Ingredientes (lista)',
-        x: xL, y: yC, w: wL, h: hIngLista,
-        text: ingListStr + '.',
-        size: tBody, family: fonts.body || 'Inter',
-        weight: 400, color: ink, align: 'left', lh: 1.3, ls: 0,
-      });
-      yC += hIngLista + gapLin;
-    }
-
-    // === ALÉRGENOS (destaque — obrigatório RDC 26/2015) ===
-    if(hasAlerg){
-      add(faceId, 'text', {
-        name:'Alérgenos',
-        x: xL, y: yC, w: wL, h: tAlerg * 0.7,
-        text: alergStr,
-        size: tAlerg, family: fonts.body || 'Inter',
-        weight: 800, color: ink, align: 'left', lh: 1.2, ls: 0,
-      });
-      yC += tAlerg * 0.7 + gapLin;
-    }
-
-    // === DECLARAÇÕES OBRIGATÓRIAS ===
-    if(hasDecl){
-      add(faceId, 'text', {
-        name:'Declarações obrigatórias',
-        x: xL, y: yC, w: wL, h: tBody * 0.7,
-        text: declText,
-        size: tBody, family: fonts.body || 'Inter',
-        weight: 700, color: ink, align: 'left', lh: 1.2, ls: 0,
-      });
-    }
+      yC += b.h + gapLin;
+    });
 
     // ============================================================
     // CÓDIGOS NO RODAPÉ (QR esquerda, EAN-13 direita)
@@ -20690,16 +20860,52 @@ function generateLabelAlimento(opts){
     }
   };
 
+  // ===== Selos escolhidos (dietéticos, nutricionais, registro, reciclagem) =====
+  // Cada selo vira uma imagem SVG editável, numa fileira. Ficam acima do peso
+  // líquido na frente (ou no topo do verso quando só há verso). O usuário pode
+  // reposicionar livremente depois.
+  const placeSelos = (faceId, x0, y0, faceW, faceH, atTop) => {
+    const ids = Object.keys(a.selos || {}).filter(k => a.selos[k]);
+    if(!ids.length) return;
+    const padX = safe + 1;
+    const innerW = faceW - 2 * padX;
+    const gap = 1.5;
+    let size = Math.min(12, (innerW - (ids.length - 1) * gap) / ids.length);
+    let perRow = ids.length;
+    if(size < 8){ size = 10; perRow = Math.max(1, Math.floor((innerW + gap) / (size + gap))); }
+    const rows = [];
+    for(let i = 0; i < ids.length; i += perRow) rows.push(ids.slice(i, i + perRow));
+    const totalH = rows.length * size + (rows.length - 1) * gap;
+    let y = atTop
+      ? y0 + safe + 1
+      : y0 + faceH - safe - ((a.peso_liquido > 0) ? 8 : 2) - totalH;
+    rows.forEach(row => {
+      const rowW = row.length * size + (row.length - 1) * gap;
+      let x = x0 + (faceW - rowW) / 2;
+      row.forEach(id => {
+        const nome = id.indexOf('rec_') === 0
+          ? 'Selo reciclagem ' + id.slice(4)
+          : ('Selo: ' + (SELOS_ALIMENTO_MAP[id] ? SELOS_ALIMENTO_MAP[id].nome : id));
+        addSvgAsImage(faceId, { name: nome, x, y, w: size, h: size }, seloAlimentoSVGById(id));
+        x += size + gap;
+      });
+      y += size + gap;
+    });
+  };
+
   // Aplica conforme a configuração de faces
   if(faceCfg.kind === 'front'){
     buildFrente('frente', 0, 0, W, H);
+    placeSelos('frente', 0, 0, W, H, false);
   } else if(faceCfg.kind === 'back'){
     buildVerso('verso', 0, 0, W, H);
+    placeSelos('verso', 0, 0, W, H, true);
   } else if(faceCfg.kind === 'unified'){
     // Frente | Verso lado a lado
     const half = W / 2;
     buildFrente('unico', 0, 0, half, H);
     buildVerso('unico', half, 0, half, H);
+    placeSelos('unico', 0, 0, half, H, false);
     // Linha de dobra
     state.editor.faces['unico'].push(mkEl('line', {
       name:'Linha de dobra (frente/verso)',
@@ -20710,6 +20916,7 @@ function generateLabelAlimento(opts){
     // dual: peças separadas
     buildFrente('frente', 0, 0, W, H);
     buildVerso('verso', 0, 0, W, H);
+    placeSelos('frente', 0, 0, W, H, false);
   }
 
   edHistory = []; edHIndex = -1;
