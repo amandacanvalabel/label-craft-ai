@@ -10969,8 +10969,74 @@ function getVisibleFolders(){
   return all.map(f => ({ ...f, parentId: null }));
 }
 
-/* Retorna a lista de projetos do localStorage. Sempre array. */
+/* ============================================================
+   ARMAZENAMENTO DE PROJETOS — IndexedDB (com cache em memória)
+   Antes os projetos iam pro localStorage, que tem ~5 MB de limite.
+   Como cada projeto guarda imagens em base64 (arte gerada, logo,
+   foto da embalagem, imagens editadas com máscara/borracha), um único
+   projeto já estourava o limite → "armazenamento cheio" ao salvar.
+   Agora usamos IndexedDB (centenas de MB). Um cache em memória mantém
+   as funções abaixo síncronas, sem precisar mexer em quem as chama.
+============================================================ */
+const IDB_NAME = 'canvalabel', IDB_STORE = 'kv', IDB_PROJECTS_KEY = 'projects';
+let _idb = null, _idbOk = false;
+let _projectsCache = null;   // null = ainda não hidratado
+
+function idbOpen(){
+  return new Promise((resolve, reject) => {
+    if(_idb) return resolve(_idb);
+    let req;
+    try { req = indexedDB.open(IDB_NAME, 1); }
+    catch(e){ return reject(e); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => { _idb = req.result; resolve(_idb); };
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGet(key){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const t = db.transaction(IDB_STORE, 'readonly');
+    const r = t.objectStore(IDB_STORE).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  }));
+}
+function idbSet(key, val){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const t = db.transaction(IDB_STORE, 'readwrite');
+    t.objectStore(IDB_STORE).put(val, key);
+    t.oncomplete = () => resolve(true);
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error);
+  }));
+}
+
+/* Hidrata o cache de projetos a partir do IndexedDB. Migra automaticamente
+   a lista antiga do localStorage (se houver) na primeira vez. */
+function hydrateProjects(){
+  return idbGet(IDB_PROJECTS_KEY).then(arr => {
+    if(!Array.isArray(arr)){
+      let old = [];
+      try { const raw = localStorage.getItem(STORAGE_KEY); const p = raw ? JSON.parse(raw) : []; if(Array.isArray(p)) old = p; } catch(_){}
+      arr = old;
+      if(arr.length){ idbSet(IDB_PROJECTS_KEY, arr).catch(()=>{}); }
+    }
+    _projectsCache = arr || [];
+    _idbOk = true;
+    // Libera espaço no localStorage — os projetos agora vivem no IndexedDB
+    try { localStorage.removeItem(STORAGE_KEY); } catch(_){}
+  }).catch(e => {
+    console.warn('IndexedDB indisponível, usando localStorage', e);
+    _idbOk = false;
+  });
+}
+
+/* Retorna a lista de projetos (cache em memória; fallback localStorage). */
 function loadProjectsList(){
+  if(Array.isArray(_projectsCache)) return _projectsCache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return [];
@@ -10982,13 +11048,23 @@ function loadProjectsList(){
   }
 }
 
-/* Persiste a lista no localStorage. */
+/* Persiste a lista. Usa IndexedDB (muito espaço) quando disponível;
+   senão cai no localStorage (que pode estourar a cota). */
 function saveProjectsList(arr){
+  if(_idbOk){
+    _projectsCache = arr;                        // cache síncrono
+    idbSet(IDB_PROJECTS_KEY, arr).catch(e => {   // persistência assíncrona
+      console.error('Falha ao salvar projetos no IndexedDB', e);
+      toast('Não consegui salvar as alterações no navegador');
+    });
+    return true;
+  }
+  // Fallback (IndexedDB indisponível): comportamento antigo
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    _projectsCache = arr;
     return true;
   } catch(e){
-    // QuotaExceededError é o erro típico de localStorage cheio
     console.error('Falha ao salvar no localStorage', e);
     return false;
   }
@@ -28159,6 +28235,7 @@ function initAuthBindings(){
 
 /* ===== Inicialização do roteador ===== */
 function initRouter(){
+  hydrateProjects();   // carrega projetos do IndexedDB (assíncrono, rápido)
   initAuthBindings();
   // Captura defaults e aplica conteúdo customizado da landing
   captureLPDefaults();
