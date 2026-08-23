@@ -20522,6 +20522,14 @@ function generateLabelAlimento(opts){
 
     let yTop = y0 + safe + 2;
 
+    // ===== MOLDURA DECORATIVA (unificação de design com o cosmético) =====
+    // Mesma moldura dupla que os templates de cosmético desenham, usando a
+    // paleta do template. Fica no fundo (atrás da arte e dos textos).
+    const _primary = palette.primary || ink;
+    const _m = Math.min(faceW, faceH) * 0.045;
+    add(faceId, 'rect', { name:'Moldura decorativa', x:x0+_m, y:y0+_m, w:faceW-_m*2, h:faceH-_m*2, fill:'#00000000', stroke:_primary, sw:0.4, radius:1 });
+    add(faceId, 'rect', { name:'Moldura decorativa interna', x:x0+_m+1, y:y0+_m+1, w:faceW-_m*2-2, h:faceH-_m*2-2, fill:'#00000000', stroke:_primary, sw:0.15, radius:1 });
+
     // 0. PEÇAS DA IA (ilustração + ornamento) — cada uma é uma CAMADA EDITÁVEL
     //    separada (mover, redimensionar, trocar, apagar), com fundo transparente.
     //    Ficam nas camadas de baixo; textos/lupas/tabela entram por cima.
@@ -20588,6 +20596,17 @@ function generateLabelAlimento(opts){
         ls: 0.15, lh: 1,
       });
       yTop += 7;
+    }
+
+    // 2b. ORNAMENTO (linha ✦ linha) — mesmo padrão decorativo dos templates de
+    // cosmético, pra unificar o visual. Fica entre a marca e o nome.
+    {
+      const ornY = yTop + 0.5;
+      const segW = innerW * 0.30;
+      add(faceId, 'line', { name:'Ornamento esquerdo', x: x0 + padX, y: ornY, w: segW, h: 0.1, stroke: accent, sw: 0.35 });
+      add(faceId, 'text', { name:'Ornamento central', x: cx - 6, y: ornY - 2.4, w: 12, h: 5, text:'✦', family: fonts.display || 'Inter', size: fs(7, 70, Math.min(faceW, 70)), weight: 400, color: accent, align: 'center', lh: 1 });
+      add(faceId, 'line', { name:'Ornamento direito', x: x0 + faceW - padX - segW, y: ornY, w: segW, h: 0.1, stroke: accent, sw: 0.35 });
+      yTop += 5;
     }
 
     // 3. NOME DO PRODUTO (destaque)
@@ -28562,38 +28581,254 @@ initRouter();
 </script>
 <script>
 /* ================================================================
-   BOOTSTRAP CanvaLabel — abre a página DIRETO na ferramenta de
-   Alimentos, pulando landing/login. Injetado por cima do protótipo
-   completo.
-   Abre no passo "Rótulo" (tipo + tamanho do rótulo), que é a primeira
-   coisa que o usuário precisa preencher. Antes abria em 'dados-alimento'
-   e pulava o tamanho do rótulo — por isso o campo não aparecia.
+   BOOTSTRAP CanvaLabel — entrada da ferramenta.
+
+   Fluxo novo (vindo da landing):
+   1) A landing salva {produto, prompt} em sessionStorage ('cvl_handoff')
+      e redireciona pra cá.
+   2) Aqui geramos uma PRÉVIA do rótulo com IA de verdade a partir do
+      prompt e mostramos numa tela de preview.
+   3) Pra CONTINUAR e preencher os dados da ANVISA, a pessoa precisa se
+      cadastrar (grátis ou pago). O cadastro/login reaproveita o auth já
+      existente (openAuth / doAuth).
+
+   Sem handoff mantém o comportamento antigo: visitante anônimo cai direto
+   no passo "Rótulo" do fluxo de alimentos.
 ================================================================ */
 (function(){
+  var PREVIEW_ID = 'cvlPreviewOverlay';
+
+  function readHandoff(){
+    try{
+      var raw = sessionStorage.getItem('cvl_handoff');
+      if(!raw) return null;
+      sessionStorage.removeItem('cvl_handoff');
+      var h = JSON.parse(raw);
+      if(h && typeof h.prompt === 'string' && h.prompt.trim().length >= 4) return h;
+    }catch(_){}
+    return null;
+  }
+  function isRealSession(){
+    var s = (typeof getSession === 'function') ? getSession() : null;
+    return !!(s && s.email && s.email !== 'ferramenta@canvalabel.com.br');
+  }
+  function applyProdutoPrompt(h){
+    try{
+      if(!window.state) return;
+      state.produto = (h.produto === 'cosmetico') ? 'cosmetico' : 'alimento';
+      state.conhece = 'sei';
+      if(h.prompt){
+        if(state.produto === 'alimento'){ state.alimento = state.alimento || {}; state.alimento.ai_prompt = h.prompt; }
+        else { state.ai = state.ai || {}; state.ai.prompt = h.prompt; }
+      }
+    }catch(_){}
+  }
+  function goFlowStart(){
+    try{
+      if(typeof go === 'function' && typeof stepIdx === 'function'){
+        var i = stepIdx('rotulo'); if(i >= 0) go(i);
+      }
+    }catch(_){}
+  }
+  function continueToAnvisa(){
+    removePreview();
+    if(typeof showLayer === 'function') showLayer('app');
+    setTimeout(goFlowStart, 60);
+  }
+
+  /* Hook: roda uma continuação pendente logo após cadastro/login (doAuth). */
+  if(typeof window.doAuth === 'function' && !window.__cvlDoAuthPatched){
+    var _origDoAuth = window.doAuth;
+    window.doAuth = function(nome, email, modo){
+      _origDoAuth(nome, email, modo);
+      if(window.__cvlAfterAuth){
+        var f = window.__cvlAfterAuth; window.__cvlAfterAuth = null;
+        setTimeout(f, 80);
+      }
+    };
+    window.__cvlDoAuthPatched = true;
+  }
+
+  function injectPreviewCSS(){
+    if(document.getElementById('cvlPreviewCSS')) return;
+    var st = document.createElement('style');
+    st.id = 'cvlPreviewCSS';
+    st.textContent = [
+      '#'+PREVIEW_ID+'{position:fixed;inset:0;z-index:99999;background:radial-gradient(1200px 700px at 70% -10%,#12307e 0%,#091742 55%,#050e2b 100%);display:flex;align-items:center;justify-content:center;padding:26px;overflow:auto;font-family:\'DM Sans\',-apple-system,BlinkMacSystemFont,sans-serif;color:#fff}',
+      '.cvlpv-card{width:min(960px,100%);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:30px;display:grid;grid-template-columns:300px 1fr;gap:34px;box-shadow:0 30px 80px rgba(0,0,0,.45)}',
+      '@media(max-width:760px){.cvlpv-card{grid-template-columns:1fr;gap:22px;padding:22px}}',
+      '.cvlpv-label{width:280px;max-width:100%;aspect-ratio:3/4;margin:0 auto;background:#fbf6ec;border-radius:14px;overflow:hidden;position:relative;box-shadow:0 18px 44px rgba(0,0,0,.4);display:flex;flex-direction:column}',
+      '.cvlpv-band{background:#2458f6;color:#fff;padding:14px 54px 12px 16px}',
+      '.cvlpv-band.cos{background:#3b4351}',
+      '.cvlpv-pre{font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-bottom:4px}',
+      '.cvlpv-name{font-family:\'Poppins\',sans-serif;font-weight:700;font-size:16px;line-height:1.14;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+      '.cvlpv-accent{height:8px;background:#ff8237}',
+      '.cvlpv-art{flex:1;position:relative;background:#fff}',
+      '.cvlpv-art img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.cvlpv-skel{position:absolute;inset:0;background:linear-gradient(100deg,#eef1f6 30%,#e2e8f2 50%,#eef1f6 70%);background-size:200% 100%;animation:cvlpvsh 1.2s linear infinite}',
+      '@keyframes cvlpvsh{0%{background-position:200% 0}100%{background-position:-200% 0}}',
+      '.cvlpv-foot{padding:9px 14px;background:#fbf6ec;border-top:1px dashed #d8cfbb;display:flex;align-items:center;gap:8px;color:#5b6472;font-size:9px}',
+      '.cvlpv-lupa{background:#111;color:#fff;font-family:\'Poppins\',sans-serif;font-weight:700;font-size:8px;line-height:1;padding:5px 6px;border-radius:4px;text-align:center}',
+      '.cvlpv-ribbon{position:absolute;top:12px;right:-34px;transform:rotate(45deg);background:#ff8237;color:#fff;font-weight:700;font-size:10px;letter-spacing:.04em;padding:5px 40px;box-shadow:0 3px 10px rgba(0,0,0,.25)}',
+      '.cvlpv-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.02em;color:#bcd0ff;background:rgba(36,88,246,.18);border:1px solid rgba(92,130,249,.35);padding:6px 12px;border-radius:999px;margin-bottom:14px}',
+      '.cvlpv-h{font-family:\'Poppins\',sans-serif;font-weight:800;font-size:27px;line-height:1.1;margin:0 0 10px}',
+      '.cvlpv-h span{color:#ffb185}',
+      '.cvlpv-sub{font-size:14.5px;line-height:1.55;color:#c7d2ee;margin:0 0 18px}',
+      '.cvlpv-prompt{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 14px;font-size:13px;color:#e6ecfb;margin:0 0 20px;max-height:120px;overflow:auto}',
+      '.cvlpv-prompt b{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8fa6d8;margin-bottom:5px;font-weight:700}',
+      '.cvlpv-steps{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:9px}',
+      '.cvlpv-steps li{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#cdd8f0}',
+      '.cvlpv-dot{width:18px;height:18px;border-radius:50%;background:rgba(36,88,246,.25);border:1px solid #5c82f9;color:#bcd0ff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px}',
+      '.cvlpv-cta{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;background:linear-gradient(135deg,#2458f6,#1943d8);color:#fff;border:0;border-radius:13px;padding:15px 20px;font-family:\'Poppins\',sans-serif;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 12px 30px rgba(36,88,246,.4);transition:transform .12s ease,box-shadow .12s ease}',
+      '.cvlpv-cta:hover{transform:translateY(-1px);box-shadow:0 16px 38px rgba(36,88,246,.5)}',
+      '.cvlpv-note{text-align:center;font-size:12px;color:#93a3c9;margin-top:11px}',
+      '.cvlpv-ghost{display:block;width:100%;background:transparent;color:#aeb9d6;border:0;padding:12px;margin-top:6px;font-size:13px;cursor:pointer}',
+      '.cvlpv-ghost:hover{color:#fff;text-decoration:underline}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+
+  function removePreview(){
+    var el = document.getElementById(PREVIEW_ID);
+    if(el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});
+  }
+  function nomeFromPrompt(p){
+    var words = String(p||'').trim().split(/\s+/).slice(0,4).join(' ');
+    if(words.length > 34) words = words.slice(0,34);
+    return words.replace(/[,.;:]$/,'') || 'Seu produto';
+  }
+
+  /* Chama a IA real e devolve uma imagem (data URL) ou null. */
+  function gerarPreviewIA(h){
+    var ratio = (h.produto === 'cosmetico') ? 0.62 : 0.78;
+    var body = {
+      productType: h.produto || 'alimento',
+      assetPrompt: 'Arte de rótulo de embalagem para o produto a seguir, pronta para impressão, sem texto legível: ' + (h.prompt || ''),
+      transparent: false,
+      refs: [],
+      ratio: ratio
+    };
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var to = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(_){}}, 28000) : null;
+    return fetch('/api/ai/generate-image', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined
+    }).then(function(res){
+      if(to) clearTimeout(to);
+      if(!res.ok) return null;
+      return res.json();
+    }).then(function(d){
+      return (d && d.imageBase64 && String(d.imageBase64).indexOf('data:image/')===0) ? d.imageBase64 : null;
+    }).catch(function(){ if(to) clearTimeout(to); return null; });
+  }
+
+  function openPreview(h){
+    injectPreviewCSS();
+    removePreview();
+    var isCos = h.produto === 'cosmetico';
+    var nome = nomeFromPrompt(h.prompt);
+    var logado = isRealSession();
+    var ctaLabel = logado ? 'Continuar e preencher os dados da ANVISA' : 'Criar minha conta e continuar';
+
+    var ov = document.createElement('div');
+    ov.id = PREVIEW_ID;
+    ov.innerHTML =
+      '<div class="cvlpv-card">' +
+        '<div>' +
+          '<div class="cvlpv-label">' +
+            '<div class="cvlpv-ribbon">Prévia IA</div>' +
+            '<div class="cvlpv-band'+(isCos?' cos':'')+'">' +
+              '<div class="cvlpv-pre">'+(isCos?'Uso cosmético':'Indústria brasileira')+'</div>' +
+              '<div class="cvlpv-name">'+escapeHtml(nome)+'</div>' +
+            '</div>' +
+            '<div class="cvlpv-accent"></div>' +
+            '<div class="cvlpv-art" id="cvlpvArt"><div class="cvlpv-skel"></div></div>' +
+            '<div class="cvlpv-foot">' +
+              (isCos ? '<span>Reg. ANVISA · lote · validade</span>' : '<span class="cvlpv-lupa">ALTO<br>EM</span><span>Tabela nutricional · lote</span>') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="cvlpv-eyebrow">✨ Prévia gerada por IA</div>' +
+          '<h2 class="cvlpv-h">Essa é a <span>cara</span> do seu rótulo</h2>' +
+          '<p class="cvlpv-sub">Geramos essa prévia a partir do que você descreveu. Agora é montar o rótulo de verdade — com a tabela nutricional, a lupa "ALTO EM", os alérgenos e tudo que a ANVISA exige, conferido norma por norma.</p>' +
+          '<div class="cvlpv-prompt"><b>Seu pedido</b>'+escapeHtml(h.prompt)+'</div>' +
+          '<ul class="cvlpv-steps">' +
+            '<li><span class="cvlpv-dot">1</span><span>Tamanho do rótulo e dados do produto</span></li>' +
+            '<li><span class="cvlpv-dot">2</span><span>'+(isCos?'Composição INCI, advertências e modo de uso':'Tabela nutricional automática e lupa "ALTO EM"')+'</span></li>' +
+            '<li><span class="cvlpv-dot">3</span><span>Revisor ANVISA + arquivo pronto pra gráfica (PDF)</span></li>' +
+          '</ul>' +
+          '<button type="button" class="cvlpv-cta" id="cvlpvGo">'+escapeHtml(ctaLabel)+' <span aria-hidden="true">→</span></button>' +
+          '<div class="cvlpv-note">'+(logado?'Você já está logada — é só continuar.':'Primeiro rótulo grátis, sem cartão. Planos a partir de R$ 49/mês.')+'</div>' +
+          '<button type="button" class="cvlpv-ghost" id="cvlpvBack">Editar meu pedido</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    // Botão principal: continua (logado) ou abre cadastro (visitante)
+    var goBtn = document.getElementById('cvlpvGo');
+    if(goBtn) goBtn.addEventListener('click', function(){
+      if(isRealSession()){
+        continueToAnvisa();
+      } else {
+        window.__cvlAfterAuth = continueToAnvisa;   // roda após o cadastro/login
+        removePreview();
+        if(typeof openAuth === 'function') openAuth('signup');
+      }
+    });
+    var backBtn = document.getElementById('cvlpvBack');
+    if(backBtn) backBtn.addEventListener('click', function(){
+      removePreview();
+      if(window.history && window.history.length > 1) window.history.back();
+      else if(typeof showLayer === 'function') showLayer('landing');
+    });
+
+    // Dispara a geração real e troca o esqueleto pela imagem
+    gerarPreviewIA(h).then(function(img){
+      var art = document.getElementById('cvlpvArt');
+      if(!art) return;
+      if(img){
+        art.innerHTML = '<img src="'+img+'" alt="Prévia do rótulo gerada por IA">';
+      } else {
+        // fallback elegante: mantém a "cara" de rótulo mesmo sem imagem
+        art.innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#94a3b8;background:#f4f6fb;text-align:center;padding:16px">'+
+          '<div style="font-size:26px">🖼️</div>'+
+          '<div style="font-size:11px;line-height:1.4;max-width:180px">Sua arte será gerada na próxima etapa, junto com os dados da ANVISA.</div>'+
+        '</div>';
+      }
+    });
+  }
+
   function boot(){
     try{
-      // Sessão atual (se houver). NÃO sobrescreve o login da pessoa: antes o
-      // bootstrap chamava setSession(ferramenta@...) em TODA carga, o que trocava
-      // a conta de quem tinha acabado de logar e forçava sempre um rótulo novo
-      // (escondendo a tela inicial com os projetos salvos).
+      var handoff = readHandoff();
       var sess = (typeof getSession === 'function') ? getSession() : null;
       var isAuto = !sess || (sess && sess.email === 'ferramenta@canvalabel.com.br');
       if (!sess && typeof setSession === 'function') {
         setSession({ email: 'ferramenta@canvalabel.com.br', nome: 'CanvaLabel', em: Date.now() });
       }
+
+      // Veio da landing com um pedido: mostra a PRÉVIA com IA + trava de cadastro.
+      if (handoff) {
+        applyProdutoPrompt(handoff);
+        if (typeof showLayer === 'function') showLayer('app');
+        openPreview(handoff);
+        return;
+      }
+
+      // Sem handoff: comportamento antigo.
       if (typeof showLayer === 'function') showLayer('app');
-      // Só joga DIRETO no fluxo de alimentos para visitante anônimo (sessão
-      // automática). Se a pessoa logou com a conta dela, respeita: mostra a tela
-      // normal do app (com os projetos salvos), sem forçar um rótulo em branco.
       if (isAuto) {
         try { if (state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
-        if (typeof go === 'function' && typeof stepIdx === 'function') {
-          var i = stepIdx('rotulo');
-          if (i >= 0) go(i);
-        }
+        goFlowStart();
       }
     }catch(e){ console.error('[boot alimentos]', e); }
   }
+
   // Roda logo após o init do app (initRouter já executou).
   setTimeout(boot, 30);
 })();
