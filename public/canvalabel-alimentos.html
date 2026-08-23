@@ -28702,28 +28702,26 @@ initRouter();
     return words.replace(/[,.;:]$/,'') || 'Seu produto';
   }
 
-  /* Chama a IA real e devolve uma imagem (data URL) ou null. */
+  /* Chama a IA de prévia (endpoint anônimo, com limite por IP) e devolve
+     { img } quando gerou, { limit:true } quando estourou o limite grátis,
+     ou {} em caso de erro. */
   function gerarPreviewIA(h){
     var ratio = (h.produto === 'cosmetico') ? 0.62 : 0.78;
-    var body = {
-      productType: h.produto || 'alimento',
-      assetPrompt: 'Arte de rótulo de embalagem para o produto a seguir, pronta para impressão, sem texto legível: ' + (h.prompt || ''),
-      transparent: false,
-      refs: [],
-      ratio: ratio
-    };
+    var body = { prompt: h.prompt || '', produto: h.produto || 'alimento', ratio: ratio };
     var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var to = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(_){}}, 28000) : null;
-    return fetch('/api/ai/generate-image', {
+    var to = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(_){}}, 45000) : null;
+    return fetch('/api/ai/preview', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined
     }).then(function(res){
       if(to) clearTimeout(to);
-      if(!res.ok) return null;
-      return res.json();
+      return res.json().catch(function(){ return {}; });
     }).then(function(d){
-      return (d && d.imageBase64 && String(d.imageBase64).indexOf('data:image/')===0) ? d.imageBase64 : null;
-    }).catch(function(){ if(to) clearTimeout(to); return null; });
+      d = d || {};
+      if(d.limit) return { limit: true };
+      if(d.imageBase64 && String(d.imageBase64).indexOf('data:image/')===0) return { img: d.imageBase64 };
+      return {};
+    }).catch(function(){ if(to) clearTimeout(to); return {}; });
   }
 
   function openPreview(h){
@@ -28763,7 +28761,7 @@ initRouter();
             '<li><span class="cvlpv-dot">3</span><span>Revisor ANVISA + arquivo pronto pra gráfica (PDF)</span></li>' +
           '</ul>' +
           '<button type="button" class="cvlpv-cta" id="cvlpvGo">'+escapeHtml(ctaLabel)+' <span aria-hidden="true">→</span></button>' +
-          '<div class="cvlpv-note">'+(logado?'Você já está logada — é só continuar.':'Primeiro rótulo grátis, sem cartão. Planos a partir de R$ 49/mês.')+'</div>' +
+          '<div class="cvlpv-note" id="cvlpvNote">'+(logado?'Você já está logada — é só continuar.':'Primeiro rótulo grátis, sem cartão. Planos a partir de R$ 49/mês.')+'</div>' +
           '<button type="button" class="cvlpv-ghost" id="cvlpvBack">Editar meu pedido</button>' +
         '</div>' +
       '</div>';
@@ -28787,14 +28785,23 @@ initRouter();
       else if(typeof showLayer === 'function') showLayer('landing');
     });
 
-    // Dispara a geração real e troca o esqueleto pela imagem
-    gerarPreviewIA(h).then(function(img){
+    // Dispara a geração e troca o esqueleto pela imagem (ou por um aviso).
+    gerarPreviewIA(h).then(function(res){
+      res = res || {};
       var art = document.getElementById('cvlpvArt');
       if(!art) return;
-      if(img){
-        art.innerHTML = '<img src="'+img+'" alt="Prévia do rótulo gerada por IA">';
+      if(res.img){
+        art.innerHTML = '<img src="'+res.img+'" alt="Prévia do rótulo gerada por IA">';
+      } else if(res.limit){
+        // Limite grátis por IP atingido → reforça o cadastro.
+        art.innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#64748b;background:#f4f6fb;text-align:center;padding:16px">'+
+          '<div style="font-size:26px">🔒</div>'+
+          '<div style="font-size:11px;line-height:1.45;max-width:190px">Você já usou suas prévias grátis. Crie sua conta pra gerar mais e finalizar seu rótulo.</div>'+
+        '</div>';
+        var note = document.getElementById('cvlpvNote');
+        if(note) note.textContent = 'Suas prévias grátis acabaram — crie sua conta pra continuar.';
       } else {
-        // fallback elegante: mantém a "cara" de rótulo mesmo sem imagem
+        // Erro/timeout: mantém a "cara" de rótulo; a arte real vem na próxima etapa.
         art.innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#94a3b8;background:#f4f6fb;text-align:center;padding:16px">'+
           '<div style="font-size:26px">🖼️</div>'+
           '<div style="font-size:11px;line-height:1.4;max-width:180px">Sua arte será gerada na próxima etapa, junto com os dados da ANVISA.</div>'+
