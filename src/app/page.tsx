@@ -1,22 +1,16 @@
-import Header from "@/components/home/Header";
-import HeroHome from "@/components/home/HeroHome";
-import BeneficiosCarrousel from "@/components/home/BeneficiosCarrousel";
-import DemonstrationCentral from "@/components/home/DemonstrationCentral";
-import Planos from "@/components/home/Planos";
-import Avaliacoes from "@/components/home/Avaliacoes";
-import GaleriaExemplos from "@/components/home/GaleriaExemplos";
+// src/app/page.tsx
+// Homepage do CanvaLabel — nova landing (design do Claude Design) nativa em React,
+// preservando modo manutenção, JSON-LD (SEO) e o tracking de pageview.
 import JsonLd from "@/components/home/JsonLd";
-import Footer from "@/components/home/Footer";
 import TrackPageView from "@/components/home/TrackPageView";
+import LandingV2 from "@/components/home/LandingV2";
 import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
-import { getGalleryImages } from "@/lib/gallery";
 
 const HomePage = async () => {
-  const [settings, session, galleryImages] = await Promise.all([
+  const [settings, session] = await Promise.all([
     getSiteSettings(),
     getSession(),
-    getGalleryImages(),
   ]);
   const canBypassMaintenance = session?.role === "ADMIN";
 
@@ -40,14 +34,7 @@ const HomePage = async () => {
     <>
       <JsonLd />
       <TrackPageView />
-      <Header />
-      <HeroHome />
-      <BeneficiosCarrousel />
-      <DemonstrationCentral />
-      <GaleriaExemplos images={galleryImages} />
-      <Planos />
-      <Avaliacoes />
-      <Footer />
+      <LandingV2 />
     </>
   );
 };
