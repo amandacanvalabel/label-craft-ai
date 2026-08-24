@@ -110,6 +110,19 @@ const PlanCardSkeleton = () => (
   </div>
 );
 
+// Para onde ir depois de criar a conta. Quem veio do funil da IA
+// (/planos?next=/canvalabel-alimentos.html) VOLTA pra ferramenta, com o modelo
+// gerado intacto. Sem "next", segue o padrão de sempre (/dashboard).
+const destinoPosCadastro = (padrao: string): string => {
+  try {
+    const n = new URLSearchParams(window.location.search).get("next");
+    if (n && n.startsWith("/") && !n.startsWith("//")) return n;
+  } catch {
+    /* ignora */
+  }
+  return padrao;
+};
+
 const Planos = () => {
   const router = useRouter();
   const [billing, setBilling] = useState<BillingPeriod>("annual");
@@ -194,7 +207,7 @@ const Planos = () => {
           if (data.status === "CONFIRMED" && data.authenticated) {
             if (pollingRef.current) clearInterval(pollingRef.current);
             setStep("success");
-            setTimeout(() => router.push("/dashboard"), 2500);
+            setTimeout(() => router.push(destinoPosCadastro("/dashboard")), 2500);
           }
         } catch {
           // silently retry
@@ -276,7 +289,7 @@ const Planos = () => {
       // Cartão aprovado direto
       if (data.authenticated && data.redirectTo) {
         setStep("success");
-        setTimeout(() => router.push(data.redirectTo), 2500);
+        setTimeout(() => router.push(destinoPosCadastro(data.redirectTo)), 2500);
       } else {
         setStep("payment");
       }
