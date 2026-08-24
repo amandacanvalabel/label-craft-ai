@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 /**
  * POST /api/ai/preview
@@ -21,7 +22,8 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ANON_PREVIEW_LIMIT = 2;
+const ANON_PREVIEW_LIMIT = 2;      // gerações grátis por IP...
+const ANON_PREVIEW_WINDOW_H = 24;  // ...dentro dessa janela (reseta a cada 24h)
 
 function pickSize(ratio?: number): "1024x1024" | "1024x1536" | "1536x1024" {
   if (typeof ratio !== "number" || !isFinite(ratio) || ratio <= 0) return "1024x1536";
@@ -51,21 +53,31 @@ async function ensureTable() {
   );
 }
 
+// Conta só o que foi gerado DENTRO da janela (24h). Fora disso, considera 0
+// (reset diário) — evita bloquear para sempre e é mais justo em IPs compartilhados.
 async function getCount(ip: string): Promise<number> {
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT count FROM anon_preview_quota WHERE ip = $1`,
-    ip
+    `SELECT count FROM anon_preview_quota
+       WHERE ip = $1 AND updated_at >= now() - ($2 || ' hours')::interval`,
+    ip,
+    String(ANON_PREVIEW_WINDOW_H)
   )) as Array<{ count: number }>;
   return rows.length ? Number(rows[0].count) : 0;
 }
 
 async function bumpCount(ip: string): Promise<void> {
+  // Se o último uso foi há mais de 24h, recomeça do 1; senão incrementa.
   await prisma.$executeRawUnsafe(
     `INSERT INTO anon_preview_quota (ip, count, updated_at)
        VALUES ($1, 1, now())
      ON CONFLICT (ip) DO UPDATE
-       SET count = anon_preview_quota.count + 1, updated_at = now()`,
-    ip
+       SET count = CASE
+             WHEN anon_preview_quota.updated_at < now() - ($2 || ' hours')::interval THEN 1
+             ELSE anon_preview_quota.count + 1
+           END,
+           updated_at = now()`,
+    ip,
+    String(ANON_PREVIEW_WINDOW_H)
   );
 }
 
@@ -81,19 +93,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Descreva o produto" }, { status: 400 });
     }
 
+    // Usuário logado (inclui admin) NÃO tem limite de prévia — o anti-abuso é
+    // só para visitante anônimo. Isso também libera você para testar à vontade.
+    let isLoggedIn = false;
+    try {
+      isLoggedIn = !!(await getSession());
+    } catch (_e) {
+      isLoggedIn = false;
+    }
+
     const ip = clientIp(req);
 
-    // Checa o limite por IP.
+    // Checa o limite por IP (só para anônimo).
     let used = 0;
-    try {
-      await ensureTable();
-      used = await getCount(ip);
-    } catch (e) {
-      // Se o banco falhar, não trava o funil: segue sem contagem confiável.
-      console.error("[preview quota]", e);
-    }
-    if (used >= ANON_PREVIEW_LIMIT) {
-      return NextResponse.json({ limit: true, remaining: 0 });
+    if (!isLoggedIn) {
+      try {
+        await ensureTable();
+        used = await getCount(ip);
+      } catch (e) {
+        // Se o banco falhar, não trava o funil: segue sem contagem confiável.
+        console.error("[preview quota]", e);
+      }
+      if (used >= ANON_PREVIEW_LIMIT) {
+        return NextResponse.json({ limit: true, remaining: 0 });
+      }
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -123,7 +146,7 @@ Requisitos:
         prompt: genPrompt,
         size,
         n: 1,
-        quality: "low", // prévia: mais rápida e barata; a arte final vem depois
+        quality: "high", // prévia caprichada (mais lenta/custosa que "low"/"medium")
       }),
     });
 
@@ -144,16 +167,18 @@ Requisitos:
       return NextResponse.json({ error: "Imagem não retornada pela IA" }, { status: 502 });
     }
 
-    // Só conta quando gerou de verdade.
-    try {
-      await bumpCount(ip);
-    } catch (e) {
-      console.error("[preview bump]", e);
+    // Só conta para anônimo, e só quando gerou de verdade.
+    if (!isLoggedIn) {
+      try {
+        await bumpCount(ip);
+      } catch (e) {
+        console.error("[preview bump]", e);
+      }
     }
 
     return NextResponse.json({
       imageBase64,
-      remaining: Math.max(0, ANON_PREVIEW_LIMIT - (used + 1)),
+      remaining: isLoggedIn ? null : Math.max(0, ANON_PREVIEW_LIMIT - (used + 1)),
     });
   } catch (error) {
     console.error("[PREVIEW ERROR]", error);
