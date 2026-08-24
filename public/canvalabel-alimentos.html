@@ -28598,15 +28598,56 @@ initRouter();
 (function(){
   var PREVIEW_ID = 'cvlPreviewOverlay';
 
-  function readHandoff(){
+  /* ---- Pedido persistente ----------------------------------------------
+     O "pedido" (produto + prompt + arte gerada) fica no localStorage, então
+     ele SOBREVIVE ao cadastro/login e à volta pra ferramenta. Antes ficava
+     só em sessionStorage e era apagado na leitura — por isso o modelo sumia. */
+  var PEDIDO_KEY = 'cvl_pedido';
+
+  function loadPedido(){
     try{
-      var raw = sessionStorage.getItem('cvl_handoff');
+      var raw = localStorage.getItem(PEDIDO_KEY);
       if(!raw) return null;
-      sessionStorage.removeItem('cvl_handoff');
-      var h = JSON.parse(raw);
-      if(h && typeof h.prompt === 'string' && h.prompt.trim().length >= 4) return h;
+      var p = JSON.parse(raw);
+      if(p && typeof p.prompt === 'string' && p.prompt.trim().length >= 4) return p;
     }catch(_){}
     return null;
+  }
+  function savePedido(p){
+    try{ localStorage.setItem(PEDIDO_KEY, JSON.stringify(p)); }catch(_){}
+  }
+  function clearPedido(){
+    try{ localStorage.removeItem(PEDIDO_KEY); }catch(_){}
+  }
+
+  function readHandoff(){
+    // 1) Pedido novo, recém-feito na landing.
+    try{
+      var raw = sessionStorage.getItem('cvl_handoff');
+      if(raw){
+        sessionStorage.removeItem('cvl_handoff');
+        var h = JSON.parse(raw);
+        if(h && typeof h.prompt === 'string' && h.prompt.trim().length >= 4){
+          var novo = {
+            produto: (h.produto === 'cosmetico') ? 'cosmetico' : 'alimento',
+            prompt: h.prompt.trim(),
+            img: null,
+            ts: Date.now()
+          };
+          savePedido(novo);   // guarda já, pra não perder nada
+          return novo;
+        }
+      }
+    }catch(_){}
+    // 2) Senão, retoma o pedido salvo (ex.: acabou de criar a conta e voltou).
+    return loadPedido();
+  }
+
+  /* Sessão REAL do site (cookie do Next), não a sessão simulada do protótipo. */
+  function checarLogin(){
+    return fetch('/api/auth/me', { credentials: 'include' })
+      .then(function(r){ return r.ok; })
+      .catch(function(){ return false; });
   }
   function isRealSession(){
     var s = (typeof getSession === 'function') ? getSession() : null;
@@ -28614,7 +28655,9 @@ initRouter();
   }
   function applyProdutoPrompt(h){
     try{
-      if(!window.state) return;
+      // OBS: o `state` do app é declarado com const/let, então NÃO existe em
+      // window.state — checar por window.state fazia o pedido ser ignorado.
+      if(typeof state === 'undefined' || !state) return;
       state.produto = (h.produto === 'cosmetico') ? 'cosmetico' : 'alimento';
       state.conhece = 'sei';
       if(h.prompt){
@@ -28767,23 +28810,36 @@ initRouter();
       '</div>';
     document.body.appendChild(ov);
 
-    // Botão principal: leva pro app REAL.
-    // - Já logado (sessão real do Next) → /dashboard.
-    // - Sem conta → /planos (cadastro grátis ou pago), que ao concluir manda pro /dashboard.
-    var goBtn = document.getElementById('cvlpvGo');
+    var goBtn  = document.getElementById('cvlpvGo');
+    var noteEl = document.getElementById('cvlpvNote');
+
+    /* Ajusta o texto do botão conforme a sessão REAL (não a simulada). */
+    checarLogin().then(function(logged){
+      if(!goBtn) return;
+      goBtn.setAttribute('data-logged', logged ? '1' : '0');
+      goBtn.innerHTML = (logged ? 'Continuar e preencher os dados da ANVISA' : 'Criar minha conta e continuar') +
+                        ' <span aria-hidden="true">→</span>';
+      if(noteEl && logged) noteEl.textContent = 'Você já está logada — é só continuar.';
+    });
+
+    /* Botão principal:
+       - logada  → aplica o modelo gerado e segue pras etapas da ANVISA, aqui mesmo.
+       - anônima → vai criar a conta e VOLTA pra cá com o modelo intacto. */
     if(goBtn) goBtn.addEventListener('click', function(){
       goBtn.disabled = true;
       goBtn.style.opacity = '0.7';
       goBtn.innerHTML = 'Abrindo...';
-      // Guarda o pedido pra retomar depois (uso futuro).
-      try{ sessionStorage.setItem('cvl_handoff', JSON.stringify(h)); }catch(_){}
-      fetch('/api/auth/me', { credentials: 'include' })
-        .then(function(r){ return r.ok; })
-        .then(function(logged){
-          window.location.href = logged ? '/dashboard' : '/planos';
-        })
-        .catch(function(){ window.location.href = '/planos'; });
+      savePedido(h);  // garante que nada se perde na troca de página
+      checarLogin().then(function(logged){
+        if(logged){
+          aplicarModeloEContinuar(h);
+        } else {
+          // volta pra ferramenta depois de criar a conta
+          window.location.href = '/planos?next=' + encodeURIComponent('/canvalabel-alimentos.html');
+        }
+      });
     });
+
     var backBtn = document.getElementById('cvlpvBack');
     if(backBtn) backBtn.addEventListener('click', function(){
       removePreview();
@@ -28791,21 +28847,32 @@ initRouter();
       else if(typeof showLayer === 'function') showLayer('landing');
     });
 
-    // Dispara a geração e troca o esqueleto pela imagem (ou por um aviso).
+    var art = document.getElementById('cvlpvArt');
+
+    // Já tem arte salva (ex.: voltou depois do cadastro): mostra na hora,
+    // SEM gerar de novo — assim o modelo é o mesmo e não gasta outra prévia.
+    if(h.img){
+      if(art) art.innerHTML = '<img src="'+h.img+'" alt="Prévia do rótulo gerada por IA">';
+      return;
+    }
+
+    // Senão, gera agora e SALVA o resultado junto do pedido.
     gerarPreviewIA(h).then(function(res){
       res = res || {};
-      var art = document.getElementById('cvlpvArt');
+      art = document.getElementById('cvlpvArt');
       if(!art) return;
       if(res.img){
         art.innerHTML = '<img src="'+res.img+'" alt="Prévia do rótulo gerada por IA">';
+        h.img = res.img;
+        savePedido(h);            // <- o modelo agora sobrevive ao cadastro
       } else if(res.limit){
         // Limite grátis por IP atingido → reforça o cadastro.
         art.innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#64748b;background:#f4f6fb;text-align:center;padding:16px">'+
           '<div style="font-size:26px">🔒</div>'+
-          '<div style="font-size:11px;line-height:1.45;max-width:190px">Você já usou suas prévias grátis. Crie sua conta pra gerar mais e finalizar seu rótulo.</div>'+
+          '<div style="font-size:11px;line-height:1.45;max-width:190px">As prévias grátis deste acesso acabaram (elas voltam em 24h). Crie sua conta pra gerar sem limite.</div>'+
         '</div>';
-        var note = document.getElementById('cvlpvNote');
-        if(note) note.textContent = 'Suas prévias grátis acabaram — crie sua conta pra continuar.';
+        var n = document.getElementById('cvlpvNote');
+        if(n) n.textContent = 'Prévias grátis esgotadas — com conta, você gera sem limite.';
       } else {
         // Erro/timeout: mantém a "cara" de rótulo; a arte real vem na próxima etapa.
         art.innerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#94a3b8;background:#f4f6fb;text-align:center;padding:16px">'+
@@ -28814,6 +28881,23 @@ initRouter();
         '</div>';
       }
     });
+  }
+
+  /* Leva o modelo gerado pra dentro do editor e entra no fluxo da ANVISA.
+     A arte da IA entra como camada editável (o mesmo canal que a geração
+     normal usa), então a pessoa edita o modelo que ela viu — sem recomeçar. */
+  function aplicarModeloEContinuar(h){
+    try{
+      applyProdutoPrompt(h);
+      if(h.img && typeof state !== 'undefined' && state){
+        state.ai = state.ai || {};
+        state.ai.aiAssets = { illustration: h.img, ornament: null };
+      }
+    }catch(e){ console.error('[aplicar modelo]', e); }
+    clearPedido();          // consumido: não reabre a prévia a cada carga
+    removePreview();
+    if(typeof showLayer === 'function') showLayer('app');
+    setTimeout(goFlowStart, 60);
   }
 
   function boot(){
