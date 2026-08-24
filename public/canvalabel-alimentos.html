@@ -28709,7 +28709,7 @@ initRouter();
     var ratio = (h.produto === 'cosmetico') ? 0.62 : 0.78;
     var body = { prompt: h.prompt || '', produto: h.produto || 'alimento', ratio: ratio };
     var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var to = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(_){}}, 45000) : null;
+    var to = ctrl ? setTimeout(function(){ try{ctrl.abort();}catch(_){}}, 62000) : null;
     return fetch('/api/ai/preview', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined
@@ -28767,16 +28767,22 @@ initRouter();
       '</div>';
     document.body.appendChild(ov);
 
-    // Botão principal: continua (logado) ou abre cadastro (visitante)
+    // Botão principal: leva pro app REAL.
+    // - Já logado (sessão real do Next) → /dashboard.
+    // - Sem conta → /planos (cadastro grátis ou pago), que ao concluir manda pro /dashboard.
     var goBtn = document.getElementById('cvlpvGo');
     if(goBtn) goBtn.addEventListener('click', function(){
-      if(isRealSession()){
-        continueToAnvisa();
-      } else {
-        window.__cvlAfterAuth = continueToAnvisa;   // roda após o cadastro/login
-        removePreview();
-        if(typeof openAuth === 'function') openAuth('signup');
-      }
+      goBtn.disabled = true;
+      goBtn.style.opacity = '0.7';
+      goBtn.innerHTML = 'Abrindo...';
+      // Guarda o pedido pra retomar depois (uso futuro).
+      try{ sessionStorage.setItem('cvl_handoff', JSON.stringify(h)); }catch(_){}
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(function(r){ return r.ok; })
+        .then(function(logged){
+          window.location.href = logged ? '/dashboard' : '/planos';
+        })
+        .catch(function(){ window.location.href = '/planos'; });
     });
     var backBtn = document.getElementById('cvlpvBack');
     if(backBtn) backBtn.addEventListener('click', function(){
