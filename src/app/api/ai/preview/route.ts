@@ -87,7 +87,30 @@ export async function POST(req: NextRequest) {
       prompt?: string;
       produto?: string;
       ratio?: number;
+      resetIp?: boolean;
     };
+
+    // Zera a cota deste IP — só ADMIN, para poder testar o fluxo anônimo.
+    // Uso: fetch('/api/ai/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resetIp:true})})
+    if (body.resetIp === true) {
+      const s = await getSession().catch(() => null);
+      if (!s || s.role !== "ADMIN") {
+        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      }
+      const ipReset = clientIp(req);
+      try {
+        await ensureTable();
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM anon_preview_quota WHERE ip = $1`,
+          ipReset
+        );
+      } catch (e) {
+        console.error("[preview reset]", e);
+        return NextResponse.json({ error: "Falha ao zerar" }, { status: 500 });
+      }
+      return NextResponse.json({ reset: true, ip: ipReset });
+    }
+
     const prompt = (body.prompt || "").trim();
     if (prompt.length < 4) {
       return NextResponse.json({ error: "Descreva o produto" }, { status: 400 });
