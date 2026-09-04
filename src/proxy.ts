@@ -13,11 +13,19 @@ export default async function proxy(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    // Páginas que precisam funcionar SEM conta: cadastro/planos (é onde a
+    // pessoa cria a conta) e a redefinição de senha (quem esqueceu a senha
+    // obviamente não está logado).
+    pathname === "/planos" ||
+    pathname.startsWith("/reset-password") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/favicon") ||
     // Arquivos estáticos públicos (logo, imagens, fontes, etc.)
-    /\.(png|jpe?g|svg|gif|webp|ico|css|js|map|woff2?|ttf|txt|xml|json)$/i.test(pathname)
+    // OBS: "html" precisa estar aqui. Sem isso, /canvalabel-alimentos.html era
+    // tratado como rota protegida e o visitante anônimo ia parar no /login —
+    // quebrando o funil (prompt -> prévia com IA) de quem ainda não tem conta.
+    /\.(html?|png|jpe?g|svg|gif|webp|ico|css|js|map|woff2?|ttf|txt|xml|json)$/i.test(pathname)
   ) {
     // If logged in and trying to access login, redirect to dashboard
     if (pathname === "/login" && token) {
