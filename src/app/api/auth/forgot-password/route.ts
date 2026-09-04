@@ -16,12 +16,18 @@ export async function POST(req: NextRequest) {
     const email = parsed.data.email.trim().toLowerCase();
 
     // Procura no subscriber e, se não achar, no admin.
-    const subscriber = await prisma.subscriber.findUnique({ where: { email } });
+    // Busca sem diferenciar maiúsculas/minúsculas: contas antigas foram gravadas
+    // com o e-mail em outro formato e não eram encontradas aqui.
+    const subscriber = await prisma.subscriber.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+    });
     let account: { id: string; name: string; password: string; kind: "subscriber" | "admin" } | null = null;
     if (subscriber) {
       account = { id: subscriber.id, name: subscriber.name, password: subscriber.password, kind: "subscriber" };
     } else {
-      const admin = await prisma.admin.findUnique({ where: { email } });
+      const admin = await prisma.admin.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+      });
       if (admin) account = { id: admin.id, name: admin.name, password: admin.password, kind: "admin" };
     }
 
