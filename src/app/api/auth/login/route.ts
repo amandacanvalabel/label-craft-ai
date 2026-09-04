@@ -13,9 +13,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { email, password } = loginSchema.parse(body);
+    // Normaliza e busca sem diferenciar maiúsculas/minúsculas: quem se cadastrou
+    // como "Amanda@x.com" precisa conseguir entrar digitando "amanda@x.com".
+    const emailNorm = email.trim().toLowerCase();
 
     // Try admin first
-    const admin = await prisma.admin.findUnique({ where: { email } });
+    const admin = await prisma.admin.findFirst({
+      where: { email: { equals: emailNorm, mode: "insensitive" } },
+    });
     if (admin) {
       const valid = await bcrypt.compare(password, admin.password);
       if (!valid) {
@@ -50,7 +55,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Try subscriber
-    const subscriber = await prisma.subscriber.findUnique({ where: { email } });
+    const subscriber = await prisma.subscriber.findFirst({
+      where: { email: { equals: emailNorm, mode: "insensitive" } },
+    });
     if (subscriber) {
       const valid = await bcrypt.compare(password, subscriber.password);
       if (!valid) {
