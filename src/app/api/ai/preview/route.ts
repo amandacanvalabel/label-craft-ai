@@ -22,8 +22,12 @@ import { getSession } from "@/lib/auth";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ANON_PREVIEW_LIMIT = 2;      // gerações grátis por IP...
-const ANON_PREVIEW_WINDOW_H = 24;  // ...dentro dessa janela (reseta a cada 24h)
+// Gerações grátis por IP, por janela. A prévia é a ISCA do funil: precisa
+// funcionar sem login e sem conta. O limite existe só como freio de abuso,
+// por isso é folgado. Dá pra ajustar sem mexer no código, pela env
+// ANON_PREVIEW_LIMIT (ex.: "20") na Vercel.
+const ANON_PREVIEW_LIMIT = Number(process.env.ANON_PREVIEW_LIMIT ?? 10) || 10;
+const ANON_PREVIEW_WINDOW_H = 24;  // reseta a cada 24h
 
 function pickSize(ratio?: number): "1024x1024" | "1024x1536" | "1536x1024" {
   if (typeof ratio !== "number" || !isFinite(ratio) || ratio <= 0) return "1024x1536";
