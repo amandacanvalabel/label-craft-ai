@@ -19630,7 +19630,9 @@ RENDER.gerando = () => {
   const maybeGo = ()=>{
     if(animDone && genDone && !navigated){
       navigated = true;
-      go(stepIdx('variacoes'));
+      // Quem já viu a arte na prévia não precisa escolher entre 4 modelos
+      // padrão: vai direto pro editor, com o rótulo dela já montado.
+      go(stepIdx(state.ai.previewArt ? 'editor' : 'variacoes'));
     }
   };
 
@@ -20240,7 +20242,7 @@ function generateLabel(opts){
   // Antes o cosmético ignorava a arte da IA. Agora entram como camadas de fundo
   // editáveis na FRENTE (atrás dos textos que o template já posicionou).
   const aiAssets = state.ai.aiAssets || {};
-  if(aiAssets.illustration || aiAssets.ornament){
+  if(state.ai.previewArt || aiAssets.illustration || aiAssets.ornament){
     let frontFace = null, fx0 = 0, fW = W;
     if(faceCfg.kind === 'unified'){ frontFace = 'unico'; fx0 = 0; fW = W/2; }
     else if(faceCfg.kind === 'front' || faceCfg.kind === 'dual'){ frontFace = 'frente'; fx0 = 0; fW = W; }
@@ -20248,6 +20250,9 @@ function generateLabel(opts){
       const padX = safe + 1;
       const innerW = fW - 2 * padX;
       const bg = [];
+      if(state.ai.previewArt){
+        bg.push(mkEl('image', { name:'Arte da IA (fundo)', x: fx0, y: 0, w: fW, h: H, src: state.ai.previewArt, fit:'cover' }));
+      }
       if(aiAssets.ornament){
         bg.push(mkEl('image', { name:'Moldura IA', x: fx0 + padX * 0.5, y: H * 0.18, w: fW - padX, h: H * 0.58, src: aiAssets.ornament, fit:'contain' }));
       }
@@ -20522,17 +20527,31 @@ function generateLabelAlimento(opts){
 
     let yTop = y0 + safe + 2;
 
+    // ===== 0. ARTE DA IA COMO FUNDO =====
+    // A arte que a pessoa viu na prévia é a PRIMEIRA camada (o fundo do
+    // rótulo). Tudo o que a ANVISA exige entra por cima, como elementos
+    // soltos e editáveis. Assim ela edita o rótulo dela, não um template.
+    const _temArteIA = !!state.ai.previewArt;
+    if(_temArteIA){
+      add(faceId, 'image', {
+        name: 'Arte da IA (fundo)',
+        x: x0, y: y0, w: faceW, h: faceH,
+        src: state.ai.previewArt, fit: 'cover',
+      });
+    }
+
     // ===== MOLDURA DECORATIVA (unificação de design com o cosmético) =====
-    // Mesma moldura dupla que os templates de cosmético desenham, usando a
-    // paleta do template. Fica no fundo (atrás da arte e dos textos).
+    // Só quando NÃO há arte da IA — sobre uma arte que ocupa o rótulo inteiro
+    // a moldura vira poluição visual.
     const _primary = palette.primary || ink;
     const _m = Math.min(faceW, faceH) * 0.045;
-    add(faceId, 'rect', { name:'Moldura decorativa', x:x0+_m, y:y0+_m, w:faceW-_m*2, h:faceH-_m*2, fill:'#00000000', stroke:_primary, sw:0.4, radius:1 });
-    add(faceId, 'rect', { name:'Moldura decorativa interna', x:x0+_m+1, y:y0+_m+1, w:faceW-_m*2-2, h:faceH-_m*2-2, fill:'#00000000', stroke:_primary, sw:0.15, radius:1 });
+    if(!_temArteIA){
+      add(faceId, 'rect', { name:'Moldura decorativa', x:x0+_m, y:y0+_m, w:faceW-_m*2, h:faceH-_m*2, fill:'#00000000', stroke:_primary, sw:0.4, radius:1 });
+      add(faceId, 'rect', { name:'Moldura decorativa interna', x:x0+_m+1, y:y0+_m+1, w:faceW-_m*2-2, h:faceH-_m*2-2, fill:'#00000000', stroke:_primary, sw:0.15, radius:1 });
+    }
 
-    // 0. PEÇAS DA IA (ilustração + ornamento) — cada uma é uma CAMADA EDITÁVEL
+    // PEÇAS DA IA (ilustração + ornamento) — cada uma é uma CAMADA EDITÁVEL
     //    separada (mover, redimensionar, trocar, apagar), com fundo transparente.
-    //    Ficam nas camadas de baixo; textos/lupas/tabela entram por cima.
     const aiAssets = state.ai.aiAssets || {};
     if(aiAssets.ornament){
       add(faceId, 'image', {
@@ -28661,8 +28680,13 @@ initRouter();
       state.produto = (h.produto === 'cosmetico') ? 'cosmetico' : 'alimento';
       state.conhece = 'sei';
       if(h.prompt){
-        if(state.produto === 'alimento'){ state.alimento = state.alimento || {}; state.alimento.ai_prompt = h.prompt; }
-        else { state.ai = state.ai || {}; state.ai.prompt = h.prompt; }
+        // Guarda nos DOIS campos que a ferramenta consulta (alimento usa
+        // state.alimento.ai_prompt; cosmético usa state.ai.prompt). Assim o
+        // texto da pessoa aparece no briefing e é usado na geração, sem sumir.
+        state.alimento = state.alimento || {};
+        state.ai = state.ai || {};
+        state.alimento.ai_prompt = h.prompt;
+        state.ai.prompt = h.prompt;
       }
     }catch(_){}
   }
@@ -28954,7 +28978,9 @@ initRouter();
       applyProdutoPrompt(h);
       if(h.img && typeof state !== 'undefined' && state){
         state.ai = state.ai || {};
-        state.ai.aiAssets = { illustration: h.img, ornament: null };
+        // A arte que a pessoa viu na prévia vira o FUNDO do rótulo (camada
+        // editável), em vez de virar uma figurinha dentro de um template.
+        state.ai.previewArt = h.img;
       }
     }catch(e){ console.error('[aplicar modelo]', e); }
     clearPedido();          // consumido: não reabre a prévia a cada carga
