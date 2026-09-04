@@ -9,6 +9,18 @@ import { toast } from "sonner";
 
 type FormMode = "login" | "forgot";
 
+// Quem veio do funil da IA (/login?next=/canvalabel-alimentos.html) volta pra
+// ferramenta com o modelo gerado intacto. Sem "next", vale o destino padrão.
+const destinoPosLogin = (padrao: string): string => {
+  try {
+    const n = new URLSearchParams(window.location.search).get("next");
+    if (n && n.startsWith("/") && !n.startsWith("//")) return n;
+  } catch {
+    /* ignora */
+  }
+  return padrao;
+};
+
 const LoginPage = () => {
   const router = useRouter();
   const [mode, setMode] = useState<FormMode>("login");
@@ -33,7 +45,7 @@ const LoginPage = () => {
         return;
       }
       toast.success(`Bem-vindo, ${data.user.name}!`);
-      router.push(data.redirect);
+      router.push(destinoPosLogin(data.redirect));
     } catch {
       toast.error("Erro de conexão");
     } finally {
