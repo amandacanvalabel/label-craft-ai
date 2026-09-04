@@ -28710,6 +28710,16 @@ initRouter();
       '.cvlpv-art img{width:100%;height:100%;object-fit:cover;display:block}',
       '.cvlpv-skel{position:absolute;inset:0;background:linear-gradient(100deg,#eef1f6 30%,#e2e8f2 50%,#eef1f6 70%);background-size:200% 100%;animation:cvlpvsh 1.2s linear infinite}',
       '@keyframes cvlpvsh{0%{background-position:200% 0}100%{background-position:-200% 0}}',
+      /* --- animação "Gerando seu rótulo" --- */
+      '.cvlpv-gen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;text-align:center;padding:18px;background:linear-gradient(100deg,#eef3ff 30%,#e2ebfd 50%,#eef3ff 70%);background-size:200% 100%;animation:cvlpvsh 1.4s linear infinite}',
+      '.cvlpv-spin{width:34px;height:34px;border-radius:50%;border:3px solid #c9d8fb;border-top-color:#2458f6;animation:cvlpvspin .8s linear infinite}',
+      '@keyframes cvlpvspin{to{transform:rotate(360deg)}}',
+      '.cvlpv-genT{font-family:\'Poppins\',sans-serif;font-weight:700;font-size:13.5px;color:#1434ab;letter-spacing:.01em}',
+      '.cvlpv-genS{font-size:10.5px;line-height:1.4;color:#5b6f9c;max-width:180px;min-height:29px}',
+      '.cvlpv-actions{opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease}',
+      '.cvlpv-actions.on{opacity:1;transform:none}',
+      '.cvlpv-login{display:block;width:100%;background:transparent;color:#cfe0ff;border:1px solid rgba(255,255,255,.28);border-radius:12px;padding:12px;margin-top:9px;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s ease}',
+      '.cvlpv-login:hover{background:rgba(255,255,255,.09);color:#fff}',
       '.cvlpv-foot{padding:9px 14px;background:#fbf6ec;border-top:1px dashed #d8cfbb;display:flex;align-items:center;gap:8px;color:#5b6472;font-size:9px}',
       '.cvlpv-lupa{background:#111;color:#fff;font-family:\'Poppins\',sans-serif;font-weight:700;font-size:8px;line-height:1;padding:5px 6px;border-radius:4px;text-align:center}',
       '.cvlpv-ribbon{position:absolute;top:12px;right:-34px;transform:rotate(45deg);background:#ff8237;color:#fff;font-weight:700;font-size:10px;letter-spacing:.04em;padding:5px 40px;box-shadow:0 3px 10px rgba(0,0,0,.25)}',
@@ -28803,41 +28813,59 @@ initRouter();
             '<li><span class="cvlpv-dot">2</span><span>'+(isCos?'Composição INCI, advertências e modo de uso':'Tabela nutricional automática e lupa "ALTO EM"')+'</span></li>' +
             '<li><span class="cvlpv-dot">3</span><span>Revisor ANVISA + arquivo pronto pra gráfica (PDF)</span></li>' +
           '</ul>' +
-          '<button type="button" class="cvlpv-cta" id="cvlpvGo">'+escapeHtml(ctaLabel)+' <span aria-hidden="true">→</span></button>' +
-          '<div class="cvlpv-note" id="cvlpvNote">'+(logado?'Você já está logada — é só continuar.':'Primeiro rótulo grátis, sem cartão. Planos a partir de R$ 49/mês.')+'</div>' +
+          /* Ações só aparecem DEPOIS que a pessoa vê o rótulo pronto. */
+          '<div class="cvlpv-actions" id="cvlpvActions" style="display:none">' +
+            '<button type="button" class="cvlpv-cta" id="cvlpvGo">Editar rótulo com as normas da ANVISA <span aria-hidden="true">→</span></button>' +
+            '<button type="button" class="cvlpv-login" id="cvlpvLogin" style="display:none">Já tenho conta — entrar</button>' +
+            '<div class="cvlpv-note" id="cvlpvNote">Crie sua conta grátis pra editar. Sem cartão.</div>' +
+          '</div>' +
           '<button type="button" class="cvlpv-ghost" id="cvlpvBack">Editar meu pedido</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
 
-    var goBtn  = document.getElementById('cvlpvGo');
-    var noteEl = document.getElementById('cvlpvNote');
+    var goBtn    = document.getElementById('cvlpvGo');
+    var noteEl   = document.getElementById('cvlpvNote');
+    var loginBtn = document.getElementById('cvlpvLogin');
+    var actions  = document.getElementById('cvlpvActions');
+    var VOLTA    = encodeURIComponent('/canvalabel-alimentos.html');
 
-    /* Ajusta o texto do botão conforme a sessão REAL (não a simulada). */
-    checarLogin().then(function(logged){
-      if(!goBtn) return;
-      goBtn.setAttribute('data-logged', logged ? '1' : '0');
-      goBtn.innerHTML = (logged ? 'Continuar e preencher os dados da ANVISA' : 'Criar minha conta e continuar') +
-                        ' <span aria-hidden="true">→</span>';
-      if(noteEl && logged) noteEl.textContent = 'Você já está logada — é só continuar.';
-    });
+    /* Mostra as ações só DEPOIS que o rótulo aparece. Quem não tem conta vê as
+       duas opções (criar conta OU entrar); quem já está logada continua direto. */
+    function revelarAcoes(){
+      if(!actions || actions.dataset.on === '1') return;
+      actions.dataset.on = '1';
+      actions.style.display = 'block';
+      checarLogin().then(function(logged){
+        if(logged){
+          if(loginBtn) loginBtn.style.display = 'none';
+          if(noteEl) noteEl.textContent = 'Você já está logada — é só continuar.';
+        } else {
+          if(loginBtn) loginBtn.style.display = 'block';
+          if(noteEl) noteEl.textContent = 'Crie sua conta grátis pra editar. Sem cartão.';
+        }
+      });
+      setTimeout(function(){ actions.classList.add('on'); }, 30);
+    }
 
     /* Botão principal:
        - logada  → aplica o modelo gerado e segue pras etapas da ANVISA, aqui mesmo.
-       - anônima → vai criar a conta e VOLTA pra cá com o modelo intacto. */
+       - anônima → cria a conta e VOLTA pra cá com o modelo intacto. */
     if(goBtn) goBtn.addEventListener('click', function(){
       goBtn.disabled = true;
       goBtn.style.opacity = '0.7';
       goBtn.innerHTML = 'Abrindo...';
       savePedido(h);  // garante que nada se perde na troca de página
       checarLogin().then(function(logged){
-        if(logged){
-          aplicarModeloEContinuar(h);
-        } else {
-          // volta pra ferramenta depois de criar a conta
-          window.location.href = '/planos?next=' + encodeURIComponent('/canvalabel-alimentos.html');
-        }
+        if(logged) aplicarModeloEContinuar(h);
+        else window.location.href = '/planos?next=' + VOLTA;
       });
+    });
+
+    /* Já tem conta → login, e volta pra ferramenta com o modelo salvo. */
+    if(loginBtn) loginBtn.addEventListener('click', function(){
+      savePedido(h);
+      window.location.href = '/login?next=' + VOLTA;
     });
 
     var backBtn = document.getElementById('cvlpvBack');
@@ -28853,14 +28881,19 @@ initRouter();
     // SEM gerar de novo — assim o modelo é o mesmo e não gasta outra prévia.
     if(h.img){
       if(art) art.innerHTML = '<img src="'+h.img+'" alt="Prévia do rótulo gerada por IA">';
+      revelarAcoes();
       return;
     }
 
-    // Senão, gera agora e SALVA o resultado junto do pedido.
+    // Enquanto a IA trabalha: animação "Gerando seu rótulo".
+    var pararAnim = art ? mostrarGerando(art) : function(){};
+
+    // Gera agora e SALVA o resultado junto do pedido.
     gerarPreviewIA(h).then(function(res){
+      pararAnim();
       res = res || {};
       art = document.getElementById('cvlpvArt');
-      if(!art) return;
+      if(!art){ revelarAcoes(); return; }
       if(res.img){
         art.innerHTML = '<img src="'+res.img+'" alt="Prévia do rótulo gerada por IA">';
         h.img = res.img;
@@ -28880,7 +28913,37 @@ initRouter();
           '<div style="font-size:11px;line-height:1.4;max-width:180px">Sua arte será gerada na próxima etapa, junto com os dados da ANVISA.</div>'+
         '</div>';
       }
+      revelarAcoes();   // agora sim: a pessoa viu o resultado
     });
+  }
+
+  /* Animação enquanto a IA trabalha: "Gerando seu rótulo" + etapas.
+     Devolve uma função que para os timers. */
+  function mostrarGerando(art){
+    art.innerHTML =
+      '<div class="cvlpv-gen">' +
+        '<div class="cvlpv-spin"></div>' +
+        '<div class="cvlpv-genT">Gerando seu rótulo<span id="cvlpvDots">.</span></div>' +
+        '<div class="cvlpv-genS" id="cvlpvStep">Interpretando o seu pedido</div>' +
+      '</div>';
+    var passos = [
+      'Interpretando o seu pedido',
+      'Escolhendo as cores e a tipografia',
+      'Desenhando a arte da frente',
+      'Dando os retoques finais'
+    ];
+    var d = 0, i = 0;
+    var t1 = setInterval(function(){
+      d = (d + 1) % 3;
+      var el = document.getElementById('cvlpvDots');
+      if(el) el.textContent = new Array(d + 2).join('.');
+    }, 420);
+    var t2 = setInterval(function(){
+      if(i < passos.length - 1) i++;
+      var el = document.getElementById('cvlpvStep');
+      if(el) el.textContent = passos[i];
+    }, 3400);
+    return function(){ clearInterval(t1); clearInterval(t2); };
   }
 
   /* Leva o modelo gerado pra dentro do editor e entra no fluxo da ANVISA.
@@ -28900,29 +28963,80 @@ initRouter();
     setTimeout(goFlowStart, 60);
   }
 
+  /* Traz a identidade REAL (cookie do site) pra dentro da ferramenta.
+     Sem isso, quem logava com a própria conta aparecia como
+     ferramenta@canvalabel.com.br — a sessão "de serviço" do protótipo. */
+  function sincronizarUsuarioReal(){
+    return fetch('/api/auth/me', { credentials: 'include' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d || !d.user) return null;
+        var u = d.user;
+        try{
+          if(typeof loadUser === 'function' && typeof saveUser === 'function'){
+            var user = loadUser();
+            if(u.name)  user.name  = u.name;
+            if(u.email) user.email = u.email;
+            saveUser(user);
+          }
+          if(typeof setSession === 'function'){
+            setSession({ email: u.email, nome: u.name, em: Date.now() });
+          }
+          if(typeof renderUserMenus === 'function') renderUserMenus();
+          if(typeof renderGlobalBanner === 'function') renderGlobalBanner();
+        }catch(e){ console.error('[sync usuario real]', e); }
+        return u;
+      })
+      .catch(function(){ return null; });
+  }
+
+  /* Logo do topo: leva pro painel (logada) ou pro site (visitante),
+     em vez de só voltar pra tela inicial da ferramenta. */
+  function ligarLogoDashboard(){
+    ['brandHome','brandHomeEditor'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.title = 'Ir para o painel';
+      el.onclick = function(ev){
+        if(ev && ev.preventDefault) ev.preventDefault();
+        checarLogin().then(function(logged){
+          window.location.href = logged ? '/dashboard' : '/';
+        });
+      };
+    });
+  }
+
   function boot(){
     try{
+      ligarLogoDashboard();
       var handoff = readHandoff();
-      var sess = (typeof getSession === 'function') ? getSession() : null;
-      var isAuto = !sess || (sess && sess.email === 'ferramenta@canvalabel.com.br');
-      if (!sess && typeof setSession === 'function') {
-        setSession({ email: 'ferramenta@canvalabel.com.br', nome: 'CanvaLabel', em: Date.now() });
-      }
 
-      // Veio da landing com um pedido: mostra a PRÉVIA com IA + trava de cadastro.
-      if (handoff) {
-        applyProdutoPrompt(handoff);
-        if (typeof showLayer === 'function') showLayer('app');
-        openPreview(handoff);
-        return;
-      }
+      // Só depois de saber quem é a pessoa de verdade é que decidimos a sessão.
+      sincronizarUsuarioReal().then(function(real){
+        try{
+          var sess = (typeof getSession === 'function') ? getSession() : null;
+          // "isAuto" = visitante sem conta (sessão de serviço do protótipo).
+          var isAuto = !real && (!sess || sess.email === 'ferramenta@canvalabel.com.br');
+          if (!real && !sess && typeof setSession === 'function') {
+            setSession({ email: 'ferramenta@canvalabel.com.br', nome: 'CanvaLabel', em: Date.now() });
+          }
 
-      // Sem handoff: comportamento antigo.
-      if (typeof showLayer === 'function') showLayer('app');
-      if (isAuto) {
-        try { if (state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
-        goFlowStart();
-      }
+          // Veio da landing com um pedido: mostra a PRÉVIA com IA.
+          if (handoff) {
+            applyProdutoPrompt(handoff);
+            if (typeof showLayer === 'function') showLayer('app');
+            openPreview(handoff);
+            return;
+          }
+
+          // Sem pedido: comportamento normal.
+          if (typeof showLayer === 'function') showLayer('app');
+          if (isAuto) {
+            try { if (typeof state !== 'undefined' && state) { state.produto = 'alimento'; state.conhece = 'sei'; } } catch(_){}
+            goFlowStart();
+          }
+        }catch(e){ console.error('[boot alimentos]', e); }
+      });
     }catch(e){ console.error('[boot alimentos]', e); }
   }
 
