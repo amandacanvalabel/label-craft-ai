@@ -351,15 +351,15 @@ const Planos = () => {
             transition={{ duration: 0.5 }}
           >
             <span className="text-sm font-semibold text-primary uppercase tracking-wider">
-              Preços
+              Planos
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              Planos que cabem no{" "}
-              <span className="gradient-text">seu bolso</span>
+              Comece grátis.{" "}
+              <span className="gradient-text">Pague menos que um rótulo de designer.</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Escolha o plano ideal para o seu negócio. Todos incluem suporte e
-              atualizações.
+              Um único rótulo feito fora custa R$ 2 a 3 mil. Aqui você faz o
+              primeiro de graça, sem cartão, e só assina quando precisar de mais.
             </p>
 
             {/* Billing Toggle */}
@@ -521,6 +521,27 @@ const Planos = () => {
               })
             )}
           </div>
+
+          {/* Linha de confiança — tira as objeções de última hora */}
+          <motion.div
+            className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted-foreground"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            {[
+              "Primeiro rótulo grátis, sem cartão",
+              "PIX, cartão em até 12x ou boleto",
+              "Cancele quando quiser",
+              "Alimentos e cosméticos na mesma plataforma",
+            ].map((item) => (
+              <span key={item} className="inline-flex items-center gap-2">
+                <HiOutlineCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                {item}
+              </span>
+            ))}
+          </motion.div>
         </div>
       </section>
 
