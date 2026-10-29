@@ -31,7 +31,7 @@ const dores = [
     dor: "Designer cobra caro e não conhece a norma",
     detalhe:
       "R$ 2 a 3 mil por rótulo, semanas de ida e volta, e no fim quem responde pela conformidade é você.",
-    solucao: "Layout profissional gerado com IA, já dentro das regras. Primeiro rótulo grátis.",
+    solucao: "Layout profissional gerado com IA, já dentro das regras, a partir de R$ 9,90 por mês.",
   },
   {
     icon: HiOutlineTableCells,
