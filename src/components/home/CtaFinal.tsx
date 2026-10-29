@@ -26,7 +26,7 @@ const CtaFinal = () => {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-sm font-semibold bg-white/15 border border-white/25 px-4 py-1.5 rounded-full">
               <HiOutlineShieldCheck className="w-4 h-4" />
-              Primeiro rótulo grátis · Sem cartão de crédito
+              A partir de R$ 9,90/mês · Sem fidelidade
             </span>
 
             <h2 className="mt-7 text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight max-w-3xl mx-auto">
@@ -61,7 +61,7 @@ const CtaFinal = () => {
             </div>
 
             <p className="mt-6 text-sm text-white/70">
-              Plano grátis com 2 rótulos · Pagos a partir de R$ 13/mês · Cancele quando quiser
+              PIX, cartão ou boleto · Cancele quando quiser
             </p>
           </div>
         </motion.div>
