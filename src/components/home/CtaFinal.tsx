@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { HiOutlineArrowRight, HiOutlineShieldCheck, HiOutlineSparkles } from "react-icons/hi2";
+import { track } from "@/lib/track";
 
 /**
  * CtaFinal — último empurrão antes do rodapé.
@@ -46,6 +47,7 @@ const CtaFinal = () => {
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <a
                 href="#planos"
+                onClick={() => track("cta_click", { local: "cta_final" })}
                 className="group inline-flex items-center gap-2 bg-white text-primary font-bold text-base rounded-full px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
               >
                 Criar meu rótulo agora
@@ -53,6 +55,7 @@ const CtaFinal = () => {
               </a>
               <a
                 href="/canvalabel-alimentos.html"
+                onClick={() => track("cta_click", { local: "cta_final_ia" })}
                 className="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium text-base px-6 py-4 rounded-full border border-white/30 hover:border-white/60 transition-all duration-300"
               >
                 <HiOutlineSparkles className="w-5 h-5" />
@@ -61,7 +64,7 @@ const CtaFinal = () => {
             </div>
 
             <p className="mt-6 text-sm text-white/70">
-              PIX, cartão ou boleto · Cancele quando quiser
+              PIX, cartão ou boleto · 7 dias de garantia · Cancele quando quiser
             </p>
           </div>
         </motion.div>
