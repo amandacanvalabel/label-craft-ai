@@ -1,5 +1,5 @@
 // src/app/planos/page.tsx
-// Página de planos + cadastro REAL (grátis ou pago). Reaproveita o componente
+// Página de planos + cadastro REAL. Reaproveita o componente
 // Planos, que cria a conta via /api/checkout e, ao concluir, manda pro /dashboard.
 // É pra cá que o funil (prévia com IA) envia quem ainda não tem conta.
 import Planos from "@/components/home/Planos";
@@ -8,7 +8,7 @@ import JsonLd from "@/components/home/JsonLd";
 export const metadata = {
   title: "Planos e cadastro | CanvaLabel",
   description:
-    "Crie sua conta no CanvaLabel — plano grátis ou pago — e finalize seu rótulo com tudo que a ANVISA exige.",
+    "Crie sua conta no CanvaLabel — a partir de R$ 9,90/mês — e finalize seu rótulo com tudo que a ANVISA exige.",
 };
 
 export default function PlanosPage() {
