@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { HiOutlineSparkles, HiOutlineArrowRight, HiOutlineShieldCheck } from "react-icons/hi2";
+import { track } from "@/lib/track";
 
 const HeroHome = () => {
   return (
@@ -59,6 +60,7 @@ const HeroHome = () => {
         >
           <a
             href="#planos"
+            onClick={() => track("cta_click", { local: "hero" })}
             className="group relative inline-flex items-center gap-2 gradient-primary text-white font-semibold text-base rounded-full px-8 py-4 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 hover:-translate-y-0.5"
           >
             Criar meu rótulo a partir de R$ 9,90
@@ -66,10 +68,37 @@ const HeroHome = () => {
           </a>
           <a
             href="#demonstracao"
+            onClick={() => track("cta_click", { local: "hero_secundario" })}
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground font-medium text-base px-6 py-4 rounded-full border border-border hover:border-foreground/20 transition-all duration-300 neo-card"
           >
             Ver como funciona
           </a>
+        </motion.div>
+
+        {/* Segmentos: a pessoa se reconhece e vê que o produto fala a língua dela */}
+        <motion.div
+          className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          {[
+            { emoji: "🥫", titulo: "Faço alimentos", detalhe: "tabela nutricional, lupa “ALTO EM”, alérgenos e glúten", href: "#calculadora", seg: "alimentos" },
+            { emoji: "🧴", titulo: "Faço cosméticos", detalhe: "INCI, modo de uso, advertências, lote e validade", href: "#beneficios", seg: "cosmeticos" },
+          ].map((s) => (
+            <a
+              key={s.seg}
+              href={s.href}
+              onClick={() => track("segmento_click", { segmento: s.seg })}
+              className="group inline-flex items-center gap-3 neo-card rounded-full pl-2 pr-5 py-2 hover:-translate-y-0.5 transition-all"
+            >
+              <span className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-lg">{s.emoji}</span>
+              <span className="text-left leading-tight">
+                <span className="block font-bold">{s.titulo}</span>
+                <span className="block text-xs text-muted-foreground">{s.detalhe}</span>
+              </span>
+            </a>
+          ))}
         </motion.div>
 
         {/* Stats */}
