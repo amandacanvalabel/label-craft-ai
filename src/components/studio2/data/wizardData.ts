@@ -16,7 +16,7 @@ export const PRODUTO_CATS: ProdutoCat[] = [
   { id: "cosmetico", name: "Cosmético", desc: "Shampoo, condicionador, máscara, leave-in, cremes e mais.", ic: '<path d="M9 2h6v3H9zM7 8h10l-1 13H8z"/><path d="M7 8a3 3 0 0 1 3-3M17 8a3 3 0 0 0-3-3"/>', soon: false },
   { id: "bebidas", name: "Bebidas", desc: "Cervejas, sucos, kombuchas e bebidas artesanais.", ic: '<path d="M6 3h12l-1 7a5 5 0 0 1-10 0zM9 21h6M12 16v5"/>', soon: true },
   { id: "suplementos", name: "Suplementos", desc: "Cápsulas, pós e suplementos alimentares.", ic: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/>', soon: true },
-  { id: "alimento", name: "Alimento", desc: "Tabela nutricional, alérgenos e rotulagem frontal (ANVISA).", ic: '<path d="M5 3v18M5 9h4M9 3v18M15 3c-2 0-3 2-3 5s1 5 3 5v8"/>', soon: false, href: "/canvalabel-alimentos.html" },
+  { id: "alimento", name: "Alimento", desc: "Tabela nutricional, lupa “ALTO EM”, alérgenos e glúten (IN 75/2020, RDC 429/2020).", ic: '<path d="M5 3v18M5 9h4M9 3v18M15 3c-2 0-3 2-3 5s1 5 3 5v8"/>', soon: false },
   { id: "limpeza", name: "Limpeza", desc: "Detergentes, desinfetantes e produtos de higiene.", ic: '<path d="M3 21h18M6 21V8l4-5h4l4 5v13M10 3v5h4V3"/>', soon: true },
 ];
 
@@ -70,6 +70,7 @@ export const MATERIAIS_RECICLAGEM: MaterialReciclagem[] = [
 export const VALIDADES = ["1M", "2M", "3M", "4M", "5M", "6M", "7M", "8M", "9M", "10M", "12M", "18M", "24M", "36M", "48M"];
 
 export const OQUE_OPCOES = ["Shampoo", "Condicionador", "Máscara capilar", "Leave-in", "Creme", "Sérum", "Óleo", "Tônico", "Sabonete", "Hidratante", "Outro"];
+export const OQUE_OPCOES_ALIMENTO = ["Molho", "Geleia", "Doce", "Granola", "Biscoito", "Pão", "Bolo", "Tempero", "Mel", "Café", "Chá", "Suco", "Iogurte", "Queijo", "Conserva", "Snack", "Outro"];
 
 export const PROMPT_EXAMPLES = [
   "Minimalista e elegante",
