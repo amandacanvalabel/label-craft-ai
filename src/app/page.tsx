@@ -1,16 +1,35 @@
 // src/app/page.tsx
-// Homepage do CanvaLabel — nova landing (design do Claude Design) nativa em React,
-// preservando modo manutenção, JSON-LD (SEO) e o tracking de pageview.
+// Homepage do CanvaLabel — landing de CAPTURA.
+//
+// Narrativa da página (de cima pra baixo):
+//   Hero (dor → promessa) → Dores resolvidas → Benefícios → Como funciona →
+//   Galeria de rótulos reais → Planos (a captura: cadastro grátis/pago) →
+//   Avaliações → CTA final → Rodapé.
+//
+// A versão "IA logo de cara" (LandingV2) não converteu bem; a ferramenta de IA
+// continua acessível como alternativa discreta no CTA final.
+// Preserva modo manutenção, JSON-LD (SEO) e o tracking de pageview.
+import Header from "@/components/home/Header";
+import HeroHome from "@/components/home/HeroHome";
+import Dores from "@/components/home/Dores";
+import BeneficiosCarrousel from "@/components/home/BeneficiosCarrousel";
+import DemonstrationCentral from "@/components/home/DemonstrationCentral";
+import GaleriaExemplos from "@/components/home/GaleriaExemplos";
+import Planos from "@/components/home/Planos";
+import Avaliacoes from "@/components/home/Avaliacoes";
+import CtaFinal from "@/components/home/CtaFinal";
+import Footer from "@/components/home/Footer";
 import JsonLd from "@/components/home/JsonLd";
 import TrackPageView from "@/components/home/TrackPageView";
-import LandingV2 from "@/components/home/LandingV2";
 import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
+import { getGalleryImages } from "@/lib/gallery";
 
 const HomePage = async () => {
-  const [settings, session] = await Promise.all([
+  const [settings, session, galleryImages] = await Promise.all([
     getSiteSettings(),
     getSession(),
+    getGalleryImages(),
   ]);
   const canBypassMaintenance = session?.role === "ADMIN";
 
@@ -34,7 +53,16 @@ const HomePage = async () => {
     <>
       <JsonLd />
       <TrackPageView />
-      <LandingV2 />
+      <Header />
+      <HeroHome />
+      <Dores />
+      <BeneficiosCarrousel />
+      <DemonstrationCentral />
+      <GaleriaExemplos images={galleryImages} />
+      <Planos />
+      <Avaliacoes />
+      <CtaFinal />
+      <Footer />
     </>
   );
 };
