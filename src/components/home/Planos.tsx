@@ -30,7 +30,24 @@ interface DBPlan {
   promotionalPrice: number | null;
   type: string;
   benefits: string[];
+  // Limites reais aplicados pelo sistema (-1 = ilimitado). Opcionais para
+  // não quebrar caso a API antiga ainda esteja em cache.
+  maxLabels?: number;
+  monthlyAiCredits?: number;
+  monthlyImageCredits?: number;
+  storageMb?: number;
 }
+
+/** "9,90" / "29,90" / "30" — centavos só quando existem. */
+const fmtBRL = (v: number) =>
+  Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ",");
+
+/** -1 vira "Ilimitados"; undefined vira "—". */
+const fmtLimit = (v: number | undefined, unit = "") =>
+  v === undefined ? "—" : v < 0 ? "Ilimitados" : `${v}${unit}`;
+
+const fmtStorage = (mb: number | undefined) =>
+  mb === undefined ? "—" : mb < 0 ? "Ilimitado" : mb >= 1024 ? `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB` : `${mb} MB`;
 
 interface UserFormData {
   name: string;
@@ -354,12 +371,14 @@ const Planos = () => {
               Planos
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              Comece grátis.{" "}
-              <span className="gradient-text">Pague menos que um rótulo de designer.</span>
+              Menos que um lanche por mês.{" "}
+              <span className="gradient-text">Muito menos que um designer.</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Um único rótulo feito fora custa R$ 2 a 3 mil. Aqui você faz o
-              primeiro de graça, sem cartão, e só assina quando precisar de mais.
+              Um único rótulo feito fora custa R$ 2 a 3 mil e leva semanas.
+              Aqui você escolhe o tamanho da sua operação, começa hoje e cancela
+              quando quiser. Todos os planos têm tudo: IA, revisor ANVISA,
+              tabela nutricional e PDF pra gráfica.
             </p>
 
             {/* Billing Toggle */}
@@ -469,7 +488,7 @@ const Planos = () => {
                             isPopular ? "text-5xl" : "text-4xl"
                           )}
                         >
-                          {getPrice(plan).toFixed(0)}
+                          {fmtBRL(getPrice(plan))}
                         </span>
                         <span className="text-sm text-muted-foreground mb-1">
                           /mês
@@ -481,6 +500,16 @@ const Planos = () => {
                           <span className="text-emerald-500 font-semibold">
                             Economia de R$ {annualSavings}/ano
                           </span>
+                        </p>
+                      )}
+                      {/* Âncora de valor: quanto sai cada rótulo */}
+                      {plan.maxLabels !== undefined && getPrice(plan) > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          {plan.maxLabels < 0
+                            ? "Rótulos ilimitados no mês"
+                            : plan.maxLabels > 0
+                            ? `≈ R$ ${(getPrice(plan) / plan.maxLabels).toFixed(2).replace(".", ",")} por rótulo`
+                            : null}
                         </p>
                       )}
                     </div>
@@ -501,7 +530,7 @@ const Planos = () => {
                           : "bg-foreground/5 text-foreground hover:bg-foreground/10 border border-border py-3.5 rounded-xl"
                       )}
                     >
-                      {getPrice(plan) <= 0 ? "Começar grátis" : "Assinar agora"}
+                      {getPrice(plan) <= 0 ? "Começar grátis" : isPopular ? "Quero este plano" : "Assinar agora"}
                     </button>
 
                     {/* Features */}
@@ -531,9 +560,9 @@ const Planos = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             {[
-              "Primeiro rótulo grátis, sem cartão",
+              "Sem fidelidade: cancele quando quiser",
               "PIX, cartão em até 12x ou boleto",
-              "Cancele quando quiser",
+              "Troque de plano a qualquer momento",
               "Alimentos e cosméticos na mesma plataforma",
             ].map((item) => (
               <span key={item} className="inline-flex items-center gap-2">
@@ -542,6 +571,116 @@ const Planos = () => {
               </span>
             ))}
           </motion.div>
+
+          {/* ============ COMPARATIVO ============ */}
+          {!plansLoading && plans.length >= 2 && (
+            <motion.div
+              className="mt-20 max-w-[1000px] mx-auto"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.6 }}
+            >
+              <div className="text-center mb-8">
+                <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  Compare e escolha pelo{" "}
+                  <span className="gradient-text">tamanho da sua produção</span>
+                </h3>
+                <p className="mt-3 text-muted-foreground">
+                  Os recursos são os mesmos em todos os planos. O que muda é
+                  quantos rótulos você faz por mês e quanto de IA tem à disposição.
+                </p>
+              </div>
+
+              <div className="neo-card rounded-3xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/60">
+                        <th className="text-left font-semibold text-muted-foreground px-5 py-4 w-[40%]">
+                          O que você recebe
+                        </th>
+                        {plans.map((plan, i) => {
+                          const popular = plans.length >= 2 && i === Math.floor((plans.length - 1) / 2);
+                          return (
+                            <th key={plan.id} className={cn("px-4 py-4 text-center", popular && "bg-primary/5")}>
+                              <p className="font-bold text-foreground">{plan.name}</p>
+                              <p className="text-xs font-normal text-muted-foreground mt-0.5">
+                                R$ {fmtBRL(getPrice(plan))}/mês
+                              </p>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Linhas de quantidade — vêm dos limites reais de cada plano */}
+                      {(
+                        [
+                          { label: "Rótulos por mês", get: (p: DBPlan) => fmtLimit(p.maxLabels) },
+                          { label: "Créditos de IA por mês (layouts e textos)", get: (p: DBPlan) => fmtLimit(p.monthlyAiCredits) },
+                          { label: "Imagens geradas por IA por mês", get: (p: DBPlan) => fmtLimit(p.monthlyImageCredits) },
+                          { label: "Armazenamento de projetos", get: (p: DBPlan) => fmtStorage(p.storageMb) },
+                        ] as { label: string; get: (p: DBPlan) => string }[]
+                      ).map((row) => (
+                        <tr key={row.label} className="border-b border-border/40">
+                          <td className="px-5 py-3.5 text-foreground/90">{row.label}</td>
+                          {plans.map((plan, i) => {
+                            const popular = plans.length >= 2 && i === Math.floor((plans.length - 1) / 2);
+                            const v = row.get(plan);
+                            return (
+                              <td key={plan.id} className={cn("px-4 py-3.5 text-center font-semibold", popular && "bg-primary/5", v === "Ilimitados" || v === "Ilimitado" ? "text-emerald-600" : "text-foreground")}>
+                                {v}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+
+                      {/* Linhas de recurso — incluídas em todos os planos */}
+                      {[
+                        "Layout inicial gerado por IA a partir da descrição",
+                        "Revisor com 32 regras da ANVISA antes de exportar",
+                        "Tabela nutricional automática (Anexo IX, base TACO/USDA)",
+                        "Lupa “ALTO EM”, alérgenos e “contém glúten”",
+                        "Editor visual com camadas, fontes e modelos prontos",
+                        "PDF 300 DPI, CMYK, sangria e marcas de corte",
+                        "Rótulos de alimentos e de cosméticos",
+                        "Suporte por e-mail",
+                      ].map((label) => (
+                        <tr key={label} className="border-b border-border/40 last:border-0">
+                          <td className="px-5 py-3.5 text-foreground/90">{label}</td>
+                          {plans.map((plan, i) => {
+                            const popular = plans.length >= 2 && i === Math.floor((plans.length - 1) / 2);
+                            return (
+                              <td key={plan.id} className={cn("px-4 py-3.5 text-center", popular && "bg-primary/5")}>
+                                <HiOutlineCheckCircle className="w-5 h-5 text-emerald-500 inline-block" />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Comparação com o caminho tradicional */}
+              <div className="mt-8 grid sm:grid-cols-3 gap-4 text-center">
+                {[
+                  { k: "Designer freelancer", v: "R$ 2.000 a 3.000", s: "por rótulo, 2 a 4 semanas, sem garantia de norma" },
+                  { k: "Lote impresso com erro", v: "Gráfica 2x", s: "reimprimir tudo, mais o atraso do lançamento" },
+                  { k: "CanvaLabel", v: `a partir de R$ ${fmtBRL(getPrice(plans[0]))}`, s: "por mês, com design, revisão e PDF inclusos", hi: true },
+                ].map((c) => (
+                  <div key={c.k} className={cn("rounded-2xl p-5 border", c.hi ? "gradient-primary text-white border-transparent shadow-lg shadow-primary/20" : "neo-card")}>
+                    <p className={cn("text-xs font-semibold uppercase tracking-wider", c.hi ? "text-white/80" : "text-muted-foreground")}>{c.k}</p>
+                    <p className="mt-2 text-2xl font-extrabold">{c.v}</p>
+                    <p className={cn("mt-1 text-xs", c.hi ? "text-white/80" : "text-muted-foreground")}>{c.s}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
       </section>
 
