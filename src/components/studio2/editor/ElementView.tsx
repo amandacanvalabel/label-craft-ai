@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import type { El, ElFinish } from "../types";
 import { MM_PER_PT } from "../generate/primitives";
 import { HOT_STAMPING_COLORS } from "../data/hotStamping";
-import { ShapeSvg, SeloSvg, BarcodeSvg, QrSvg, TextCurveSvg } from "./svg";
+import { ShapeSvg, SeloSvg, BarcodeSvg, QrSvg, TextCurveSvg, NutriSvg, LupaSvg } from "./svg";
 
 // Porte de edRenderElements + edPaintEl (render de um elemento no artboard).
 export default function ElementView({ el, ppm, selected, finish, editing, onCommitText }: { el: El; ppm: number; selected: boolean; finish?: ElFinish; editing?: boolean; onCommitText?: (id: string, text: string, html: string, height: number) => void }) {
@@ -88,6 +88,10 @@ export default function ElementView({ el, ppm, selected, finish, editing, onComm
     content = <ShapeSvg el={el} ppm={ppm} />;
   } else if (el.type === "textCurve") {
     content = <TextCurveSvg el={el} ppm={ppm} />;
+  } else if (el.type === "nutri") {
+    content = <NutriSvg el={el} ppm={ppm} />;
+  } else if (el.type === "lupa") {
+    content = <LupaSvg el={el} ppm={ppm} />;
   }
 
   return (
