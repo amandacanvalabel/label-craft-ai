@@ -25,9 +25,9 @@ export default function StepProduto() {
         Que tipo de <span className="hl">produto</span> você vai rotular?
       </h1>
       <p className="scr-sub">
-        Escolha a categoria do produto. Cada categoria tem regras de rotulagem e modelos próprios. Hoje a
-        criação está disponível para cosméticos, e <b>alimentos</b> abrem a calculadora de tabela nutricional —
-        as demais chegam em breve.
+        Escolha a categoria do produto. Cada categoria tem suas próprias regras da ANVISA e o assistente se
+        adapta: <b>cosméticos</b> seguem a RDC 907/2024 (INCI, modo de uso, PAO); <b>alimentos</b> seguem a
+        IN 75/2020 e a RDC 429/2020 (tabela nutricional, lupa “ALTO EM”, alérgenos e glúten). As demais chegam em breve.
       </p>
 
       <div className="cards c3">
@@ -36,12 +36,10 @@ export default function StepProduto() {
             key={c.id}
             className={`card ${produto === c.id ? "sel" : ""} ${c.soon ? "soon" : ""}`}
             disabled={c.soon}
-            onClick={() => (c.href ? window.open(c.href, "_blank", "noopener") : selectCat(c.id))}
+            onClick={() => selectCat(c.id)}
           >
             {c.soon ? (
               <span className="soon-tag">Em breve</span>
-            ) : c.href ? (
-              <span className="soon-tag" style={{ background: "#2563eb", color: "#fff" }}>Ferramenta</span>
             ) : (
               <span className="chk">
                 <Svg paths='<path d="M20 6L9 17l-5-5"/>' sw={3.5} />
