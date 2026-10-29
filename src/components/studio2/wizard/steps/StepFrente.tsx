@@ -1,7 +1,7 @@
 "use client";
 
 import { useStudioStore } from "../../store/useStudioStore";
-import { OQUE_OPCOES } from "../../data/wizardData";
+import { OQUE_OPCOES, OQUE_OPCOES_ALIMENTO } from "../../data/wizardData";
 import { pickFile } from "../../hooks/useFilePicker";
 import { toast } from "../../ui/Toast";
 import Svg from "../../ui/Svg";
@@ -10,6 +10,8 @@ import Svg from "../../ui/Svg";
 export default function StepFrente() {
   const f = useStudioStore((s) => s.frente);
   const patch = useStudioStore((s) => s.patch);
+  const produto = useStudioStore((s) => s.produto);
+  const opcoes = produto === "alimento" ? OQUE_OPCOES_ALIMENTO : OQUE_OPCOES;
 
   return (
     <div className="screen">
@@ -85,7 +87,7 @@ export default function StepFrente() {
           <label>O que é</label>
           <select className="ipt" value={f.oque} onChange={(e) => patch("frente", { oque: e.target.value })}>
             <option value="">Selecione...</option>
-            {OQUE_OPCOES.map((o) => (
+            {opcoes.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
