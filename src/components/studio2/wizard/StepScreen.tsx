@@ -14,18 +14,23 @@ import StepVariacoes from "./steps/StepVariacoes";
 import StepMaterial from "./steps/StepMaterial";
 import StepAcabamentos from "./steps/StepAcabamentos";
 import StepExportar from "./steps/StepExportar";
+import StepAlimento from "../alimento/StepAlimento";
+import StepNutricional from "../alimento/StepNutricional";
+import { useStudioStore } from "../store/useStudioStore";
 
 // Roteador de telas do wizard.
 export default function StepScreen({ stepId }: { stepId: StepId }) {
+  const produto = useStudioStore((s) => s.produto);
+  const alimento = produto === "alimento";
   switch (stepId) {
     case "produto":
       return <StepProduto />;
     case "rotulo":
       return <StepRotulo />;
     case "verso":
-      return <StepVerso />;
+      return alimento ? <StepAlimento /> : <StepVerso />;
     case "selos":
-      return <StepSelos />;
+      return alimento ? <StepNutricional /> : <StepSelos />;
     case "frente":
       return <StepFrente />;
     case "refs":
