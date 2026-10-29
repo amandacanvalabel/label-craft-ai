@@ -3,6 +3,7 @@
 
 import type { El, ElementType, FaceConfig, RotuloState, StudioState } from "../types";
 import { MATERIAIS_RECICLAGEM } from "../data/wizardData";
+import { buildBackAlimento } from "../alimento/layout";
 
 export const MM_PER_PT = 0.352777778;
 
@@ -111,7 +112,8 @@ export function getSelosList(state: StudioState): SeloEntry[] {
     const name = mat ? mat.name : s.tipoMaterial;
     list.push({ seloKind: kind, name: `Selo Material ${name}` });
   }
-  if (s.validadeAbertura) {
+  // PAO é conceito de cosmético; alimento não usa.
+  if (s.validadeAbertura && state.produto !== "alimento") {
     list.push({ seloKind: "pao_" + s.validadeAbertura, name: `Selo PAO ${s.validadeAbertura}` });
   }
   return list;
@@ -168,6 +170,11 @@ export function buildSelosBack(ctx: Ctx) {
 
 // Gera os parágrafos do verso (compartilhado pelos templates).
 export function buildBackParagraphs(ctx: Ctx) {
+  // ALIMENTO: verso próprio (ingredientes, alérgenos, tabela nutricional...).
+  if (ctx.state.produto === "alimento") {
+    buildBackAlimento(ctx);
+    return;
+  }
   const { region: r, palette: p, fonts: f, state, add } = ctx;
   const v = state.verso;
   const nome = (state.frente.nome || v.nome || "Nome do Produto").toUpperCase();
