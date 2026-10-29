@@ -4,6 +4,7 @@ import { useStudioStore } from "../../store/useStudioStore";
 import { MATERIAIS_RECICLAGEM } from "../../data/wizardData";
 import { stepIdx } from "../../data/steps";
 import Svg from "../../ui/Svg";
+import { calcLupas, fraseAlergenos, fraseGluten, ingredientesDaReceita, LUPA_LABEL } from "../../alimento/calc";
 
 const PRODUTO_LABEL: Record<string, string> = { cosmetico: "Cosmético", bebidas: "Bebidas", suplementos: "Suplementos", alimento: "Alimento", limpeza: "Limpeza" };
 const TIPO_LABEL: Record<string, string> = { adesivo: "Adesivo", sleeve: "Sleeve", serigrafia: "Serigrafia", inmold: "In Mold" };
@@ -69,6 +70,22 @@ export default function StepResumo() {
           <div className="sum-row"><span className="sk">Faca/Molde</span>{s.rotulo.faca ? <span className="sv"><span className="pill accent">{s.rotulo.facaNome || "anexado"}</span></span> : <span className="sv empty">não anexado</span>}</div>
         </div>
 
+        {s.produto === "alimento" && s.alimento ? (
+        <div className="sum-card full">
+          <div className="sh"><Svg paths='<path d="M3 7h18M3 12h18M3 17h12"/>' sw={2.2} />Alimento (normas ANVISA)</div>
+          {EditBtn(2)}
+          <div className="sum-row"><span className="sk">Denominação</span><SV empty="—">{s.alimento.designacao || undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Conteúdo</span><SV empty="—">{s.alimento.pesoLiquido ? `${s.alimento.pesoLiquido} ${s.alimento.categoria === "liquido" ? "ml" : "g"}` : undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Porção</span><SV empty="—">{s.alimento.porcao ? `${s.alimento.porcao} ${s.alimento.categoria === "liquido" ? "ml" : "g"}${s.alimento.medidaCaseira ? ` (${s.alimento.medidaCaseira})` : ""}` : undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Ingredientes</span>{(() => { const t = s.alimento.modo === "receita" ? ingredientesDaReceita(s.alimento.receita) : s.alimento.ingredientesTexto; return t ? <span className="sv">{t.slice(0, 90)}{t.length > 90 ? "…" : ""}</span> : <span className="sv empty">em branco</span>; })()}</div>
+          <div className="sum-row"><span className="sk">Alérgenos</span><SV empty="nenhum">{fraseAlergenos(s.alimento) || undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Glúten / lactose</span><SV empty="não informado">{[fraseGluten(s.alimento), s.alimento.lactose ? "CONTÉM LACTOSE" : ""].filter(Boolean).join(" · ") || undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Lupa “ALTO EM”</span>{(() => { const l = calcLupas(s.alimento); return l.length ? <span className="sv">{l.map((k) => <span key={k} className="pill accent">{LUPA_LABEL[k]}</span>)}</span> : <span className="sv">não exigida</span>; })()}</div>
+          <div className="sum-row"><span className="sk">Fabricado por</span><span className="sv">{s.verso.fabNome || <span className="sv empty">em branco</span>}{s.verso.fabCnpj ? ` · ${s.verso.fabCnpj}` : ""}</span></div>
+          <div className="sum-row"><span className="sk">SAC</span><SV empty="em branco">{s.verso.sac || undefined}</SV></div>
+          <div className="sum-row"><span className="sk">Cód. de barras</span><SV empty="em branco">{s.verso.codBarras || undefined}</SV></div>
+        </div>
+        ) : (
         <div className="sum-card full">
           <div className="sh"><Svg paths='<path d="M3 7h18M3 12h18M3 17h12"/>' sw={2.2} />Verso (informações obrigatórias)</div>
           {EditBtn(2)}
@@ -80,6 +97,7 @@ export default function StepResumo() {
           <div className="sum-row"><span className="sk">Cód. de barras</span><SV empty="em branco">{s.verso.codBarras || undefined}</SV></div>
           <div className="sum-row"><span className="sk">Processo ANVISA</span><SV empty="em branco — será gerada versão sem este número também">{s.verso.fabAnvisa || undefined}</SV></div>
         </div>
+        )}
 
         <div className="sum-card">
           <div className="sh"><Svg paths='<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>' sw={2.2} />Selos</div>
