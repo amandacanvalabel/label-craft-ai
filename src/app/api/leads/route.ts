@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Captura de leads da landing (checklist ANVISA em troca do e-mail).
@@ -68,4 +69,34 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, url: "/checklist-anvisa-32-itens.html" });
+}
+
+// Lista de leads para a Amanda (só ADMIN logado).
+//   /api/leads            → JSON
+//   /api/leads?format=csv → baixa CSV pra abrir no Excel / importar no e-mail marketing
+export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session || session.role !== "ADMIN") {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  try {
+    await ensureTable();
+    const rows = (await prisma.$queryRawUnsafe(
+      `SELECT email, source, created_at FROM landing_leads ORDER BY created_at DESC LIMIT 5000`
+    )) as { email: string; source: string; created_at: Date }[];
+
+    if (req.nextUrl.searchParams.get("format") === "csv") {
+      const csv = ["email;origem;data", ...rows.map((r) => `${r.email};${r.source};${new Date(r.created_at).toISOString()}`)].join("\n");
+      return new NextResponse("\uFEFF" + csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="leads-canvalabel.csv"`,
+        },
+      });
+    }
+    return NextResponse.json({ total: rows.length, leads: rows });
+  } catch (err) {
+    console.error("[leads] erro ao listar", err);
+    return NextResponse.json({ error: "Erro ao listar leads" }, { status: 500 });
+  }
 }
