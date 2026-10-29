@@ -31,8 +31,8 @@ const faqs = [
     a: "O PDF sai em 300 DPI, CMYK, com sangria de 3 mm e marcas de corte. É a especificação padrão que gráficas pedem para rótulo adesivo e embalagem. Se a sua gráfica tiver alguma exigência específica, você ajusta as medidas no próprio editor.",
   },
   {
-    q: "Preciso colocar cartão para testar?",
-    a: "Não. O primeiro rótulo é grátis e o cadastro pede só nome, e-mail, CPF ou CNPJ e uma senha. Você assina um plano quando precisar de mais rótulos ou de recursos adicionais, e pode cancelar quando quiser.",
+    q: "Tem fidelidade? Posso cancelar?",
+    a: "Não tem fidelidade. Os planos são mensais (ou anuais, com desconto) e você cancela quando quiser, sem multa. O cadastro pede só nome, e-mail, CPF ou CNPJ e uma senha, e dá pra pagar com PIX, cartão em até 12x ou boleto. Se a sua produção crescer, é só trocar de plano.",
   },
 ];
 
