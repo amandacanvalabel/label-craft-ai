@@ -6525,7 +6525,7 @@ var qrcode = function() {
     <div class="sec-head reveal">
       <div class="sec-eyebrow">Planos</div>
       <h2 class="sec-title">Comece grátis, evolua quando precisar</h2>
-      <p class="sec-sub">Sem fidelidade. Cancele quando quiser. Seus projetos ficam salvos mesmo no plano gratuito.</p>
+      <p class="sec-sub">Sem fidelidade. Cancele quando quiser. Seus projetos ficam salvos na sua conta.</p>
     </div>
     <div class="pricing-grid">
       <!-- Free -->
@@ -28130,7 +28130,7 @@ const LEGAL_PAGES = {
       <p>Para usar o Serviço, você deve criar uma conta com informações verdadeiras e mantê-las atualizadas. Você é responsável por manter a confidencialidade de suas credenciais e por todas as atividades realizadas em sua conta. Avise-nos imediatamente em caso de uso não autorizado.</p>
 
       <h3>3. Planos, pagamentos e cancelamento</h3>
-      <p>O CanvaLabel oferece um plano gratuito e planos pagos (Starter e Profissional), com cobrança mensal ou anual conforme escolha no momento da contratação. Os pagamentos são processados por meio de provedores terceirizados. Você pode cancelar a assinatura a qualquer momento; o acesso aos recursos pagos permanece ativo até o fim do período já pago, sem reembolso proporcional, salvo disposição legal em contrário. Seus projetos permanecem salvos mesmo após o retorno ao plano gratuito.</p>
+      <p>O CanvaLabel oferece planos pagos (Essencial, Profissional e Negócio), com cobrança mensal ou anual conforme escolha no momento da contratação. Os pagamentos são processados por meio de provedores terceirizados. Você pode cancelar a assinatura a qualquer momento; o acesso aos recursos pagos permanece ativo até o fim do período já pago, sem reembolso proporcional, salvo disposição legal em contrário. Seus projetos permanecem salvos mesmo após o retorno ao plano gratuito.</p>
 
       <h3>4. Uso aceitável</h3>
       <p>Você concorda em não utilizar a Plataforma para fins ilícitos, enganosos ou que violem direitos de terceiros. É proibido tentar acessar áreas restritas, interferir no funcionamento do Serviço, ou utilizar a Plataforma para criar rótulos com informações falsas ou que induzam o consumidor a erro.</p>
@@ -28841,7 +28841,7 @@ initRouter();
           '<div class="cvlpv-actions" id="cvlpvActions" style="display:none">' +
             '<button type="button" class="cvlpv-cta" id="cvlpvGo">Editar rótulo com as normas da ANVISA <span aria-hidden="true">→</span></button>' +
             '<button type="button" class="cvlpv-login" id="cvlpvLogin" style="display:none">Já tenho conta — entrar</button>' +
-            '<div class="cvlpv-note" id="cvlpvNote">Crie sua conta grátis pra editar. Sem cartão.</div>' +
+            '<div class="cvlpv-note" id="cvlpvNote">Escolha um plano a partir de R$ 9,90/mês pra editar. Sem fidelidade.</div>' +
           '</div>' +
           '<button type="button" class="cvlpv-ghost" id="cvlpvBack">Editar meu pedido</button>' +
         '</div>' +
@@ -28866,7 +28866,7 @@ initRouter();
           if(noteEl) noteEl.textContent = 'Você já está logada — é só continuar.';
         } else {
           if(loginBtn) loginBtn.style.display = 'block';
-          if(noteEl) noteEl.textContent = 'Crie sua conta grátis pra editar. Sem cartão.';
+          if(noteEl) noteEl.textContent = 'Escolha um plano a partir de R$ 9,90/mês pra editar. Sem fidelidade.';
         }
       });
       setTimeout(function(){ actions.classList.add('on'); }, 30);
