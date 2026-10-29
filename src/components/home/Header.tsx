@@ -20,6 +20,7 @@ import {
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { track } from "@/lib/track";
 
 interface SessionUser {
   id: string;
@@ -355,6 +356,7 @@ const Header = () => {
               </Link>
               <a
                 href="#planos"
+                onClick={() => track("cta_click", { local: "header" })}
                 className="text-sm font-semibold text-primary-foreground gradient-primary rounded-full px-6 py-2.5 hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >
                 Começar por R$ 9,90
@@ -449,6 +451,7 @@ const Header = () => {
               </Link>
               <a
                 href="#planos"
+                onClick={() => track("cta_click", { local: "header_mobile" })}
                 className="text-sm font-semibold text-center text-primary-foreground gradient-primary rounded-xl py-2.5"
               >
                 Começar por R$ 9,90
