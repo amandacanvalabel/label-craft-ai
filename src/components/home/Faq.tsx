@@ -31,8 +31,8 @@ const faqs = [
     a: "O PDF sai em 300 DPI, CMYK, com sangria de 3 mm e marcas de corte. É a especificação padrão que gráficas pedem para rótulo adesivo e embalagem. Se a sua gráfica tiver alguma exigência específica, você ajusta as medidas no próprio editor.",
   },
   {
-    q: "Tem fidelidade? Posso cancelar?",
-    a: "Não tem fidelidade. Os planos são mensais (ou anuais, com desconto) e você cancela quando quiser, sem multa. O cadastro pede só nome, e-mail, CPF ou CNPJ e uma senha, e dá pra pagar com PIX, cartão em até 12x ou boleto. Se a sua produção crescer, é só trocar de plano.",
+    q: "Tem fidelidade? E se eu não gostar?",
+    a: "Não tem fidelidade, e você tem 7 dias de garantia: se não gostar, pede o reembolso pelo contato@canvalabel.com.br e devolvemos o valor (é o seu direito de arrependimento do Código de Defesa do Consumidor, art. 49). Os planos são mensais (ou anuais, com desconto) e você cancela quando quiser, sem multa. O cadastro pede só nome, e-mail, CPF ou CNPJ e uma senha, e dá pra pagar com PIX, cartão em até 12x ou boleto. Se a sua produção crescer, é só trocar de plano.",
   },
 ];
 
