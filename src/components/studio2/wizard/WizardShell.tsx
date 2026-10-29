@@ -7,6 +7,7 @@ import {
   groupForStep,
   stepIdx,
   stepIdxInGroup,
+  stepLabel,
 } from "../data/steps";
 import { toast } from "../ui/Toast";
 import Stepper from "./Stepper";
@@ -25,7 +26,8 @@ export default function WizardShell() {
   const groupLabel = gi >= 0 ? STEP_GROUPS[gi].label : "";
   const inGroup = stepIdxInGroup(cur);
   const groupTotal = gi >= 0 ? STEP_GROUPS[gi].stepIds.length : 1;
-  const subtitle = groupTotal > 1 ? `${STEPS[cur].label} · ${inGroup + 1}/${groupTotal}` : STEPS[cur].label;
+  const label = stepLabel(id, state.produto);
+  const subtitle = groupTotal > 1 ? `${label} · ${inGroup + 1}/${groupTotal}` : label;
   const footMeta = `Fase ${gi + 1} · ${groupLabel} · ${subtitle} · CanvaLabel`;
 
   // Etapas com navegação própria não mostram o rodapé padrão.
