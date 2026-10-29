@@ -51,6 +51,15 @@ export const STEP_GROUPS: StepGroup[] = [
   { id: "producao", label: "Produção", sub: "Material e exportação", stepIds: ["material", "acabamentos", "exportar"] },
 ];
 
+// Rótulo da etapa conforme a categoria do produto (alimento usa outros nomes).
+export function stepLabel(id: StepId, produto: string | null): string {
+  if (produto === "alimento") {
+    if (id === "verso") return "Alimento";
+    if (id === "selos") return "Nutricional";
+  }
+  return STEPS.find((s) => s.id === id)?.label || id;
+}
+
 export function stepIdx(id: StepId): number {
   return STEPS.findIndex((s) => s.id === id);
 }
