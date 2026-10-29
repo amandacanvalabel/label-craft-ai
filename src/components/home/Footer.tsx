@@ -21,7 +21,7 @@ const footerLinks = {
     { label: "Planos e preços", href: "#planos" },
   ],
   "para você": [
-    { label: "Criar conta grátis", href: "#planos" },
+    { label: "Escolher um plano", href: "#planos" },
     { label: "Entrar na plataforma", href: "/login" },
     { label: "Gerar prévia com IA", href: "/canvalabel-alimentos.html" },
     { label: "Dúvidas frequentes", href: "#faq" },
@@ -103,13 +103,13 @@ const Footer = async () => {
               Comece hoje
             </h4>
             <p className="text-sm text-white/40 mb-4">
-              Primeiro rótulo grátis, sem cartão de crédito.
+              Planos a partir de R$ 9,90/mês, sem fidelidade.
             </p>
             <a
               href="#planos"
               className="inline-flex w-full items-center justify-center gradient-primary px-5 py-3 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
             >
-              Criar meu rótulo grátis
+              Ver os planos
             </a>
           </div>
         </div>
