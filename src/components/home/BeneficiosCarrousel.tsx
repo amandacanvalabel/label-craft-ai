@@ -216,7 +216,7 @@ const BeneficiosCarrousel = () => {
                     href="#planos"
                     className="text-xs font-semibold text-primary hover:underline"
                   >
-                    Testar grátis →
+                    Ver planos →
                   </a>
                 </div>
               </motion.div>
