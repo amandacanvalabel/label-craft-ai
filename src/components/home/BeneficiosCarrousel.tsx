@@ -15,68 +15,78 @@ import {
   HiOutlineChevronRight,
 } from "react-icons/hi2";
 
+// Cada benefício responde a uma dor: `ganho` é o que a pessoa deixa de sofrer,
+// `description` explica como a ferramenta entrega isso.
 const benefits = [
   {
     icon: HiOutlineSparkles,
-    title: "Rótulos com IA",
+    title: "Layout pronto com IA",
+    ganho: "Chega de começar do zero",
     description:
-      "Descreva seu produto e a IA monta o layout, os textos e a estrutura do rótulo em segundos — para alimentos e cosméticos.",
+      "Descreva o produto em uma frase e receba o rótulo montado: layout, textos e estrutura, para alimentos ou cosméticos. Você só ajusta o que quiser.",
     color: "from-blue-500 to-cyan-400",
     bg: "bg-blue-50",
   },
   {
     icon: HiOutlineShieldCheck,
-    title: "Conformidade ANVISA",
+    title: "Revisor de normas da ANVISA",
+    ganho: "Chega de descobrir o erro depois de imprimir",
     description:
-      "Validação automática das normas: IN 75/2020, RDC 429/2020 e RDC 26/2015. O revisor checa cada item obrigatório antes de exportar.",
+      "32 regras da IN 75/2020, RDC 429/2020 e RDC 26/2015 conferidas antes de exportar: tamanho de letra, campos obrigatórios, advertências. Ele aponta exatamente o que falta.",
     color: "from-emerald-500 to-teal-400",
     bg: "bg-emerald-50",
   },
   {
     icon: HiOutlineTableCells,
-    title: "Tabela nutricional automática",
+    title: "Tabela nutricional em segundos",
+    ganho: "Chega de planilha e arredondamento na mão",
     description:
-      "Calcule a tabela nutricional pela receita ou pelos valores, no padrão do Anexo IX da IN 75/2020. Mais de 1.000 alimentos cadastrados (TACO/USDA).",
+      "Informe a receita ou os valores e a tabela sai no padrão do Anexo IX, com porção, %VD e arredondamento certos. Base TACO/USDA com mais de 1.000 alimentos.",
     color: "from-amber-500 to-orange-400",
     bg: "bg-amber-50",
   },
   {
     icon: HiOutlineExclamationTriangle,
-    title: "Selos obrigatórios e lupa",
+    title: "Lupa “ALTO EM” e alérgenos",
+    ganho: "Chega de dúvida sobre quando a lupa entra",
     description:
-      "Gera os selos frontais “ALTO EM” (lupa preta), as advertências de alérgenos e “contém glúten” automaticamente, conforme RDC 429/2020 e RDC 26/2015.",
+      "A ferramenta decide pelos seus números se o produto é alto em açúcar, sódio ou gordura saturada, e gera a lupa frontal, os alérgenos e o “contém glúten” no formato exigido.",
     color: "from-rose-500 to-pink-400",
     bg: "bg-rose-50",
   },
   {
     icon: HiOutlinePaintBrush,
-    title: "Editor profissional + modelos",
+    title: "Editor visual com modelos",
+    ganho: "Chega de depender de designer",
     description:
-      "Editor visual completo (tipo Canva) com camadas, tipografia e modelos prontos para alimentos, bebidas e cosméticos.",
+      "Editor com camadas, tipografia e cores, no estilo que você já conhece. Modelos prontos para alimentos, bebidas e cosméticos, só trocar texto e imagem.",
     color: "from-violet-500 to-purple-400",
     bg: "bg-violet-50",
   },
   {
     icon: HiOutlineArrowDownTray,
-    title: "Pronto para a gráfica",
+    title: "PDF que a gráfica aceita",
+    ganho: "Chega de arquivo voltando",
     description:
-      "Exporte em alta resolução (300 DPI), com sangria e marcas de corte — o PDF técnico sai pronto para impressão.",
+      "Exportação em 300 DPI, CMYK, com sangria de 3 mm e marcas de corte. O arquivo técnico sai pronto para imprimir, sem retrabalho.",
     color: "from-teal-500 to-emerald-400",
     bg: "bg-teal-50",
   },
   {
     icon: HiOutlineCube,
-    title: "Preview realista",
+    title: "Prévia na embalagem",
+    ganho: "Chega de surpresa no produto final",
     description:
-      "Veja o rótulo aplicado no frasco ou na embalagem antes de imprimir, com simulação de acabamentos.",
+      "Veja o rótulo aplicado no frasco, pote ou embalagem antes de mandar imprimir e corrija proporção e leitura com antecedência.",
     color: "from-sky-500 to-blue-400",
     bg: "bg-sky-50",
   },
   {
     icon: HiOutlineBolt,
-    title: "Alimentos e cosméticos",
+    title: "Alimentos e cosméticos juntos",
+    ganho: "Chega de duas ferramentas",
     description:
-      "Uma plataforma para os dois mundos: rotulagem de alimentos (tabela nutricional e lupa) e de cosméticos, sempre no padrão da ANVISA.",
+      "Tabela nutricional e lupa para alimentos; INCI, modo de uso e advertências para cosméticos. Cada categoria pede só os campos que a norma exige.",
     color: "from-indigo-500 to-blue-400",
     bg: "bg-indigo-50",
   },
@@ -121,17 +131,16 @@ const BeneficiosCarrousel = () => {
         >
           <div>
             <span className="text-sm font-semibold text-primary uppercase tracking-wider">
-              Benefícios
+              O que muda no seu dia a dia
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              Tudo para rotular{" "}
-              <span className="gradient-text">alimentos e cosméticos</span>{" "}
-              conforme a ANVISA
+              Tudo o que você fazia na mão,{" "}
+              <span className="gradient-text">resolvido em um só lugar</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-xl">
-              Tabela nutricional automática, selos obrigatórios e a lupa “ALTO
-              EM”, alérgenos e exportação pronta para a gráfica — tudo em
-              conformidade com a IN 75/2020 e a RDC 429/2020.
+              Layout, tabela nutricional, lupa “ALTO EM”, alérgenos, revisão
+              das normas e PDF pra gráfica. Arraste pro lado e veja cada
+              problema que deixa de existir.
             </p>
           </div>
 
@@ -193,16 +202,22 @@ const BeneficiosCarrousel = () => {
                     </span>
                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-1.5">
+                  {benefit.ganho}
+                </p>
+                <h3 className="text-lg font-bold text-foreground mb-2 leading-snug">
                   {benefit.title}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed flex-1">
                   {benefit.description}
                 </p>
                 <div className="mt-5 pt-4 border-t border-border/40">
-                  <span className="text-xs font-semibold text-primary group-hover:underline cursor-pointer">
-                    Saiba mais →
-                  </span>
+                  <a
+                    href="#planos"
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Testar grátis →
+                  </a>
                 </div>
               </motion.div>
             ))}
