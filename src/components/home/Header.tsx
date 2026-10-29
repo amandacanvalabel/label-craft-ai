@@ -37,7 +37,7 @@ interface PlanInfo {
 
 const navLinks = [
   { label: "Benefícios", href: "#beneficios" },
-  { label: "Demonstração", href: "#demonstracao" },
+  { label: "Como funciona", href: "#demonstracao" },
   { label: "Planos", href: "#planos" },
   { label: "Avaliações", href: "#avaliacoes" },
 ];
@@ -357,7 +357,7 @@ const Header = () => {
                 href="#planos"
                 className="text-sm font-semibold text-primary-foreground gradient-primary rounded-full px-6 py-2.5 hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >
-                Assinar Plano
+                Começar grátis
               </a>
             </>
           )}
@@ -451,7 +451,7 @@ const Header = () => {
                 href="#planos"
                 className="text-sm font-semibold text-center text-primary-foreground gradient-primary rounded-xl py-2.5"
               >
-                Assinar Plano
+                Começar grátis
               </a>
             </div>
           )}
