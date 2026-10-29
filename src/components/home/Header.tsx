@@ -357,7 +357,7 @@ const Header = () => {
                 href="#planos"
                 className="text-sm font-semibold text-primary-foreground gradient-primary rounded-full px-6 py-2.5 hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
               >
-                Começar grátis
+                Começar por R$ 9,90
               </a>
             </>
           )}
@@ -451,7 +451,7 @@ const Header = () => {
                 href="#planos"
                 className="text-sm font-semibold text-center text-primary-foreground gradient-primary rounded-xl py-2.5"
               >
-                Começar grátis
+                Começar por R$ 9,90
               </a>
             </div>
           )}
