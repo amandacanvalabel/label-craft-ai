@@ -100,7 +100,7 @@ const Avaliacoes = () => {
               Avaliações
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              Quem já passou pela dor{" "}
+              Quem já passou pelo problema{" "}
               <span className="gradient-text">conta como resolveu</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-xl">
