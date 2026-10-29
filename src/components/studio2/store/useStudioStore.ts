@@ -5,6 +5,7 @@ import type { AnalysisResult, EditorState, El, ElementType, StudioState } from "
 import { STEPS, type StepId, stepIdx } from "../data/steps";
 import { generateLabel, generateVariations, type GenerateOptions } from "../generate/engine";
 import { SHAPE_LIB } from "../data/svgLibs";
+import { defaultAlimento, buildNutriTable, calcLupas } from "../alimento/calc";
 
 // ---- Estado inicial (porte de `const state` + STATE_DEFAULTS) ----
 export function createInitialState(): StudioState {
@@ -57,6 +58,7 @@ export function createInitialState(): StudioState {
       outros: [],
     },
     frente: { logo: null, logoNome: null, nome: "", oque: "", ativos: "", volume: "" },
+    alimento: defaultAlimento(),
     refs: [],
     ai: {
       prompt: "",
@@ -159,7 +161,7 @@ function elDefaultName(type: ElementType, els: El[]): string {
   const map: Record<string, string> = {
     text: "Texto", textCurve: "Texto em curva", rect: "Retângulo", ellipse: "Elipse",
     line: "Linha", image: "Imagem", shape: "Forma", selo: "Selo",
-    barcode: "Código de barras", qr: "QR Code",
+    barcode: "Código de barras", qr: "QR Code", nutri: "Tabela nutricional", lupa: "Lupa ALTO EM",
   };
   let n = 1;
   while (els.some((e) => e.name === (map[type] || "Elemento") + " " + n)) n++;
@@ -218,6 +220,8 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
   loadState: (s, meta) =>
     set({
       ...s,
+      // Projetos antigos não têm o bloco de alimento: completa com padrão.
+      alimento: { ...defaultAlimento(), ...(s.alimento || {}) },
       cur: 0,
       dirty: false,
       edReady: editorHasElements(s),
@@ -371,6 +375,9 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
       shape: { x: cx - 15, y: cy - 15, w: 30, h: 30, shapeKind: (extra && extra.shapeKind) || "heart", fill: "#1a1a1a", stroke: "#00000000", sw: 0 },
       barcode: { x: cx - 18, y: cy - 8, w: 36, h: 16, code: "7890000000000", fg: "#000000" },
       qr: { x: cx - 10, y: cy - 10, w: 20, h: 20, seed: "canvalabel", fg: "#000000" },
+      // Alimentos: tabela recalculada a partir dos dados do passo "Alimento".
+      nutri: { x: cx - 20, y: cy - 24, w: 40, h: 48, fg: "#000000", nutri: s.alimento ? buildNutriTable(s.alimento) : undefined },
+      lupa: { x: cx - 15, y: cy - 6, w: 30, h: 12, lupas: s.alimento ? calcLupas(s.alimento) : ["acucar"] },
     };
     const el: El = { ...base, ...(defaults[type] || {}), ...(extra || {}) };
     if (type === "shape" && el.shapeKind && SHAPE_LIB[el.shapeKind]) el.name = SHAPE_LIB[el.shapeKind].name;
@@ -523,6 +530,16 @@ export function validateStep(id: StepId, s: StudioState): { ok: boolean; msg?: s
     }
     return { ok: true };
   }
+  if (id === "verso" && s.produto === "alimento") {
+    const a = s.alimento;
+    if (!a || !a.designacao.trim()) return { ok: false, msg: "Informe a denominação de venda do alimento" };
+    if (a.modo === "receita" ? a.receita.length === 0 : !a.ingredientesTexto.trim())
+      return { ok: false, msg: a.modo === "receita" ? "Adicione os ingredientes da receita" : "Informe a lista de ingredientes" };
+    if (!(a.pesoLiquido > 0)) return { ok: false, msg: "Informe o peso ou volume líquido" };
+    if (!(a.porcao > 0)) return { ok: false, msg: "Informe o tamanho da porção" };
+    if (!a.gluten) return { ok: false, msg: "Indique se o produto contém glúten" };
+    return { ok: true };
+  }
   if (id === "frente") {
     if (!s.frente.nome.trim()) return { ok: false, msg: "Informe o nome do produto" };
     return { ok: true };
@@ -540,6 +557,7 @@ export function serializeStudioState(s: StudioState): StudioState {
     verso: s.verso,
     selos: s.selos,
     frente: s.frente,
+    alimento: s.alimento,
     refs: s.refs,
     ai: s.ai,
     editor: { ...s.editor, selSet: s.editor.selSet },
