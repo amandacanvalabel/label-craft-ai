@@ -17,6 +17,7 @@ import {
   HiOutlineCheckCircle,
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/track";
 
 type BillingPeriod = "monthly" | "annual";
 type PaymentMethod = "pix" | "card" | "boleto" | null;
@@ -223,6 +224,7 @@ const Planos = () => {
           const data = await res.json();
           if (data.status === "CONFIRMED" && data.authenticated) {
             if (pollingRef.current) clearInterval(pollingRef.current);
+            track("assinatura_confirmada", { plano: selectedPlan?.name, metodo: paymentMethod ?? undefined });
             setStep("success");
             setTimeout(() => router.push(destinoPosCadastro("/dashboard")), 2500);
           }
@@ -305,9 +307,11 @@ const Planos = () => {
 
       // Cartão aprovado direto
       if (data.authenticated && data.redirectTo) {
+        track("assinatura_confirmada", { plano: selectedPlan?.name, metodo: paymentMethod ?? undefined });
         setStep("success");
         setTimeout(() => router.push(destinoPosCadastro(data.redirectTo)), 2500);
       } else {
+        track("pagamento_gerado", { plano: selectedPlan?.name, metodo: paymentMethod ?? undefined });
         setStep("payment");
       }
     } catch (err: unknown) {
@@ -517,6 +521,7 @@ const Planos = () => {
                     {/* CTA */}
                     <button
                       onClick={() => {
+                        track("plano_selecionado", { plano: plan.name, cobranca: billing, preco: getPrice(plan) });
                         setSelectedPlan(plan);
                         setPaymentMethod(null);
                         // Plano grátis pula direto para o cadastro (sem método de pagamento).
@@ -560,10 +565,10 @@ const Planos = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             {[
+              "7 dias de garantia: não gostou, devolvemos",
               "Sem fidelidade: cancele quando quiser",
               "PIX, cartão em até 12x ou boleto",
               "Troque de plano a qualquer momento",
-              "Alimentos e cosméticos na mesma plataforma",
             ].map((item) => (
               <span key={item} className="inline-flex items-center gap-2">
                 <HiOutlineCheck className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -816,7 +821,7 @@ const Planos = () => {
                       {paymentMethods.map((method) => (
                         <button
                           key={method.id}
-                          onClick={() => setPaymentMethod(method.id)}
+                          onClick={() => { setPaymentMethod(method.id); track("metodo_pagamento", { metodo: method.id ?? undefined, plano: selectedPlan?.name }); }}
                           className={cn(
                             "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left",
                             paymentMethod === method.id
