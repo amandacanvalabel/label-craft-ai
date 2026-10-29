@@ -61,7 +61,7 @@ const HeroHome = () => {
             href="#planos"
             className="group relative inline-flex items-center gap-2 gradient-primary text-white font-semibold text-base rounded-full px-8 py-4 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 hover:-translate-y-0.5"
           >
-            Criar meu primeiro rótulo grátis
+            Criar meu rótulo a partir de R$ 9,90
             <HiOutlineArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
           <a
