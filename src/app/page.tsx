@@ -2,9 +2,10 @@
 // Homepage do CanvaLabel — landing de CAPTURA.
 //
 // Narrativa da página (de cima pra baixo):
-//   Hero (dor → promessa) → Dores resolvidas → Benefícios → Como funciona →
-//   Galeria de rótulos reais → Planos (a captura: cadastro grátis/pago) →
-//   Avaliações → FAQ (objeções) → CTA final → Rodapé.
+//   Hero (dor → promessa) → Dores resolvidas → Benefícios → Calculadora da
+//   lupa (prova interativa) → Como funciona → Galeria → Planos (a captura) →
+//   Avaliações → FAQ (objeções) → Checklist (lead p/ quem não assina hoje) →
+//   CTA final → Rodapé. Barra fixa de CTA no celular.
 //
 // A versão "IA logo de cara" (LandingV2) não converteu bem; a ferramenta de IA
 // continua acessível como alternativa discreta no CTA final.
@@ -13,11 +14,14 @@ import Header from "@/components/home/Header";
 import HeroHome from "@/components/home/HeroHome";
 import Dores from "@/components/home/Dores";
 import BeneficiosCarrousel from "@/components/home/BeneficiosCarrousel";
+import LupaCalculadora from "@/components/home/LupaCalculadora";
 import DemonstrationCentral from "@/components/home/DemonstrationCentral";
 import GaleriaExemplos from "@/components/home/GaleriaExemplos";
 import Planos from "@/components/home/Planos";
 import Avaliacoes from "@/components/home/Avaliacoes";
 import Faq from "@/components/home/Faq";
+import ChecklistLead from "@/components/home/ChecklistLead";
+import StickyCta from "@/components/home/StickyCta";
 import CtaFinal from "@/components/home/CtaFinal";
 import Footer from "@/components/home/Footer";
 import JsonLd from "@/components/home/JsonLd";
@@ -58,13 +62,16 @@ const HomePage = async () => {
       <HeroHome />
       <Dores />
       <BeneficiosCarrousel />
+      <LupaCalculadora />
       <DemonstrationCentral />
       <GaleriaExemplos images={galleryImages} />
       <Planos />
       <Avaliacoes />
       <Faq />
+      <ChecklistLead />
       <CtaFinal />
       <Footer />
+      <StickyCta />
     </>
   );
 };
