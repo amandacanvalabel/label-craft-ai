@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { HiOutlineSparkles, HiOutlinePlay } from "react-icons/hi2";
+import { HiOutlineSparkles, HiOutlineArrowRight, HiOutlineShieldCheck } from "react-icons/hi2";
 
 const HeroHome = () => {
   return (
@@ -20,8 +20,8 @@ const HeroHome = () => {
           transition={{ duration: 0.5 }}
         >
           <span className="inline-flex items-center gap-2 gradient-primary-soft text-primary text-sm font-semibold px-5 py-2 rounded-full border border-primary/10">
-            <HiOutlineSparkles className="w-4 h-4" />
-            Rótulos ANVISA para alimentos e cosméticos, com IA
+            <HiOutlineShieldCheck className="w-4 h-4" />
+            Para quem produz alimentos e cosméticos e precisa vender com segurança
           </span>
         </motion.div>
 
@@ -32,9 +32,8 @@ const HeroHome = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Crie rótulos de{" "}
-          <span className="gradient-text">alimentos e cosméticos</span> em
-          conformidade com a ANVISA
+          Seu rótulo dentro da norma da ANVISA,{" "}
+          <span className="gradient-text">sem designer e sem medo de errar</span>
         </motion.h1>
 
         {/* Subtitle */}
@@ -44,10 +43,11 @@ const HeroHome = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          Gere a <b className="text-foreground/80 font-semibold">tabela nutricional</b>, os
-          selos obrigatórios (lupa de advertência e alérgenos) e o layout do seu
-          rótulo com IA. Mais de <b className="text-foreground/80 font-semibold">1.000 alimentos
-          cadastrados</b> e exportação em alta resolução, pronta para a gráfica.
+          Você descreve o produto. O CanvaLabel monta o layout, calcula a{" "}
+          <b className="text-foreground/80 font-semibold">tabela nutricional</b>, aplica a lupa
+          &ldquo;ALTO EM&rdquo; e os alérgenos, e{" "}
+          <b className="text-foreground/80 font-semibold">confere cada regra</b> antes de gerar o PDF
+          pra gráfica. O que levava semanas e custava milhares, leva minutos.
         </motion.p>
 
         {/* CTAs */}
@@ -61,13 +61,15 @@ const HeroHome = () => {
             href="#planos"
             className="group relative inline-flex items-center gap-2 gradient-primary text-white font-semibold text-base rounded-full px-8 py-4 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 hover:-translate-y-0.5"
           >
-            Começar Agora — Grátis
-            <HiOutlineSparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            Criar meu primeiro rótulo grátis
+            <HiOutlineArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
-          <button className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground font-medium text-base px-6 py-4 rounded-full border border-border hover:border-foreground/20 transition-all duration-300 neo-card">
-            <HiOutlinePlay className="w-5 h-5" />
-            Ver Demonstração
-          </button>
+          <a
+            href="#demonstracao"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground font-medium text-base px-6 py-4 rounded-full border border-border hover:border-foreground/20 transition-all duration-300 neo-card"
+          >
+            Ver como funciona
+          </a>
         </motion.div>
 
         {/* Stats */}
@@ -78,9 +80,9 @@ const HeroHome = () => {
           transition={{ duration: 0.7, delay: 0.5 }}
         >
           {[
-            { value: "+1.000", label: "Alimentos na base nutricional" },
-            { value: "ANVISA", label: "IN 75/2020 · RDC 429/2020 · RDC 26/2015" },
-            { value: "2 min", label: "Do briefing ao PDF pronto" },
+            { value: "R$ 3.000+", label: "que você deixa de pagar a um designer, por rótulo" },
+            { value: "32 regras", label: "da ANVISA conferidas antes de exportar" },
+            { value: "2 min", label: "do briefing ao PDF pronto pra gráfica" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="text-3xl sm:text-4xl font-extrabold gradient-text">
