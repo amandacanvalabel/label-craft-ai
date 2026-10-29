@@ -112,7 +112,7 @@ const Dores = () => {
                   </span>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-red-500/80">
-                      A dor
+                      O problema
                     </p>
                     <h3 className="mt-1 text-lg font-bold leading-snug">{item.dor}</h3>
                   </div>
@@ -149,7 +149,7 @@ const Dores = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          Resolvemos cada uma dessas dores em um só lugar.{" "}
+          Resolvemos cada um desses problemas em um só lugar.{" "}
           <a href="#beneficios" className="font-semibold text-primary hover:underline">
             Veja como ↓
           </a>
