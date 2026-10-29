@@ -4,7 +4,7 @@
 // Narrativa da página (de cima pra baixo):
 //   Hero (dor → promessa) → Dores resolvidas → Benefícios → Como funciona →
 //   Galeria de rótulos reais → Planos (a captura: cadastro grátis/pago) →
-//   Avaliações → CTA final → Rodapé.
+//   Avaliações → FAQ (objeções) → CTA final → Rodapé.
 //
 // A versão "IA logo de cara" (LandingV2) não converteu bem; a ferramenta de IA
 // continua acessível como alternativa discreta no CTA final.
@@ -17,6 +17,7 @@ import DemonstrationCentral from "@/components/home/DemonstrationCentral";
 import GaleriaExemplos from "@/components/home/GaleriaExemplos";
 import Planos from "@/components/home/Planos";
 import Avaliacoes from "@/components/home/Avaliacoes";
+import Faq from "@/components/home/Faq";
 import CtaFinal from "@/components/home/CtaFinal";
 import Footer from "@/components/home/Footer";
 import JsonLd from "@/components/home/JsonLd";
@@ -61,6 +62,7 @@ const HomePage = async () => {
       <GaleriaExemplos images={galleryImages} />
       <Planos />
       <Avaliacoes />
+      <Faq />
       <CtaFinal />
       <Footer />
     </>
