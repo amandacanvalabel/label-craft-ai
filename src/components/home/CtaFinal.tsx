@@ -61,7 +61,7 @@ const CtaFinal = () => {
             </div>
 
             <p className="mt-6 text-sm text-white/70">
-              Planos a partir de R$ 49/mês · Cancele quando quiser
+              Plano grátis com 2 rótulos · Pagos a partir de R$ 13/mês · Cancele quando quiser
             </p>
           </div>
         </motion.div>
