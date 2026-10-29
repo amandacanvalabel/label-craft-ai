@@ -2,6 +2,7 @@
 // Funções puras sobre o StudioState.
 
 import type { El, StudioState } from "../types";
+import { runAlimentoChecks } from "../alimento/checks";
 
 export type IssueLevel = "crit" | "warn" | "info";
 export type IssueAction =
@@ -43,6 +44,8 @@ function countSmallText(s: StudioState, minPt: number) {
 }
 
 export function runAnvisaChecks(s: StudioState): Issue[] {
+  // Cada categoria tem suas normas: alimento usa o revisor próprio.
+  if (s.produto === "alimento") return runAlimentoChecks(s);
   const sv = s.verso, sf = s.frente as typeof s.frente & { marca?: string }, ss = s.selos;
   const allText = allTextOf(s);
   const issues: Issue[] = [];
