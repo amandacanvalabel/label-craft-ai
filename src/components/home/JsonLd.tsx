@@ -38,9 +38,9 @@ const schema = {
         "Crie rótulos de alimentos e cosméticos de acordo com a ANVISA. Gere a tabela nutricional automática (IN 75/2020), a lupa e os selos “ALTO EM” (RDC 429/2020), as advertências de alérgenos (RDC 26/2015) e exporte em PDF pronto para a gráfica. Mais de 1.000 alimentos na base nutricional.",
       offers: {
         "@type": "Offer",
-        price: "0",
+        price: "9.90",
         priceCurrency: "BRL",
-        description: "Plano gratuito para criar seus primeiros rótulos.",
+        description: "Planos mensais a partir de R$ 9,90, com IA, revisor ANVISA, tabela nutricional e PDF para gráfica.",
       },
       featureList: [
         "Rótulos com inteligência artificial",
@@ -90,10 +90,10 @@ const schema = {
         },
         {
           "@type": "Question",
-          name: "Consigo começar de graça?",
+          name: "Quanto custa o CanvaLabel?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Sim. Existe um plano gratuito para você criar seus primeiros rótulos e conhecer a plataforma. Para exportar em alta resolução para a gráfica, basta escolher um dos planos pagos.",
+            text: "Os planos começam em R$ 9,90 por mês, sem fidelidade, e todos incluem geração por IA, revisor com as regras da ANVISA, tabela nutricional automática e exportação em PDF para a gráfica. O que muda entre os planos é a quantidade de rótulos e de créditos de IA por mês.",
           },
         },
       ],
