@@ -12,7 +12,9 @@ export type ElementType =
   | "qr"
   | "selo"
   | "shape"
-  | "textCurve";
+  | "textCurve"
+  | "nutri" // tabela de informação nutricional (alimentos, IN 75/2020)
+  | "lupa"; // rotulagem nutricional frontal "ALTO EM" (RDC 429/2020)
 
 // Elemento do canvas. Campos comuns + props específicas por tipo (opcionais).
 // Mantemos um shape único e permissivo para espelhar o objeto dinâmico do
@@ -71,6 +73,76 @@ export interface El {
 
   // selo
   seloKind?: string;
+
+  // nutri — snapshot da tabela (o motor recalcula a partir de state.alimento)
+  nutri?: NutriTableData;
+
+  // lupa — nutrientes em excesso ("ACUCAR" | "GORDURA" | "SODIO")
+  lupas?: LupaKind[];
+}
+
+// ---------- Alimentos (IN 75/2020 · RDC 429/2020 · RDC 26/2015) ----------
+
+export type LupaKind = "acucar" | "gordura" | "sodio";
+
+export interface NutriV100 {
+  energia: number; // kcal
+  carbo: number;
+  acucarT: number;
+  acucarA: number;
+  proteina: number;
+  gordura: number;
+  gordSat: number;
+  gordTrans: number;
+  fibra: number;
+  sodio: number; // mg
+}
+
+export interface NutriRow {
+  label: string;
+  indent?: boolean;
+  v100: string;
+  porcao: string;
+  vd: string; // "" quando não há VD (açúcares totais, trans)
+}
+
+export interface NutriTableData {
+  porcaoLabel: string; // "Porção de 30 g (1 fatia)"
+  porcoesLabel: string; // "Porções por embalagem: cerca de 10"
+  unidade: "g" | "ml";
+  porcao: number;
+  rows: NutriRow[];
+}
+
+export interface IngredienteReceita {
+  id: string; // id na base nutricional
+  nome: string;
+  qt: number; // g ou ml usados na receita
+}
+
+export interface AlimentoState {
+  categoria: "solido" | "liquido";
+  designacao: string; // denominação de venda ("Molho de tomate")
+  pesoLiquido: number; // g ou ml
+  porcao: number; // g ou ml
+  medidaCaseira: string; // "1 colher de sopa"
+  modo: "receita" | "direto";
+  receita: IngredienteReceita[];
+  rendimento: number; // g/ml que a receita rende (para normalizar por 100)
+  ingredientesTexto: string; // lista final impressa (modo direto, ou editada)
+  v100Manual: NutriV100; // valores por 100 g/ml quando modo = direto
+  alergenos: string[]; // ids: leite, ovo, trigo, soja...
+  podeConter: string[];
+  gluten: "contem" | "nao" | null;
+  lactose: boolean;
+  declaracoes: string[]; // "Colorido artificialmente" etc.
+  conservacao: string;
+  conservacaoAberto: string;
+  preparo: string;
+  lote: string;
+  validade: string;
+  registroMs: string; // "Dispensado de registro (RDC 27/2010)" / nº
+  pais: string;
 }
 
 export type FaceId = string;
@@ -238,6 +310,9 @@ export interface StudioState {
   verso: VersoState;
   selos: SelosState;
   frente: FrenteState;
+  // Dados específicos de ALIMENTO (usado quando produto === "alimento").
+  // Opcional porque projetos antigos (cosméticos) não têm o campo.
+  alimento?: AlimentoState;
   refs: string[];
   ai: AiState;
   editor: EditorState;
