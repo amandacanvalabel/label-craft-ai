@@ -15,7 +15,7 @@ const steps = [
     icon: HiOutlineSparkles,
     title: "Descreva seu produto",
     description:
-      "Informe o nicho, nome do produto e ingredientes. Nossa IA faz o resto.",
+      "Nome, categoria e ingredientes, do jeito que você explicaria pra um amigo. Sem briefing, sem arquivo de referência: a IA monta o primeiro layout a partir daí.",
     visual: {
       label: "Molho de Tomate Artesanal",
       elements: ["Nome do produto", "Ingredientes", "Peso líquido: 350g"],
@@ -25,9 +25,9 @@ const steps = [
   {
     id: 2,
     icon: HiOutlinePaintBrush,
-    title: "Personalize o design",
+    title: "Ajuste do seu jeito",
     description:
-      "Use o editor visual para ajustar cores, fontes, imagens e layout do rótulo.",
+      "Troque cores, fontes e imagens no editor visual. A tabela nutricional, a lupa e os alérgenos já entram calculados e no formato certo; você só posiciona.",
     visual: {
       label: "Editor Visual",
       elements: ["Camadas", "Tipografia", "Paleta de cores"],
@@ -37,9 +37,9 @@ const steps = [
   {
     id: 3,
     icon: HiOutlineShieldCheck,
-    title: "Validação ANVISA",
+    title: "Revisão das normas da ANVISA",
     description:
-      "O sistema verifica automaticamente a conformidade com todas as normas obrigatórias.",
+      "Antes de exportar, o revisor confere 32 regras e lista o que está faltando ou fora do tamanho. Você corrige ali mesmo, não depois do lote impresso.",
     visual: {
       label: "Conformidade",
       elements: ["Tabela nutricional ✓", "Alergênicos ✓", "Rotulagem frontal ✓"],
@@ -49,9 +49,9 @@ const steps = [
   {
     id: 4,
     icon: HiOutlineArrowDownTray,
-    title: "Exporte e imprima",
+    title: "Exporte e mande pra gráfica",
     description:
-      "Baixe em alta resolução com perfil CMYK, pronto para enviar à gráfica.",
+      "PDF em 300 DPI, CMYK, com sangria e marcas de corte. É o arquivo que a gráfica pede, então ele não volta pedindo ajuste.",
     visual: {
       label: "Exportação",
       elements: ["PDF 300 DPI", "CMYK pronto", "Sangria inclusa"],
@@ -81,12 +81,12 @@ const DemonstrationCentral = () => {
             Como funciona
           </span>
           <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-            Do zero ao rótulo perfeito em{" "}
+            Da ideia ao arquivo na gráfica em{" "}
             <span className="gradient-text">4 passos</span>
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Um fluxo simplificado para que qualquer pessoa crie rótulos
-            profissionais sem experiência em design.
+            O caminho que hoje leva semanas entre você, o designer e a gráfica,
+            resolvido em uma sessão. Clique em cada passo pra ver.
           </p>
         </motion.div>
 
