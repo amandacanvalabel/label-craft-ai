@@ -100,12 +100,12 @@ const Avaliacoes = () => {
               Avaliações
             </span>
             <h2 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-              O que nossos clientes{" "}
-              <span className="gradient-text">dizem</span>
+              Quem já passou pela dor{" "}
+              <span className="gradient-text">conta como resolveu</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-xl">
-              Milhares de empreendedores já confiam no CanvaLabel para criar seus
-              rótulos profissionais.
+              Produtores de alimentos e cosméticos que trocaram o medo de errar
+              na norma por um rótulo pronto em minutos.
             </p>
           </div>
 
