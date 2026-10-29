@@ -15,6 +15,7 @@ import {
 } from "./primitives";
 import { makeVector, mergeVectors, parsePrompt, vectorDistance, type StyleVec } from "./style";
 import { applyColorsToPalette, paletteToRoles, visualAnalysisToVector } from "./analyze";
+import { buildLupaFront } from "../alimento/layout";
 
 export interface GenerateOptions {
   templateId?: string;
@@ -60,6 +61,8 @@ export function generateLabel(state: StudioState, opts: GenerateOptions = {}): P
     };
     if (options.front) {
       tpl.layoutFront(ctx);
+      // ALIMENTO: lupa "ALTO EM" na metade superior da frente (RDC 429/2020).
+      if (state.produto === "alimento") buildLupaFront(ctx);
       // Híbrido: se a IA gerou a "cara" do rótulo, ela substitui o fundo sólido
       // da frente. Fica no fundo (mesma posição do "Fundo da frente"); os textos
       // e a tabela do template continuam por cima e editáveis.
