@@ -1,11 +1,12 @@
 "use client";
 
 import { useStudioStore } from "../store/useStudioStore";
-import type { El, SelosState } from "../types";
+import type { El, LupaLayoutOpt, SelosState } from "../types";
 import { MATERIAIS_RECICLAGEM } from "../data/wizardData";
 import { NutriSvg, LupaSvg } from "../editor/svg";
 import Svg from "../ui/Svg";
 import { LUPA_LABEL, LUPA_LIMITES, buildNutriTable, calcLupas, defaultAlimento, fmt, fraseAlergenos, fraseGluten, v100Atual } from "./calc";
+import { lupaAspect, lupaSizeMm } from "./lupaArt";
 
 // Ocupa o slot "Selos" quando produto === "alimento": mostra a tabela
 // nutricional e a lupa calculadas (pré-visualização fiel ao que vai pro
@@ -25,6 +26,7 @@ function Chip({ id, label }: { id: "vegano" | "materialReciclavel" | "jogueLixo"
 export default function StepNutricional() {
   const a = useStudioStore((s) => s.alimento) || defaultAlimento();
   const selos = useStudioStore((s) => s.selos);
+  const rotulo = useStudioStore((s) => s.rotulo);
   const patch = useStudioStore((s) => s.patch);
   const go = useStudioStore((s) => s.go);
   const cur = useStudioStore((s) => s.cur);
@@ -36,7 +38,20 @@ export default function StepNutricional() {
   const un = a.categoria === "liquido" ? "ml" : "g";
 
   const tblEl: El = { id: "prev-nutri", type: "nutri", x: 0, y: 0, w: 70, h: 86, rot: 0, opacity: 100, visible: true, locked: false, nutri: tbl, fg: "#000" };
-  const lupaEl: El = { id: "prev-lupa", type: "lupa", x: 0, y: 0, w: 46, h: 16 + 5 * Math.max(0, lupas.length - 1), rot: 0, opacity: 100, visible: true, locked: false, lupas };
+  const lupaLayout: LupaLayoutOpt = a.lupaLayout || "auto";
+  // Mesma disposição que o motor vai usar no rótulo (o "auto" depende da largura da face).
+  const lupaResolved = lupas.length ? lupaSizeMm(lupas, lupaLayout, rotulo.w || 80, rotulo.h || 100).layout : "linha";
+  const lupaW = 56;
+  const lupaEl: El = {
+    id: "prev-lupa", type: "lupa", x: 0, y: 0, w: lupaW, h: lupas.length ? lupaW / lupaAspect(lupas, lupaResolved) : 12,
+    rot: 0, opacity: 100, visible: true, locked: false, lupas, lupaLayout: lupaResolved,
+  };
+  const LAYOUTS: { id: LupaLayoutOpt; label: string }[] = [
+    { id: "auto", label: "Automático" },
+    { id: "linha", label: "Em linha" },
+    { id: "bloco", label: "Bloco" },
+    { id: "coluna", label: "Em coluna" },
+  ];
 
   const linhas = [
     { k: "acucar" as const, nome: "Açúcares adicionados", valor: v.acucarA, lim: lim.acucar, un: "g" },
@@ -76,10 +91,23 @@ export default function StepNutricional() {
               <div style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: 12, padding: 18, display: "grid", placeItems: "center" }}>
                 <LupaSvg el={lupaEl} ppm={4.4} />
               </div>
+              <div className="chips" style={{ marginTop: 10 }}>
+                {LAYOUTS.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`chip ${lupaLayout === l.id ? "sel" : ""}`}
+                    onClick={() => patch("alimento", { lupaLayout: l.id })}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
               <p style={{ fontSize: 12.5, color: "var(--ink-dim)", marginTop: 10, lineHeight: 1.6 }}>
-                Seu produto é <b>alto em {lupas.map((l) => LUPA_LABEL[l].toLowerCase()).join(", ")}</b>. A lupa entra na metade
-                superior da frente, em preto sobre branco, no tamanho mínimo proporcional à área do painel. O
-                CanvaLabel posiciona automaticamente; você pode mover no editor, mas não alterar cores ou proporção.
+                Seu produto é <b>alto em {lupas.map((l) => LUPA_LABEL[l].toLowerCase()).join(", ")}</b>. Esta é a arte
+                oficial da ANVISA (Anexo XVII da IN 75/2020). A lupa entra na metade superior da frente, em preto
+                sobre branco, no tamanho proporcional à área do painel (Anexo XVIII). Você pode mover no editor, mas
+                não alterar cores nem proporção.
               </p>
             </>
           ) : (
