@@ -5,6 +5,7 @@ import qrcode from "qrcode-generator";
 import type { El } from "../types";
 import { MM_PER_PT } from "../generate/primitives";
 import { SHAPE_LIB, MATERIAL_SVGS, ETHICAL_SVGS, RECYCLING_SVGS, getSeloSVG } from "../data/svgLibs";
+import { lupaArt } from "../alimento/lupaArt";
 
 export function ShapeSvg({ el, ppm }: { el: El; ppm: number }) {
   const w = el.w * ppm, h = el.h * ppm;
@@ -190,36 +191,19 @@ export function NutriSvg({ el, ppm }: { el: El; ppm: number }) {
   return <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} dangerouslySetInnerHTML={{ __html: out }} />;
 }
 
-// Lupa "ALTO EM" (RDC 429/2020): retângulo preto com cantos arredondados,
-// lupa à esquerda, "ALTO EM" e os nutrientes em caixa alta à direita.
-const LUPA_TXT: Record<string, string> = { acucar: "AÇÚCAR ADICIONADO", gordura: "GORDURA SATURADA", sodio: "SÓDIO" };
-
+// Lupa "ALTO EM" (RDC 429/2020 · IN 75/2020 Anexo XVII): arte oficial da
+// ANVISA montada em lupaArt.ts. A arte mantém a proporção dentro da caixa do
+// elemento (preserveAspectRatio), então redimensionar nunca a deforma.
 export function LupaSvg({ el, ppm }: { el: El; ppm: number }) {
   const w = el.w * ppm, h = el.h * ppm;
-  const itens = (el.lupas && el.lupas.length ? el.lupas : ["acucar"]).map((k) => LUPA_TXT[k] || k);
-  const r = h * 0.12;
-  const iconW = h * 0.78;
-  const textX = iconW + h * 0.12;
-  const textW = w - textX - h * 0.1;
-  const n = itens.length;
-  // Fontes: "ALTO EM" menor; itens maiores; limitadas pela largura disponível.
-  const maxLen = Math.max(...itens.map((t) => t.length), 7);
-  // Arial bold caixa alta ≈ 0,68 em por caractere → fonte limitada pela largura.
-  const fsItem = Math.min(h / (n + 1.6), textW / (maxLen * 0.76));
-  const fsAlto = fsItem * 0.62;
-  const totalTextH = fsAlto * 1.2 + n * fsItem * 1.12;
-  let ty = (h - totalTextH) / 2 + fsAlto;
-  let out = `<rect x="0.5" y="0.5" width="${w - 1}" height="${h - 1}" rx="${r}" fill="#000"/>`;
-  // lupa
-  const cx = iconW * 0.46, cy = h * 0.44, rad = h * 0.2;
-  out += `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="#fff" stroke-width="${h * 0.075}"/>`;
-  out += `<line x1="${cx + rad * 0.72}" y1="${cy + rad * 0.72}" x2="${cx + rad * 1.75}" y2="${cy + rad * 1.75}" stroke="#fff" stroke-width="${h * 0.11}" stroke-linecap="round"/>`;
-  out += `<line x1="${iconW}" x2="${iconW}" y1="${h * 0.12}" y2="${h * 0.88}" stroke="#fff" stroke-width="${Math.max(1, h * 0.02)}"/>`;
-  out += `<text x="${textX}" y="${ty}" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${fsAlto}" fill="#fff" letter-spacing="${fsAlto * 0.12}">ALTO EM</text>`;
-  ty += fsAlto * 0.25;
-  itens.forEach((t) => {
-    ty += fsItem * 1.12;
-    out += `<text x="${textX}" y="${ty}" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="${fsItem}" fill="#fff">${esc(t)}</text>`;
-  });
-  return <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} dangerouslySetInnerHTML={{ __html: out }} />;
+  const art = lupaArt(el.lupas && el.lupas.length ? el.lupas : ["acucar"], el.lupaLayout);
+  return (
+    <svg
+      viewBox={`0 0 ${art.w} ${art.h}`}
+      width={w}
+      height={h}
+      preserveAspectRatio="xMidYMid meet"
+      dangerouslySetInnerHTML={{ __html: art.inner }}
+    />
+  );
 }
