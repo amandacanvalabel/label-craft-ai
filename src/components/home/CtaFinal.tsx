@@ -54,7 +54,7 @@ const CtaFinal = () => {
                 <HiOutlineArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="/canvalabel-alimentos.html"
+                href="/criar"
                 onClick={() => track("cta_click", { local: "cta_final_ia" })}
                 className="inline-flex items-center gap-2 text-white/90 hover:text-white font-medium text-base px-6 py-4 rounded-full border border-white/30 hover:border-white/60 transition-all duration-300"
               >
