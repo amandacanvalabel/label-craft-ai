@@ -1,11 +1,12 @@
 "use client";
 
 import { create } from "zustand";
-import type { AnalysisResult, EditorState, El, ElementType, StudioState } from "../types";
+import type { AnalysisResult, EditorState, El, ElementType, LupaKind, StudioState } from "../types";
 import { STEPS, type StepId, stepIdx } from "../data/steps";
 import { generateLabel, generateVariations, type GenerateOptions } from "../generate/engine";
 import { SHAPE_LIB } from "../data/svgLibs";
 import { defaultAlimento, buildNutriTable, calcLupas } from "../alimento/calc";
+import { lupaAspect } from "../alimento/lupaArt";
 
 // ---- Estado inicial (porte de `const state` + STATE_DEFAULTS) ----
 export function createInitialState(): StudioState {
@@ -377,7 +378,12 @@ export const useStudioStore = create<StudioStore>((set, get) => ({
       qr: { x: cx - 10, y: cy - 10, w: 20, h: 20, seed: "canvalabel", fg: "#000000" },
       // Alimentos: tabela recalculada a partir dos dados do passo "Alimento".
       nutri: { x: cx - 20, y: cy - 24, w: 40, h: 48, fg: "#000000", nutri: s.alimento ? buildNutriTable(s.alimento) : undefined },
-      lupa: { x: cx - 15, y: cy - 6, w: 30, h: 12, lupas: s.alimento ? calcLupas(s.alimento) : ["acucar"] },
+      lupa: (() => {
+        const lupas = s.alimento && calcLupas(s.alimento).length ? calcLupas(s.alimento) : (["acucar"] as LupaKind[]);
+        const layout = (s.alimento && s.alimento.lupaLayout) || "auto";
+        const w = 36, h = w / lupaAspect(lupas, layout);
+        return { x: cx - w / 2, y: cy - h / 2, w, h, lupas, lupaLayout: layout };
+      })(),
     };
     const el: El = { ...base, ...(defaults[type] || {}), ...(extra || {}) };
     if (type === "shape" && el.shapeKind && SHAPE_LIB[el.shapeKind]) el.name = SHAPE_LIB[el.shapeKind].name;
