@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { HiOutlineMagnifyingGlass, HiOutlineArrowRight, HiOutlineInformationCircle } from "react-icons/hi2";
 import { track } from "@/lib/track";
+import { lupaSvgString } from "@/components/studio2/alimento/lupaArt";
+import type { LupaKind } from "@/components/studio2/types";
 
 /**
  * LupaCalculadora — "Seu produto precisa da lupa ALTO EM?"
@@ -62,11 +64,13 @@ const LupaCalculadora = () => {
     { key: "sodio", label: "Sódio", unidade: "mg", value: sodio, set: setSodio, limite: `${lim.sodio} mg` },
   ] as const;
 
-  const lupas = [
-    { ativa: resultado.acucar, texto: "AÇÚCAR ADICIONADO" },
-    { ativa: resultado.saturada, texto: "GORDURA SATURADA" },
-    { ativa: resultado.sodio, texto: "SÓDIO" },
-  ].filter((l) => l.ativa);
+  const lupas = (
+    [
+      { ativa: resultado.acucar, kind: "acucar" },
+      { ativa: resultado.saturada, kind: "gordura" },
+      { ativa: resultado.sodio, kind: "sodio" },
+    ] as { ativa: boolean; kind: LupaKind }[]
+  ).filter((l) => l.ativa);
 
   return (
     <section id="calculadora" className="relative py-24 sm:py-28 overflow-hidden">
@@ -179,20 +183,11 @@ const LupaCalculadora = () => {
               </div>
             ) : (
               <div className="flex-1">
-                {/* Lupa no estilo da norma: fundo preto, lupa, texto em caixa alta */}
-                <div className="inline-flex items-stretch rounded-md overflow-hidden border-2 border-black bg-black text-white">
-                  <div className="flex items-center px-3 border-r border-white/40">
-                    <HiOutlineMagnifyingGlass className="w-7 h-7" strokeWidth={2.2} />
-                  </div>
-                  <div className="px-4 py-2.5">
-                    <p className="text-[11px] font-extrabold tracking-widest leading-none">ALTO EM</p>
-                    {lupas.map((l) => (
-                      <p key={l.texto} className="text-sm font-extrabold tracking-wide leading-tight mt-1">
-                        {l.texto}
-                      </p>
-                    ))}
-                  </div>
-                </div>
+                {/* Arte oficial da ANVISA (Anexo XVII da IN 75/2020), montada pelo mesmo motor do estúdio */}
+                <div
+                  className="w-full max-w-[300px] [&>svg]:w-full [&>svg]:h-auto"
+                  dangerouslySetInnerHTML={{ __html: lupaSvgString(lupas.map((l) => l.kind)) }}
+                />
 
                 <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
                   <li>• {lupas.length === 1 ? "1 lupa obrigatória" : `${lupas.length} lupas, em um único selo`}, na metade superior da face principal.</li>
