@@ -7,7 +7,8 @@ import { STEPS, stepIdx } from "./data/steps";
 import { loadProject } from "./store/persistence";
 import WizardShell from "./wizard/WizardShell";
 import EditorShell from "./editor/EditorShell";
-import Toast from "./ui/Toast";
+import Toast, { toast } from "./ui/Toast";
+import { clearHandoff, readHandoff } from "@/lib/handoff";
 
 interface StudioAppProps {
   modelId?: string;
@@ -41,6 +42,29 @@ export default function StudioApp({ modelId }: StudioAppProps) {
       })
       .catch(() => {});
   }, []);
+
+  // Handoff do funil /criar: ?handoff=1 (ou prévia recente salva) → aplica
+  // produto, prompt e arte e já pula a escolha de categoria.
+  useEffect(() => {
+    if (modelId) return;
+    let viaQuery = false;
+    try { viaQuery = new URLSearchParams(window.location.search).get("handoff") === "1"; } catch { /* ignora */ }
+    const h = readHandoff();
+    if (!h || !viaQuery) return;
+    const st = useStudioStore.getState();
+    st.resetToInitial();
+    st.set({
+      produto: h.produto,
+      conhece: "sei",
+      refs: h.image ? [h.image] : [],
+      ai: { ...useStudioStore.getState().ai, prompt: h.prompt, handoffBackground: h.image || null },
+      editor: { ...useStudioStore.getState().editor, docname: h.prompt.slice(0, 40) || "Rótulo" },
+    });
+    st.go(stepIdx("rotulo"));
+    clearHandoff();
+    toast(h.image ? "Sua prévia foi carregada — agora é só completar os dados." : "Seu prompt foi carregado.");
+    try { window.history.replaceState(null, "", window.location.pathname); } catch { /* ignora */ }
+  }, [modelId]);
 
   // Carrega modelo existente via ?id= e abre direto no editor.
   useEffect(() => {
