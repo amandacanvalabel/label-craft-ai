@@ -36,8 +36,11 @@ export default function StepGerando() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // Limpa qualquer fundo IA de uma geração anterior antes de recomeçar.
-    patch("ai", { aiBackground: null });
+    // Limpa qualquer fundo IA de uma geração anterior antes de recomeçar —
+    // exceto quando a pessoa chegou com a prévia do funil (/criar): essa arte
+    // ela já aprovou, então vira o fundo e não geramos outra por cima.
+    const handoffBg = useStudioStore.getState().ai.handoffBackground || null;
+    patch("ai", { aiBackground: handoffBg });
 
     // Navega para "variacoes" só quando animação E geração terminarem — assim a
     // chamada de IA (que pode demorar mais que a animação) sempre é refletida.
@@ -77,7 +80,7 @@ export default function StepGerando() {
       // Roda em paralelo — NÃO travamos a navegação por ela. Quando chegar,
       // injetamos como fundo e reaplicamos a variação atual. Falha vira null e
       // o rótulo segue sem fundo IA (motor editável normal).
-      if (hasPrompt || hasRefs) {
+      if (!handoffBg && (hasPrompt || hasRefs)) {
         fetchAiImage(useStudioStore.getState())
           .then((img) => {
             if (!img) return;
