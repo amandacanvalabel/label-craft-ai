@@ -23,7 +23,7 @@ const footerLinks = {
   "para você": [
     { label: "Escolher um plano", href: "#planos" },
     { label: "Entrar na plataforma", href: "/login" },
-    { label: "Gerar prévia com IA", href: "/canvalabel-alimentos.html" },
+    { label: "Gerar prévia com IA", href: "/criar" },
     { label: "Dúvidas frequentes", href: "#faq" },
   ],
 };
