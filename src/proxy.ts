@@ -17,6 +17,8 @@ export default async function proxy(req: NextRequest) {
     // pessoa cria a conta) e a redefinição de senha (quem esqueceu a senha
     // obviamente não está logado).
     pathname === "/planos" ||
+    // Funil "prévia com IA sem login" (substitui o canvalabel-alimentos.html).
+    pathname === "/criar" ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
