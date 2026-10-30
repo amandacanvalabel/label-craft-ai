@@ -79,11 +79,15 @@ export interface El {
 
   // lupa — nutrientes em excesso ("ACUCAR" | "GORDURA" | "SODIO")
   lupas?: LupaKind[];
+  // lupa — disposição dos blocos (modelos do Anexo XVII). "auto" = em linha
+  // para 1 ou 2 nutrientes, bloco compacto 2×2 para 3.
+  lupaLayout?: LupaLayoutOpt;
 }
 
 // ---------- Alimentos (IN 75/2020 · RDC 429/2020 · RDC 26/2015) ----------
 
 export type LupaKind = "acucar" | "gordura" | "sodio";
+export type LupaLayoutOpt = "auto" | "linha" | "coluna" | "bloco";
 
 export interface NutriV100 {
   energia: number; // kcal
@@ -143,6 +147,8 @@ export interface AlimentoState {
   validade: string;
   registroMs: string; // "Dispensado de registro (RDC 27/2010)" / nº
   pais: string;
+  // Disposição escolhida para a lupa "ALTO EM" (opcional; padrão "auto").
+  lupaLayout?: LupaLayoutOpt;
 }
 
 export type FaceId = string;
@@ -271,6 +277,9 @@ export interface AiState {
   // Imagem-base gerada por IA (data URL) usada como fundo da frente. Fica no
   // state para o motor reinjetar a cada variação escolhida. null = sem fundo IA.
   aiBackground?: string | null;
+  // Arte vinda do funil /criar (prévia aprovada pela pessoa antes do login).
+  // Quando existe, a geração usa esta imagem como fundo em vez de gerar outra.
+  handoffBackground?: string | null;
 }
 
 export interface Variation {
