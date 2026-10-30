@@ -6,6 +6,7 @@
 import type { Ctx } from "../generate/primitives";
 import { MM_PER_PT, fs } from "../generate/primitives";
 import { buildNutriTable, calcLupas, defaultAlimento, fraseAlergenos, fraseGluten, ingredientesDaReceita } from "./calc";
+import { lupaSizeMm } from "./lupaArt";
 
 export function buildBackAlimento(ctx: Ctx) {
   const { region: r, palette: p, fonts: f, state, add } = ctx;
@@ -102,11 +103,9 @@ export function buildLupaFront(ctx: Ctx) {
   if (!a) return;
   const lupas = calcLupas(a);
   if (!lupas.length) return;
-  const area = r.w * r.h; // cm² ≈ mm²/100
-  const areaCm2 = area / 100;
-  // Largura mínima aproximada da lupa por faixa de área (IN 75/2020, Anexo XVIII)
-  let lw = areaCm2 < 60 ? 23 : areaCm2 < 100 ? 29 : areaCm2 < 200 ? 35 : areaCm2 < 300 ? 42 : 50;
-  lw = Math.min(lw, r.w * 0.6);
-  const lh = lw * (0.36 + 0.1 * (lupas.length - 1));
-  add("lupa", { name: "Lupa ALTO EM", x: r.x + r.w - lw - r.w * 0.05, y: r.y + r.h * 0.05, w: lw, h: lh, lupas });
+  // Tamanho pelo percentual de ocupação do painel principal (IN 75/2020,
+  // Anexo XVIII) e disposição escolhida no passo 4 (padrão automática).
+  const { w: lw, h: lh, layout } = lupaSizeMm(lupas, a.lupaLayout || "auto", r.w, r.h);
+  // Metade superior da face principal, encostada à direita.
+  add("lupa", { name: "Lupa ALTO EM", x: r.x + r.w - lw - r.w * 0.05, y: r.y + r.h * 0.05, w: lw, h: lh, lupas, lupaLayout: layout });
 }
