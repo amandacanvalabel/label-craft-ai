@@ -10,6 +10,7 @@ import {
 } from "@/lib/asaas";
 import { validateCoupon, redeemCoupon } from "@/lib/coupon";
 import { addCredits } from "@/lib/usage";
+import { friendlyPaymentError } from "@/lib/billing";
 
 // Compra de um pacote de créditos avulsos por um assinante autenticado.
 export async function POST(req: NextRequest) {
@@ -38,6 +39,14 @@ export async function POST(req: NextRequest) {
 
     const subscriber = await prisma.subscriber.findUnique({ where: { id: session.id } });
     if (!subscriber) return NextResponse.json({ error: "Assinante não encontrado" }, { status: 404 });
+    // Conta criada pelo Google/Facebook nasce sem CPF: ele é obrigatório para cobrar.
+    const cpfCnpj = subscriber.cpfOrCnpj;
+    if (!cpfCnpj) {
+      return NextResponse.json(
+        { error: "Informe seu CPF ou CNPJ em Configurações antes de comprar créditos.", code: "CPF_REQUIRED" },
+        { status: 400 },
+      );
+    }
 
     // Cupom (opcional)
     let value = pkg.price;
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
       : await findCustomerByEmail(subscriber.email);
     if (!asaasCustomer) {
       asaasCustomer = await createCustomer({
-        name: subscriber.name, email: subscriber.email, cpfCnpj: subscriber.cpfOrCnpj, phone: subscriber.phone ?? undefined,
+        name: subscriber.name, email: subscriber.email, cpfCnpj, phone: subscriber.phone ?? undefined,
       });
       await prisma.subscriber.update({ where: { id: subscriber.id }, data: { asaasCustomerId: asaasCustomer.id } });
     }
@@ -75,7 +84,7 @@ export async function POST(req: NextRequest) {
         expiryMonth: creditCard.expiryMonth, expiryYear: creditCard.expiryYear, ccv: creditCard.ccv,
       };
       paymentData.creditCardHolderInfo = {
-        name: subscriber.name, email: subscriber.email, cpfCnpj: subscriber.cpfOrCnpj,
+        name: subscriber.name, email: subscriber.email, cpfCnpj,
         phone: subscriber.phone?.replace(/\D/g, "") || "",
         postalCode: creditCard.postalCode || "00000000", addressNumber: creditCard.addressNumber || "0",
       };
@@ -116,7 +125,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("[CHECKOUT PACKAGE ERROR]", error);
-    const message = error instanceof Error ? error.message : "Erro no checkout do pacote";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: friendlyPaymentError(error) }, { status: 502 });
   }
 }
