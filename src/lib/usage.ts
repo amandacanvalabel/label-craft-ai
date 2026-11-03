@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { getPlanAccess } from "./access";
 
 // Cobrança avançada: limites de uso, créditos avulsos e reset mensal do ciclo.
 
@@ -35,10 +36,13 @@ async function ensurePeriod(subscriberId: string) {
   return s;
 }
 
-async function limitsFor(planId: string | null): Promise<Limits> {
-  if (!planId) return { ...FREE_LIMITS };
+// Limites do plano só valem com pagamento confirmado e dentro do prazo.
+// Conta criada sem pagar (ou plano vencido) usa o tier gratuito até regularizar.
+async function limitsFor(subscriberId: string): Promise<Limits> {
+  const access = await getPlanAccess(subscriberId);
+  if (!access.active || !access.plan) return { ...FREE_LIMITS };
   const plan = await prisma.plan.findUnique({
-    where: { id: planId },
+    where: { id: access.plan.id },
     select: { monthlyAiCredits: true, monthlyImageCredits: true, maxLabels: true, storageMb: true },
   });
   return plan ?? { ...FREE_LIMITS };
@@ -74,7 +78,7 @@ export interface UsageInfo {
 export async function getUsage(subscriberId: string): Promise<UsageInfo | null> {
   const s = await ensurePeriod(subscriberId);
   if (!s) return null;
-  const lim = await limitsFor(s.planId);
+  const lim = await limitsFor(s.id);
   const [labelsUsed, storageMb] = await Promise.all([
     prisma.subscriberModel.count({ where: { subscriberId } }),
     estimateStorageMb(subscriberId),
@@ -94,7 +98,7 @@ export async function getUsage(subscriberId: string): Promise<UsageInfo | null> 
 export async function checkCredit(subscriberId: string, kind: CreditKind): Promise<{ ok: boolean; error?: string }> {
   const s = await ensurePeriod(subscriberId);
   if (!s) return { ok: false, error: "Assinante não encontrado" };
-  const lim = await limitsFor(s.planId);
+  const lim = await limitsFor(s.id);
   const limit = kind === "ai" ? lim.monthlyAiCredits : lim.monthlyImageCredits;
   const used = kind === "ai" ? s.aiCreditsUsed : s.imageCreditsUsed;
   const extra = kind === "ai" ? s.extraAiCredits : s.extraImageCredits;
@@ -112,7 +116,7 @@ export async function checkCredit(subscriberId: string, kind: CreditKind): Promi
 export async function consumeCredit(subscriberId: string, kind: CreditKind): Promise<void> {
   const s = await ensurePeriod(subscriberId);
   if (!s) return;
-  const lim = await limitsFor(s.planId);
+  const lim = await limitsFor(s.id);
   const limit = kind === "ai" ? lim.monthlyAiCredits : lim.monthlyImageCredits;
   const used = kind === "ai" ? s.aiCreditsUsed : s.imageCreditsUsed;
   const extra = kind === "ai" ? s.extraAiCredits : s.extraImageCredits;
