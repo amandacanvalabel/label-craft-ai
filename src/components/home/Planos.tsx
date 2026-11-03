@@ -22,7 +22,17 @@ import {
 } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
+import SocialLogin from "@/components/auth/SocialLogin";
 import { isValidCpfCnpj, isValidPhone, maskCardNumber, maskCep, maskCpfCnpj, maskPhone, normalizeEmail, EMAIL_RE, passwordIssue } from "@/lib/validation";
+
+const SIGNUP_DRAFT_KEY = "cl_signup_draft";
+const clearSignupDraft = () => {
+  try {
+    localStorage.removeItem(SIGNUP_DRAFT_KEY);
+  } catch {
+    /* sem storage */
+  }
+};
 
 type BillingPeriod = "monthly" | "annual";
 type PaymentMethod = "pix" | "card" | "boleto" | null;
@@ -148,15 +158,6 @@ const Field = ({ label, required, error, hint, className, children }: { label: s
   </div>
 );
 
-const GoogleMark = () => (
-  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-  </svg>
-);
-
 const PlanCardSkeleton = () => (
   <div className="rounded-[1.5rem] p-7 neo-card animate-pulse space-y-4">
     <div className="h-5 w-28 bg-muted rounded-full" />
@@ -205,7 +206,6 @@ const Planos = () => {
   const [showPw, setShowPw] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [me, setMe] = useState<MeInfo | null>(null);
-  const [googleLogin, setGoogleLogin] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [userData, setUserData] = useState<UserFormData>({
@@ -216,6 +216,31 @@ const Planos = () => {
     password: "",
     confirmPassword: "",
   });
+
+  // Rascunho do cadastro no próprio navegador (nome, e-mail e telefone — nunca
+  // senha, CPF ou cartão): quem fecha o modal ou a aba e volta depois encontra
+  // o formulário preenchido. Some quando a conta é criada.
+  const draftLoaded = useRef(false);
+  useEffect(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(SIGNUP_DRAFT_KEY) || "null");
+      if (d && Date.now() - (d.ts || 0) < 7 * 86_400_000) {
+        setUserData((u) => ({ ...u, name: u.name || d.name || "", email: u.email || d.email || "", phone: u.phone || d.phone || "" }));
+      }
+    } catch {
+      /* sem storage */
+    }
+    draftLoaded.current = true;
+  }, []);
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const { name, email, phone } = userData;
+    try {
+      if (name || email || phone) localStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify({ name, email, phone, ts: Date.now() }));
+    } catch {
+      /* sem storage */
+    }
+  }, [userData]);
 
   const [cardData, setCardData] = useState<CardFormData>({
     holderName: "",
@@ -244,10 +269,6 @@ const Planos = () => {
           });
         }
       })
-      .catch(() => {});
-    fetch("/api/auth/providers")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setGoogleLogin(!!d?.google))
       .catch(() => {});
   }, []);
 
@@ -386,6 +407,7 @@ const Planos = () => {
       if (!res.ok) {
         // Conta criada, mas a cobrança falhou: a pessoa não perde nada.
         if (data.accountCreated || data.paymentFailed) {
+          clearSignupDraft();
           track("cadastro_concluido", { plano: selectedPlan?.name, pagamento: "falhou" });
           setError(data.error || "Não foi possível gerar o pagamento agora.");
           setStep("payment_failed");
@@ -396,6 +418,7 @@ const Planos = () => {
       }
 
       setCheckoutResult(data);
+      clearSignupDraft();
       if (!loggedIn) track("cadastro_concluido", { plano: selectedPlan?.name, metodo: paymentMethod ?? "gratis" });
 
       if (data.confirmed || (data.authenticated && data.method === "free")) {
@@ -807,7 +830,7 @@ const Planos = () => {
               transition={{ duration: 0.3, type: "spring", damping: 25 }}
             >
               {/* Header */}
-              <div className="gradient-primary p-6 text-white relative shrink-0">
+              <div className="gradient-primary p-5 sm:p-6 text-white relative shrink-0">
                 {step !== "processing" && (
                   <button
                     onClick={resetModal}
@@ -829,7 +852,7 @@ const Planos = () => {
                   </button>
                 )}
 
-                <h3 className="text-xl font-bold">
+                <h3 className={cn("text-xl font-bold pr-10", step !== "method" && step !== "processing" && step !== "success" && step !== "payment_failed" && "pl-10")}>
                   {step === "success" ? (freeFlow ? "Conta criada!" : "Pagamento confirmado!") : step === "payment_failed" ? "Conta criada" : `Assinar ${selectedPlan.name}`}
                 </h3>
                 <p className="text-white/80 text-sm mt-1">
@@ -1010,23 +1033,7 @@ const Planos = () => {
                         </div>
                       ) : (
                         <>
-                          {googleLogin && (
-                            <div>
-                              <a
-                                href={`/api/auth/google?next=${encodeURIComponent("/planos")}`}
-                                onClick={() => track("login_google_click", { local: "cadastro" })}
-                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-border/70 bg-white text-sm font-semibold hover:bg-muted/40 transition-colors"
-                              >
-                                <GoogleMark />
-                                Continuar com Google
-                              </a>
-                              <div className="flex items-center gap-3 my-4 text-[11px] text-muted-foreground">
-                                <div className="flex-1 h-px bg-border/60" />
-                                ou preencha seus dados
-                                <div className="flex-1 h-px bg-border/60" />
-                              </div>
-                            </div>
-                          )}
+                          <SocialLogin local="cadastro" next="/planos" dividerText="ou preencha seus dados" />
                           <p className="text-xs text-muted-foreground -mt-1">
                             Já tem conta?{" "}
                             <Link href={`/login?next=${encodeURIComponent("/planos")}`} className="text-primary font-semibold hover:underline">
@@ -1415,7 +1422,7 @@ const Planos = () => {
                           <HiOutlineCheckCircle className="w-4 h-4" /> Sua conta já está criada e salva.
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-1">
-                          Prefere pagar depois? O QR Code fica disponível em <b>Meu plano</b>.
+                          Prefere pagar depois? {paymentMethod === "boleto" ? "O boleto" : "O QR Code"} fica disponível em <b>Meu plano</b>.
                         </p>
                         <Link
                           href={destinoPosCadastro("/dashboard")}
