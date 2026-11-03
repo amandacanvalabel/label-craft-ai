@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiOutlineEnvelope, HiOutlineLockClosed, HiOutlineArrowLeft, HiOutlineSparkles } from "react-icons/hi2";
 import { toast } from "sonner";
+import SocialLogin from "@/components/auth/SocialLogin";
 
 type FormMode = "login" | "forgot";
+
+// Mensagens para quem volta do Google/Facebook com algum problema (?erro=).
+const ERROS_LOGIN: Record<string, string> = {
+  google: "O login com Google ainda não está disponível. Entre com e-mail e senha.",
+  facebook: "O login com Facebook ainda não está disponível. Entre com e-mail e senha.",
+  social_cancelado: "Login cancelado. Você pode tentar de novo ou entrar com e-mail e senha.",
+  social_state: "A sessão de login expirou. Tente de novo.",
+  social_email: "Seu e-mail não está confirmado nessa conta. Confirme o e-mail ou entre com e-mail e senha.",
+  facebook_sem_email: "Sua conta do Facebook não tem e-mail. Use Google ou cadastre-se com e-mail e senha.",
+  social_falhou: "Não conseguimos concluir o login agora. Tente de novo em instantes.",
+  admin_social: "Contas de administrador entram só com e-mail e senha.",
+};
 
 // Quem veio do funil da IA (/login?next=/canvalabel-alimentos.html) volta pra
 // ferramenta com o modelo gerado intacto. Sem "next", vale o destino padrão.
@@ -29,6 +42,17 @@ const LoginPage = () => {
   const [forgotEmail, setForgotEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [nextParam, setNextParam] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const erro = sp.get("erro");
+    // Pequeno atraso: o <Toaster> do layout monta depois deste efeito.
+    const t = erro ? setTimeout(() => toast.error(ERROS_LOGIN[erro] || "Não foi possível entrar. Tente de novo.", { duration: 8000 }), 400) : undefined;
+    const n = sp.get("next");
+    if (n && n.startsWith("/") && !n.startsWith("//")) setNextParam(n);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,9 +133,11 @@ const LoginPage = () => {
                     Bem-vindo de volta
                   </h1>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Entre com suas credenciais para acessar o painel
+                    Entre para continuar seus rótulos
                   </p>
                 </div>
+
+                <SocialLogin local="login" next={nextParam} />
 
                 <form onSubmit={handleLogin} className="space-y-5">
                   {/* Email */}
@@ -191,18 +217,18 @@ const LoginPage = () => {
                 <div className="flex items-center gap-4 my-8">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-xs text-muted-foreground font-medium">
-                    Ainda não é assinante?
+                    Ainda não tem conta?
                   </span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
 
                 {/* Subscribe CTA */}
                 <Link
-                  href="/#planos"
+                  href="/planos"
                   className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl border border-border text-foreground font-semibold text-sm hover:bg-muted/50 transition-all duration-300"
                 >
                   <HiOutlineSparkles className="w-4 h-4 text-primary" />
-                  Assinar um plano
+                  Criar minha conta
                 </Link>
               </motion.div>
             ) : (
