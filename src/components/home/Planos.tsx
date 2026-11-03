@@ -272,6 +272,40 @@ const Planos = () => {
       .catch(() => {});
   }, []);
 
+  // Voltou do Google/Facebook (/planos?plano=…&cobranca=…): a conta já existe,
+  // então reabre o modal do plano escolhido direto na etapa de pagamento.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !me || !plans.length) return;
+    const sp = new URLSearchParams(window.location.search);
+    const nome = sp.get("plano");
+    if (!nome) return;
+    autoOpened.current = true;
+    const cob = sp.get("cobranca");
+    ["plano", "cobranca", "bemvindo"].forEach((k) => sp.delete(k));
+    const qs = sp.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : "") + "#planos");
+    const plan = plans.find((p) => p.name === nome);
+    if (!plan) return;
+    if (cob === "monthly" || cob === "annual") setBilling(cob);
+    setSelectedPlan(plan);
+    setPaymentMethod(null);
+    setError("");
+    setStep("method");
+  }, [me, plans]);
+
+  // Para onde o botão Google/Facebook volta: este plano, já na etapa de pagamento.
+  const socialNext = (plan: DBPlan) => {
+    let n = `/planos?plano=${encodeURIComponent(plan.name)}&cobranca=${billing}`;
+    try {
+      const funil = new URLSearchParams(window.location.search).get("next");
+      if (funil && funil.startsWith("/") && !funil.startsWith("//")) n += `&next=${encodeURIComponent(funil)}`;
+    } catch {
+      /* ignora */
+    }
+    return n;
+  };
+
   // Valor cobrado agora (anual = 12 meses de uma vez).
   const chargeFor = (plan: DBPlan) => {
     const perMonth = getPrice(plan);
@@ -334,25 +368,81 @@ const Planos = () => {
     }
   }, [step, checkoutResult, paymentMethod, router]);
 
-  const handleSubmitUserData = async () => {
+  // ETAPA 1 — cria a conta (formulário). Google/Facebook fazem o mesmo pelo
+  // botão social e voltam direto para a etapa 2 deste plano.
+  const handleCreateAccount = async () => {
     setError("");
     const errs: Record<string, string> = {};
-    const loggedIn = !!me;
-
-    if (!loggedIn) {
-      if (userData.name.trim().length < 3) errs.name = "Informe seu nome completo";
-      if (!EMAIL_RE.test(normalizeEmail(userData.email))) errs.email = "Informe um e-mail válido";
-      const pw = passwordIssue(userData.password);
-      if (pw) errs.password = pw;
-      if (userData.password !== userData.confirmPassword) errs.confirmPassword = "As senhas não coincidem";
-      if (!acceptTerms) errs.acceptTerms = "Aceite os Termos de Uso e a Política de Privacidade para continuar";
-    }
-    if ((!loggedIn || me?.needsCpf) && !freeFlow) {
-      if (!isValidCpfCnpj(userData.cpfOrCnpj)) errs.cpfOrCnpj = "CPF ou CNPJ inválido";
-    } else if (!loggedIn && userData.cpfOrCnpj && !isValidCpfCnpj(userData.cpfOrCnpj)) {
-      errs.cpfOrCnpj = "CPF ou CNPJ inválido";
-    }
+    if (userData.name.trim().length < 3) errs.name = "Informe seu nome completo";
+    if (!EMAIL_RE.test(normalizeEmail(userData.email))) errs.email = "Informe um e-mail válido";
+    const pw = passwordIssue(userData.password);
+    if (pw) errs.password = pw;
+    if (userData.password !== userData.confirmPassword) errs.confirmPassword = "As senhas não coincidem";
     if (!isValidPhone(userData.phone)) errs.phone = "Telefone inválido (DDD + número)";
+    if (!acceptTerms) errs.acceptTerms = "Aceite os Termos de Uso e a Política de Privacidade para continuar";
+    setFieldErr(errs);
+    if (Object.keys(errs).length) {
+      setError("Confira os campos destacados.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planName: selectedPlan!.name,
+          billingPeriod: billing,
+          paymentMethod: null,
+          createOnly: !freeFlow,
+          name: userData.name.trim(),
+          email: normalizeEmail(userData.email),
+          phone: userData.phone,
+          password: userData.password,
+          acceptTerms,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.field) setFieldErr({ [data.field]: data.error });
+        throw new Error(data.error || "Não foi possível criar a conta. Tente novamente.");
+      }
+      clearSignupDraft();
+      track("cadastro_concluido", { plano: selectedPlan?.name, metodo: freeFlow ? "gratis" : "conta" });
+
+      if (freeFlow) {
+        setCheckoutResult(data);
+        track("assinatura_confirmada", { plano: selectedPlan?.name, metodo: "gratis" });
+        setStep("success");
+        setTimeout(() => router.push(destinoPosCadastro(data.redirectTo || "/dashboard")), 2500);
+        return;
+      }
+      // Conta criada e logada: segue para a forma de pagamento.
+      setMe({
+        id: data.user?.id || "",
+        name: data.user?.name || userData.name.trim(),
+        email: data.user?.email || normalizeEmail(userData.email),
+        needsCpf: data.needsCpf !== false,
+        planName: selectedPlan?.name ?? null,
+        planStatus: "pending",
+      });
+      setUserData((u) => ({ ...u, password: "", confirmPassword: "" }));
+      setPaymentMethod(null);
+      setStep("method");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ETAPA 2 — conta já existe (logada): escolhe a forma e gera a cobrança.
+  const handlePay = async () => {
+    setError("");
+    const errs: Record<string, string> = {};
+    if (!freeFlow && !paymentMethod) errs.method = "Escolha a forma de pagamento";
+    if (!freeFlow && me?.needsCpf && !isValidCpfCnpj(userData.cpfOrCnpj)) errs.cpfOrCnpj = "CPF ou CNPJ inválido";
     if (paymentMethod === "card") {
       if (!cardData.holderName.trim()) errs.holderName = "Nome como está no cartão";
       if (cardData.number.replace(/\D/g, "").length < 13) errs.cardNumber = "Número do cartão inválido";
@@ -363,27 +453,20 @@ const Planos = () => {
     }
     setFieldErr(errs);
     if (Object.keys(errs).length) {
-      setError("Confira os campos destacados.");
+      setError(errs.method || "Confira os campos destacados.");
       return;
     }
 
     setStep("processing");
     setLoading(true);
-
     try {
       const body: Record<string, unknown> = {
         planName: selectedPlan!.name,
         billingPeriod: billing,
-        paymentMethod: freeFlow ? null : paymentMethod,
-        phone: userData.phone,
+        paymentMethod: paymentMethod || "pix",
       };
-      if (userData.cpfOrCnpj) body.cpfOrCnpj = userData.cpfOrCnpj;
-      if (!loggedIn) {
-        body.name = userData.name.trim();
-        body.email = normalizeEmail(userData.email);
-        body.password = userData.password;
-        body.acceptTerms = acceptTerms;
-      }
+      if (me?.needsCpf && userData.cpfOrCnpj) body.cpfOrCnpj = userData.cpfOrCnpj;
+      if (userData.phone) body.phone = userData.phone;
       if (couponInfo && coupon.trim()) body.couponCode = coupon.trim();
       if (paymentMethod === "card") {
         body.creditCard = {
@@ -397,31 +480,30 @@ const Planos = () => {
         };
       }
 
-      const res = await fetch(loggedIn ? "/api/subscriber/subscribe" : "/api/checkout", {
+      const res = await fetch("/api/subscriber/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
+      // CPF válido já ficou salvo na conta, mesmo se a cobrança falhar.
+      if (me?.needsCpf && isValidCpfCnpj(userData.cpfOrCnpj) && data.field !== "cpfOrCnpj") setMe((m) => (m ? { ...m, needsCpf: false } : m));
 
       if (!res.ok) {
-        // Conta criada, mas a cobrança falhou: a pessoa não perde nada.
-        if (data.accountCreated || data.paymentFailed) {
-          clearSignupDraft();
-          track("cadastro_concluido", { plano: selectedPlan?.name, pagamento: "falhou" });
-          setError(data.error || "Não foi possível gerar o pagamento agora.");
-          setStep("payment_failed");
-          return;
+        if (res.status === 401) throw new Error("Sua sessão expirou. Entre na sua conta para concluir o pagamento.");
+        if (data.field) {
+          setFieldErr({ [data.field]: data.error });
+          throw new Error(data.error || "Confira os dados.");
         }
-        if (data.field) setFieldErr({ [data.field]: data.error });
-        throw new Error(data.error || "Erro ao processar. Tente novamente.");
+        // Falha no Asaas: a conta continua salva.
+        setError(data.error || "Não foi possível gerar o pagamento agora.");
+        track("pagamento_falhou", { plano: selectedPlan?.name, metodo: paymentMethod ?? undefined });
+        setStep("payment_failed");
+        return;
       }
 
       setCheckoutResult(data);
-      clearSignupDraft();
-      if (!loggedIn) track("cadastro_concluido", { plano: selectedPlan?.name, metodo: paymentMethod ?? "gratis" });
-
-      if (data.confirmed || (data.authenticated && data.method === "free")) {
+      if (data.confirmed || data.method === "free") {
         track("assinatura_confirmada", { plano: selectedPlan?.name, metodo: paymentMethod ?? undefined });
         setStep("success");
         setTimeout(() => router.push(destinoPosCadastro(data.redirectTo || "/dashboard")), 2500);
@@ -431,7 +513,7 @@ const Planos = () => {
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
-      setStep("userdata");
+      setStep("method");
     } finally {
       setLoading(false);
     }
@@ -464,10 +546,11 @@ const Planos = () => {
 
   // Step indicators — no plano grátis só existe a etapa de dados.
   const freeFlow = isFreePlan(selectedPlan);
-  const stepLabels = freeFlow ? ["Dados"] : ["Método", "Dados", "Pagamento"];
+  // Ordem: 1) Conta (Google/Facebook ou formulário) → 2) Forma de pagamento → 3) Pagar.
+  const stepLabels = freeFlow ? ["Conta"] : ["Conta", "Pagamento", "Concluir"];
   const stepIndex = freeFlow
     ? 0
-    : step === "method" ? 0 : step === "userdata" ? 1 : 2;
+    : step === "userdata" ? 0 : step === "method" ? 1 : 2;
 
   return (
     <>
@@ -639,8 +722,8 @@ const Planos = () => {
                         track("plano_selecionado", { plano: plan.name, cobranca: billing, preco: getPrice(plan) });
                         setSelectedPlan(plan);
                         setPaymentMethod(null);
-                        // Plano grátis pula direto para o cadastro (sem método de pagamento).
-                        setStep(getPrice(plan) <= 0 ? "userdata" : "method");
+                        // Primeiro a conta; quem já está logado vai direto ao pagamento.
+                        setStep(me ? "method" : "userdata");
                         setError("");
                       }}
                       className={cn(
@@ -839,25 +922,22 @@ const Planos = () => {
                     <HiOutlineXMark className="w-5 h-5" />
                   </button>
                 )}
-                {step !== "method" && step !== "processing" && step !== "success" && step !== "payment_failed" && (
+                {step === "payment" && (
                   <button
-                    onClick={() => {
-                      // No fluxo grátis não há etapa de método: voltar reinicia a seleção.
-                      if (freeFlow) { resetModal(); return; }
-                      setStep(step === "payment" ? "userdata" : "method");
-                    }}
+                    onClick={() => setStep("method")}
+                    aria-label="Voltar para a forma de pagamento"
                     className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                   >
                     <HiOutlineArrowLeft className="w-5 h-5" />
                   </button>
                 )}
 
-                <h3 className={cn("text-xl font-bold pr-10", step !== "method" && step !== "processing" && step !== "success" && step !== "payment_failed" && "pl-10")}>
+                <h3 className={cn("text-xl font-bold pr-10", step === "payment" && "pl-10")}>
                   {step === "success" ? (freeFlow ? "Conta criada!" : "Pagamento confirmado!") : step === "payment_failed" ? "Conta criada" : `Assinar ${selectedPlan.name}`}
                 </h3>
                 <p className="text-white/80 text-sm mt-1">
-                  {step === "method" && "Selecione a forma de pagamento"}
-                  {step === "userdata" && (me ? `Assinando como ${me.email}` : freeFlow ? "Crie sua conta gratuita" : "Crie sua conta e escolha como pagar")}
+                  {step === "userdata" && (freeFlow ? "Crie sua conta gratuita" : "Primeiro, crie sua conta — leva 30 segundos")}
+                  {step === "method" && (freeFlow ? "Ative seu plano" : "Agora escolha como prefere pagar")}
                   {step === "payment_failed" && "O pagamento não saiu agora — mas sua conta está salva"}
                   {step === "processing" && "Processando seu pagamento..."}
                   {step === "payment" && paymentMethod === "pix" && "Escaneie o QR Code ou copie o código"}
@@ -932,7 +1012,135 @@ const Planos = () => {
               {/* Body */}
               <div className="p-6 overflow-y-auto flex-1">
                 <AnimatePresence mode="wait">
-                  {/* ---- STEP 1: Payment Method ---- */}
+                  {/* ---- ETAPA 1: Conta (Google/Facebook ou formulário) ---- */}
+                  {step === "userdata" && (
+                    <motion.div
+                      key="userdata"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="space-y-4"
+                    >
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
+                          {error}
+                          {fieldErr.email && /já existe uma conta/i.test(fieldErr.email) && (
+                            <Link href={`/login?next=${encodeURIComponent("/planos")}`} className="block mt-1 font-semibold underline">
+                              Entrar na minha conta
+                            </Link>
+                          )}
+                        </div>
+                      )}
+
+                      <SocialLogin local="cadastro" next={socialNext(selectedPlan)} dividerText="ou cadastre com seu e-mail" />
+
+                      <div className="grid grid-cols-2 gap-3">
+                            <Field label="Nome completo" required error={fieldErr.name} className="col-span-2">
+                              <input
+                                type="text"
+                                autoComplete="name"
+                                value={userData.name}
+                                onChange={(e) => { setUserData({ ...userData, name: e.target.value }); clearErr("name"); }}
+                                className={inputCls(!!fieldErr.name)}
+                                placeholder="Como no seu documento"
+                              />
+                            </Field>
+                            <Field label="E-mail" required error={fieldErr.email} className="col-span-2">
+                              <input
+                                type="email"
+                                autoComplete="email"
+                                inputMode="email"
+                                value={userData.email}
+                                onChange={(e) => { setUserData({ ...userData, email: e.target.value }); clearErr("email"); }}
+                                className={inputCls(!!fieldErr.email)}
+                                placeholder="voce@empresa.com.br"
+                              />
+                            </Field>
+                        <Field label="WhatsApp / telefone" hint="Opcional — para avisos do seu pedido" error={fieldErr.phone} className="col-span-2">
+                          <input
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
+                            value={userData.phone}
+                            onChange={(e) => { setUserData({ ...userData, phone: maskPhone(e.target.value) }); clearErr("phone"); }}
+                            className={inputCls(!!fieldErr.phone)}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </Field>
+                            <Field label="Senha" required error={fieldErr.password}>
+                              <div className="relative">
+                                <input
+                                  type={showPw ? "text" : "password"}
+                                  autoComplete="new-password"
+                                  value={userData.password}
+                                  onChange={(e) => { setUserData({ ...userData, password: e.target.value }); clearErr("password"); }}
+                                  className={cn(inputCls(!!fieldErr.password), "pr-10")}
+                                  placeholder="6+ caracteres, letras e números"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPw((v) => !v)}
+                                  aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  {showPw ? <HiOutlineEyeSlash className="w-4 h-4" /> : <HiOutlineEye className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            </Field>
+                            <Field label="Confirmar senha" required error={fieldErr.confirmPassword}>
+                              <input
+                                type={showPw ? "text" : "password"}
+                                autoComplete="new-password"
+                                value={userData.confirmPassword}
+                                onChange={(e) => { setUserData({ ...userData, confirmPassword: e.target.value }); clearErr("confirmPassword"); }}
+                                className={inputCls(!!fieldErr.confirmPassword)}
+                                placeholder="Repita a senha"
+                              />
+                            </Field>
+                      </div>
+
+
+                        <label className={cn("flex items-start gap-2.5 text-xs leading-relaxed cursor-pointer rounded-xl p-2 -m-2", fieldErr.acceptTerms && "bg-red-50")}>
+                          <input
+                            type="checkbox"
+                            checked={acceptTerms}
+                            onChange={(e) => { setAcceptTerms(e.target.checked); clearErr("acceptTerms"); }}
+                            className="mt-0.5 w-4 h-4 rounded border-border accent-[var(--color-primary)]"
+                          />
+                          <span className="text-muted-foreground">
+                            Li e aceito os{" "}
+                            <Link href="/termos" target="_blank" className="text-primary font-semibold hover:underline">Termos de Uso</Link>{" "}
+                            e a{" "}
+                            <Link href="/privacidade" target="_blank" className="text-primary font-semibold hover:underline">Política de Privacidade</Link>
+                            . Seus dados são usados só para a sua conta e o pagamento.
+                          </span>
+                        </label>
+                      {fieldErr.acceptTerms && <p className="text-[11px] text-red-500 -mt-2">{fieldErr.acceptTerms}</p>}
+
+                      <button
+                        onClick={handleCreateAccount}
+                        disabled={loading}
+                        className="w-full py-4 rounded-2xl font-semibold text-sm gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer transition-all duration-300 disabled:opacity-60 disabled:hover:translate-y-0"
+                      >
+                        {loading ? "Criando sua conta..." : freeFlow ? "Criar conta grátis" : "Criar conta e continuar"}
+                      </button>
+
+                      <p className="text-center text-xs text-muted-foreground">
+                        Já tem conta?{" "}
+                        <Link href={`/login?next=${encodeURIComponent("/planos")}`} className="text-primary font-semibold hover:underline">
+                          Entrar
+                        </Link>
+                      </p>
+                      <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1">
+                        <HiOutlineShieldCheck className="w-3.5 h-3.5" />
+                        {freeFlow
+                          ? "Seus dados estão protegidos. Nenhuma cobrança será feita."
+                          : "Na próxima etapa você escolhe PIX, cartão ou boleto. Sua conta fica salva."}
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {/* ---- ETAPA 2: Forma de pagamento (conta já criada) ---- */}
                   {step === "method" && (
                     <motion.div
                       key="method"
@@ -941,10 +1149,27 @@ const Planos = () => {
                       exit={{ opacity: 0, x: -20 }}
                       className="space-y-3"
                     >
+                      {me && (
+                        <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm">
+                          <HiOutlineCheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                          <span className="min-w-0 text-emerald-800">
+                            Conta <b className="break-all">{me.email}</b> {me.planStatus === "active" ? "ativa" : "criada e salva"}.
+                          </span>
+                        </div>
+                      )}
+
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
+                          {error}
+                        </div>
+                      )}
+
+                      {!freeFlow && (
+                        <>
                       {paymentMethods.map((method) => (
                         <button
                           key={method.id}
-                          onClick={() => { setPaymentMethod(method.id); track("metodo_pagamento", { metodo: method.id ?? undefined, plano: selectedPlan?.name }); }}
+                          onClick={() => { setPaymentMethod(method.id); setError(""); clearErr("method"); track("metodo_pagamento", { metodo: method.id ?? undefined, plano: selectedPlan?.name }); }}
                           className={cn(
                             "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left",
                             paymentMethod === method.id
@@ -993,84 +1218,13 @@ const Planos = () => {
                         </button>
                       ))}
 
-                      <button
-                        disabled={!paymentMethod}
-                        onClick={() => setStep("userdata")}
-                        className={cn(
-                          "w-full py-4 rounded-2xl font-semibold text-sm mt-4 transition-all duration-300",
-                          paymentMethod
-                            ? "gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer"
-                            : "bg-muted text-muted-foreground cursor-not-allowed"
-                        )}
-                      >
-                        Continuar
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* ---- STEP 2: User Data ---- */}
-                  {step === "userdata" && (
-                    <motion.div
-                      key="userdata"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-4"
-                    >
-                      {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
-                          {error}
-                        </div>
-                      )}
-
-                      {me ? (
-                        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
-                          <p className="font-semibold text-foreground">Você já está logada(o) como {me.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {me.planStatus === "pending" ? "Sua conta está criada e aguarda o pagamento. " : ""}
-                            A assinatura vai para a conta <b>{me.email}</b>.
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          <SocialLogin local="cadastro" next="/planos" dividerText="ou preencha seus dados" />
-                          <p className="text-xs text-muted-foreground -mt-1">
-                            Já tem conta?{" "}
-                            <Link href={`/login?next=${encodeURIComponent("/planos")}`} className="text-primary font-semibold hover:underline">
-                              Entrar
-                            </Link>
-                          </p>
                         </>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        {!me && (
-                          <>
-                            <Field label="Nome completo" required error={fieldErr.name} className="col-span-2">
-                              <input
-                                type="text"
-                                autoComplete="name"
-                                value={userData.name}
-                                onChange={(e) => { setUserData({ ...userData, name: e.target.value }); clearErr("name"); }}
-                                className={inputCls(!!fieldErr.name)}
-                                placeholder="Como no seu documento"
-                              />
-                            </Field>
-                            <Field label="E-mail" required error={fieldErr.email} className="col-span-2">
-                              <input
-                                type="email"
-                                autoComplete="email"
-                                inputMode="email"
-                                value={userData.email}
-                                onChange={(e) => { setUserData({ ...userData, email: e.target.value }); clearErr("email"); }}
-                                className={inputCls(!!fieldErr.email)}
-                                placeholder="voce@empresa.com.br"
-                              />
-                            </Field>
-                          </>
-                        )}
-                        {(!me || me.needsCpf) && (
-                          <Field label="CPF ou CNPJ" required={!freeFlow} error={fieldErr.cpfOrCnpj} hint={!me ? "Usado só na emissão do pagamento" : undefined}>
+                      {(paymentMethod || freeFlow) && (
+                        <div className="space-y-4 pt-1">
+                        {me?.needsCpf && paymentMethod && (
+                          <Field label="CPF ou CNPJ do pagador" required error={fieldErr.cpfOrCnpj} hint="Exigido pelo banco para emitir PIX, boleto ou cobrança no cartão">
                             <input
                               type="text"
                               inputMode="numeric"
@@ -1082,53 +1236,6 @@ const Planos = () => {
                             />
                           </Field>
                         )}
-                        <Field label="WhatsApp / telefone" error={fieldErr.phone} className={me && !me.needsCpf ? "col-span-2" : ""}>
-                          <input
-                            type="tel"
-                            inputMode="tel"
-                            autoComplete="tel"
-                            value={userData.phone}
-                            onChange={(e) => { setUserData({ ...userData, phone: maskPhone(e.target.value) }); clearErr("phone"); }}
-                            className={inputCls(!!fieldErr.phone)}
-                            placeholder="(11) 99999-9999"
-                          />
-                        </Field>
-                        {!me && (
-                          <>
-                            <Field label="Senha" required error={fieldErr.password}>
-                              <div className="relative">
-                                <input
-                                  type={showPw ? "text" : "password"}
-                                  autoComplete="new-password"
-                                  value={userData.password}
-                                  onChange={(e) => { setUserData({ ...userData, password: e.target.value }); clearErr("password"); }}
-                                  className={cn(inputCls(!!fieldErr.password), "pr-10")}
-                                  placeholder="6+ caracteres, letras e números"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPw((v) => !v)}
-                                  aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                >
-                                  {showPw ? <HiOutlineEyeSlash className="w-4 h-4" /> : <HiOutlineEye className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            </Field>
-                            <Field label="Confirmar senha" required error={fieldErr.confirmPassword}>
-                              <input
-                                type={showPw ? "text" : "password"}
-                                autoComplete="new-password"
-                                value={userData.confirmPassword}
-                                onChange={(e) => { setUserData({ ...userData, confirmPassword: e.target.value }); clearErr("confirmPassword"); }}
-                                className={inputCls(!!fieldErr.confirmPassword)}
-                                placeholder="Repita a senha"
-                              />
-                            </Field>
-                          </>
-                        )}
-                      </div>
-
                       {/* Card fields */}
                       {paymentMethod === "card" && (
                         <div className="pt-3 border-t border-border/40 space-y-3">
@@ -1235,7 +1342,7 @@ const Planos = () => {
                       )}
 
                       {/* Cupom de desconto — não se aplica ao plano grátis */}
-                      {!freeFlow && (
+                      {!freeFlow && paymentMethod && (
                       <div>
                         <label className="text-xs font-medium text-muted-foreground mb-1 block">Cupom de desconto</label>
                         <div className="flex gap-2">
@@ -1259,45 +1366,35 @@ const Planos = () => {
                       </div>
                       )}
 
-                      {!me && (
-                        <label className={cn("flex items-start gap-2.5 text-xs leading-relaxed cursor-pointer rounded-xl p-2 -m-2", fieldErr.acceptTerms && "bg-red-50")}>
-                          <input
-                            type="checkbox"
-                            checked={acceptTerms}
-                            onChange={(e) => { setAcceptTerms(e.target.checked); clearErr("acceptTerms"); }}
-                            className="mt-0.5 w-4 h-4 rounded border-border accent-[var(--color-primary)]"
-                          />
-                          <span className="text-muted-foreground">
-                            Li e aceito os{" "}
-                            <Link href="/termos" target="_blank" className="text-primary font-semibold hover:underline">Termos de Uso</Link>{" "}
-                            e a{" "}
-                            <Link href="/privacidade" target="_blank" className="text-primary font-semibold hover:underline">Política de Privacidade</Link>
-                            . Seus dados são usados só para a sua conta e o pagamento.
-                          </span>
-                        </label>
+
+                          <button
+                            onClick={handlePay}
+                            disabled={loading}
+                            className="w-full py-4 rounded-2xl font-semibold text-sm gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer transition-all duration-300 disabled:opacity-60"
+                          >
+                            {freeFlow
+                              ? "Ativar plano grátis"
+                              : paymentMethod === "pix"
+                              ? `Gerar PIX de R$ ${fmtBRL(couponInfo ? couponInfo.finalAmount : chargeFor(selectedPlan).total)}`
+                              : paymentMethod === "card"
+                              ? `Pagar R$ ${fmtBRL(couponInfo ? couponInfo.finalAmount : chargeFor(selectedPlan).total)} no cartão`
+                              : `Gerar boleto de R$ ${fmtBRL(couponInfo ? couponInfo.finalAmount : chargeFor(selectedPlan).total)}`}
+                          </button>
+                        </div>
                       )}
-                      {fieldErr.acceptTerms && <p className="text-[11px] text-red-500 -mt-2">{fieldErr.acceptTerms}</p>}
 
-                      <button
-                        onClick={handleSubmitUserData}
-                        disabled={loading}
-                        className="w-full py-4 rounded-2xl font-semibold text-sm gradient-primary text-white shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer transition-all duration-300 disabled:opacity-60"
-                      >
-                        {freeFlow
-                          ? "Criar conta grátis"
-                          : paymentMethod === "pix"
-                          ? `${me ? "Gerar" : "Criar conta e gerar"} PIX de R$ ${fmtBRL(couponInfo ? couponInfo.finalAmount : chargeFor(selectedPlan).total)}`
-                          : paymentMethod === "card"
-                          ? `Pagar R$ ${fmtBRL(couponInfo ? couponInfo.finalAmount : chargeFor(selectedPlan).total)} no cartão`
-                          : `${me ? "Gerar" : "Criar conta e gerar"} boleto`}
-                      </button>
-
-                      <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1">
+                      <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1 pt-1">
                         <HiOutlineShieldCheck className="w-3.5 h-3.5" />
-                        {freeFlow
-                          ? "Seus dados estão protegidos. Nenhuma cobrança será feita."
-                          : "Pagamento processado pelo Asaas. Sua conta fica salva mesmo se você pagar depois."}
+                        Pagamento processado pelo Asaas, com segurança.
                       </p>
+                      {me && (
+                        <p className="text-center text-xs text-muted-foreground">
+                          Prefere pagar depois?{" "}
+                          <Link href="/dashboard/meu-plano" className="text-primary font-semibold hover:underline">
+                            Entrar no painel
+                          </Link>
+                        </p>
+                      )}
                     </motion.div>
                   )}
 
@@ -1463,7 +1560,7 @@ const Planos = () => {
                         Ir para o painel e pagar depois
                       </button>
                       <button
-                        onClick={() => { setMe({ id: "", name: userData.name, email: normalizeEmail(userData.email), needsCpf: false, planName: selectedPlan.name, planStatus: "pending" }); setError(""); setStep("method"); }}
+                        onClick={() => { setError(""); setPaymentMethod(null); setStep("method"); }}
                         className="w-full py-3 rounded-2xl font-semibold text-sm border border-border/70 hover:bg-muted/40 transition-colors"
                       >
                         Tentar outra forma de pagamento
