@@ -35,10 +35,11 @@ export default function PrivacidadePage() {
           <li>Endereço IP, tipo de navegador e dispositivo, páginas visitadas e eventos de uso (por exemplo, clique em “gerar prévia”), por meio de cookies e do Google Analytics — somente com o seu consentimento, conforme a <a href="/cookies">Política de Cookies</a>.</li>
           <li>Registros técnicos (logs) necessários à segurança e ao funcionamento do serviço.</li>
         </ul>
-        <h3>Login com Google</h3>
+        <h3>Login com Google ou Facebook</h3>
         <p>
-          Se você optar por entrar com o Google, recebemos do Google seu nome, e-mail e foto de perfil. Não temos acesso à sua
-          senha do Google nem a outros dados da sua conta.
+          Se você optar por entrar com o Google ou com o Facebook, recebemos do provedor escolhido seu nome, e-mail, foto de
+          perfil e um identificador da conta. Não temos acesso à sua senha nem a outros dados, contatos ou publicações. Para
+          desconectar ou excluir esses dados, veja <a href="/exclusao-de-dados">Exclusão de dados</a>.
         </p>
       </section>
 
@@ -62,6 +63,7 @@ export default function PrivacidadePage() {
           <li><b>Asaas</b> (processamento de pagamentos — PIX, boleto e cartão);</li>
           <li><b>Vercel</b> (hospedagem e banco de dados) e serviços de armazenamento de arquivos;</li>
           <li><b>Google</b> (Analytics, com consentimento; e login social, se você escolher);</li>
+          <li><b>Meta/Facebook</b> (somente login social, se você escolher);</li>
           <li><b>Provedores de inteligência artificial</b> para gerar textos e imagens dos rótulos;</li>
           <li><b>Serviço de envio de e-mails transacionais</b>.</li>
         </ul>
@@ -84,7 +86,7 @@ export default function PrivacidadePage() {
       <section>
         <h2>6. Seus direitos (art. 18 da LGPD)</h2>
         <p>Você pode, a qualquer momento, solicitar: confirmação de tratamento e acesso aos dados; correção; anonimização, bloqueio ou eliminação; portabilidade; informação sobre compartilhamentos; revogação do consentimento; e exclusão da conta.</p>
-        <p>Para exercer esses direitos, escreva para <a href="mailto:contato@canvalabel.com.br">contato@canvalabel.com.br</a>. Respondemos em até 15 dias. Você também pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).</p>
+        <p>Para exercer esses direitos, escreva para <a href="mailto:contato@canvalabel.com.br">contato@canvalabel.com.br</a> (para excluir a conta, veja <a href="/exclusao-de-dados">Exclusão de dados</a>). Respondemos em até 15 dias. Você também pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).</p>
       </section>
 
       <section>
