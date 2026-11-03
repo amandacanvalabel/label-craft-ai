@@ -1,6 +1,19 @@
 const ASAAS_API_URL = process.env.ASAAS_API_URL || "https://api.asaas.com/v3";
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY || "";
 
+// Erro vindo do Asaas (com o status HTTP), para separar "o Asaas recusou"
+// (mensagem pode ir ao cliente) de falhas internas (nunca mostradas cruas).
+export class AsaasError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "AsaasError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 interface AsaasRequestOptions {
   method: "GET" | "POST" | "PUT" | "DELETE";
   path: string;
@@ -12,21 +25,35 @@ async function asaasRequest<T = Record<string, unknown>>(
 ): Promise<T> {
   const { method, path, body } = options;
 
-  const res = await fetch(`${ASAAS_API_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      access_token: ASAAS_API_KEY,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  if (!ASAAS_API_KEY) {
+    // Sem a chave nenhuma cobrança é gerada. Aparece nos logs da Vercel.
+    console.error("[ASAAS] ASAAS_API_KEY não configurada — nenhuma cobrança pode ser gerada.");
+    throw new AsaasError("ASAAS_API_KEY ausente", 401, "missing_api_key");
+  }
 
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${ASAAS_API_URL}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "CanvaLabel",
+        access_token: ASAAS_API_KEY,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    console.error("[ASAAS] falha de rede", path, err);
+    throw new AsaasError("Falha de comunicação com o Asaas", 503, "network");
+  }
+
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const errorMsg =
-      data?.errors?.[0]?.description || data?.message || "Erro na API Asaas";
-    throw new Error(errorMsg);
+    const first = data?.errors?.[0];
+    const errorMsg = first?.description || data?.message || "Erro na API Asaas";
+    console.error(`[ASAAS] ${method} ${path} → ${res.status}`, first?.code || "", errorMsg);
+    throw new AsaasError(errorMsg, res.status, first?.code);
   }
 
   return data as T;
