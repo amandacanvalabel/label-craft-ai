@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addCredits } from "@/lib/usage";
+import { sendPlanConfirmationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,14 +28,20 @@ export async function POST(req: NextRequest) {
     if (confirmedEvents.includes(event)) {
       const payment = await prisma.payment.findUnique({
         where: { asaasPaymentId: asaasPayment.id },
-        include: { creditPackage: true },
+        include: { creditPackage: true, plan: { select: { name: true } }, subscriber: { select: { email: true, name: true } } },
       });
 
       if (payment) {
+        const wasPending = payment.status !== "CONFIRMED";
         await prisma.payment.update({
           where: { id: payment.id },
           data: { status: "CONFIRMED" },
         });
+
+        // Assinatura paga (PIX/boleto compensado): avisa por e-mail uma vez.
+        if (wasPending && payment.kind === "SUBSCRIPTION" && payment.plan) {
+          sendPlanConfirmationEmail(payment.subscriber.email, payment.subscriber.name, payment.plan.name, payment.amount).catch(() => {});
+        }
 
         // Compra de pacote: credita os créditos avulsos uma única vez.
         if (payment.kind === "CREDIT_PACKAGE" && payment.creditPackage && !payment.creditsApplied) {
