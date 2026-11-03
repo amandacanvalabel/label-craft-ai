@@ -15,6 +15,7 @@ export default function LegalPage({ title, subtitle, children }: { title: string
           <Link href="/privacidade" className="text-muted-foreground hover:text-foreground">Privacidade</Link>
           <Link href="/termos" className="text-muted-foreground hover:text-foreground">Termos</Link>
           <Link href="/cookies" className="text-muted-foreground hover:text-foreground">Cookies</Link>
+          <Link href="/exclusao-de-dados" className="hidden sm:inline text-muted-foreground hover:text-foreground">Excluir dados</Link>
         </nav>
       </header>
       <article className="max-w-[760px] mx-auto px-6 py-12">
