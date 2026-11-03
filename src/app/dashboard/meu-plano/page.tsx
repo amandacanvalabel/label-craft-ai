@@ -53,6 +53,8 @@ interface CurrentPlan {
   promotionalPrice: number | null; benefits: string[];
   activatedAt: string; expiresAt: string | null;
   lastPaymentMethod: string | null;
+  status?: "none" | "active" | "pending" | "expired";
+  active?: boolean;
 }
 
 interface AvailablePlan {
@@ -148,7 +150,10 @@ export default function MeuPlanoPage() {
   const now = Date.now();
   const start = cp?.activatedAt ? new Date(cp.activatedAt).getTime() : now;
   const end = cp?.expiresAt ? new Date(cp.expiresAt).getTime() : now;
-  const isLifetime = cp?.type === "LIFETIME" || !cp?.expiresAt;
+  // Situação real: só é "ativo" com pagamento confirmado dentro do prazo.
+  const planStatus = cp?.status ?? "active";
+  const isActive = planStatus === "active";
+  const isLifetime = isActive && (cp?.type === "LIFETIME" || !cp?.expiresAt);
   const totalMs = end - start || 1;
   const usedMs = now - start;
   const planPct = isLifetime ? 100 : Math.min(100, Math.max(0, Math.round((usedMs / totalMs) * 100)));
@@ -242,7 +247,13 @@ export default function MeuPlanoPage() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="success" dot className="!bg-white/20 !text-white">Ativo</Badge>
+                        {isActive ? (
+                          <Badge variant="success" dot className="!bg-white/20 !text-white">Ativo</Badge>
+                        ) : planStatus === "expired" ? (
+                          <Badge variant="error" dot className="!bg-white/20 !text-white">Vencido</Badge>
+                        ) : (
+                          <Badge variant="warning" dot className="!bg-white/20 !text-white">Aguardando pagamento</Badge>
+                        )}
                       </div>
                       <h2 className="text-3xl font-extrabold text-white">Plano {cp.name}</h2>
                       <p className="text-white/60 text-sm mt-1">
@@ -257,8 +268,16 @@ export default function MeuPlanoPage() {
                     </Button>
                   </div>
 
+                  {!isActive && (
+                    <p className="mt-4 text-sm text-white/85 max-w-xl">
+                      {planStatus === "expired"
+                        ? "Seu período pago terminou. Seus rótulos continuam salvos — renove para voltar a usar os limites do plano e exportar."
+                        : "Sua conta está criada e o plano fica ativo assim que o pagamento for confirmado. Até lá, seus rótulos ficam salvos e a exportação fica bloqueada."}
+                    </p>
+                  )}
+
                   {/* Progress bar */}
-                  {!isLifetime && (
+                  {isActive && !isLifetime && (
                     <div className="mt-5 mb-2">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">Ciclo do plano</span>
@@ -284,7 +303,7 @@ export default function MeuPlanoPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
                     <div>
                       <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Ativação</p>
-                      <p className="text-sm font-bold text-white mt-0.5">{fmtDate(cp.activatedAt)}</p>
+                      <p className="text-sm font-bold text-white mt-0.5">{isActive || planStatus === "expired" ? fmtDate(cp.activatedAt) : "—"}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Expiração</p>
@@ -297,7 +316,7 @@ export default function MeuPlanoPage() {
                       <p className="text-sm font-bold text-white mt-0.5">{cp.lastPaymentMethod ?? "—"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Próx. Renovação</p>
+                      <p className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Válido até</p>
                       <p className="text-sm font-bold text-white mt-0.5">
                         {isLifetime ? "—" : cp.expiresAt ? fmtDate(cp.expiresAt) : "—"}
                       </p>
