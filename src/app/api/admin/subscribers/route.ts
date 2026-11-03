@@ -1,6 +1,34 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { normalizeEmail, passwordIssue } from "@/lib/validation";
+
+import { INTERNAL_PLAN_NAME } from "@/lib/access";
+
+// Plano interno para contas de teste/equipe: grátis, sem limites e ESCONDIDO
+// (isActive = false → não aparece na landing, em /planos nem no checkout).
+// Plano de preço zero é sempre "ativo" para quem o tem (ver src/lib/access.ts).
+
+async function ensureInternalPlan() {
+  const found = await prisma.plan.findFirst({ where: { name: INTERNAL_PLAN_NAME } });
+  if (found) return found;
+  return prisma.plan.create({
+    data: {
+      name: INTERNAL_PLAN_NAME,
+      description: "Uso interno: contas de teste da equipe. Não aparece para clientes.",
+      benefits: ["Tudo ilimitado", "Somente para testes internos"],
+      type: "LIFETIME",
+      price: 0,
+      promotionalPrice: null,
+      isActive: false,
+      monthlyAiCredits: -1,
+      monthlyImageCredits: -1,
+      maxLabels: -1,
+      storageMb: -1,
+    },
+  });
+}
 
 const PLAN_DURATION_DAYS: Record<string, number> = {
   MONTHLY: 30, QUARTERLY: 90, SEMIANNUAL: 180, ANNUAL: 365, LIFETIME: 0,
@@ -19,7 +47,8 @@ export async function GET() {
     prisma.subscriber.count(),
     prisma.subscriber.count({ where: { createdAt: { gte: startOfMonth } } }),
     prisma.plan.findMany({
-      where: { isActive: true },
+      // Planos à venda + o plano interno (para poder atribuí-lo pelo painel).
+      where: { OR: [{ isActive: true }, { name: INTERNAL_PLAN_NAME }] },
       orderBy: { price: "asc" },
       select: { id: true, name: true, type: true, price: true, promotionalPrice: true },
     }),
@@ -106,4 +135,39 @@ export async function GET() {
     subscribers: list,
     plans,
   });
+}
+
+// Cria uma conta de teste já no plano interno ilimitado (só admin).
+export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session || session.role !== "ADMIN") {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  const body = (await req.json().catch(() => ({}))) as { name?: string; email?: string; password?: string };
+  const name = (body.name || "").trim();
+  const email = normalizeEmail(body.email || "");
+  const password = body.password || "";
+  if (name.length < 2) return NextResponse.json({ error: "Informe o nome", field: "name" }, { status: 400 });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "E-mail inválido", field: "email" }, { status: 400 });
+  const pw = passwordIssue(password);
+  if (pw) return NextResponse.json({ error: pw, field: "password" }, { status: 400 });
+
+  const [sub, adm] = await Promise.all([
+    prisma.subscriber.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+    prisma.admin.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+  ]);
+  if (sub || adm) return NextResponse.json({ error: "Já existe uma conta com este e-mail", field: "email" }, { status: 409 });
+
+  const plan = await ensureInternalPlan();
+  const created = await prisma.subscriber.create({
+    data: {
+      name,
+      email,
+      password: await bcrypt.hash(password, 12),
+      planId: plan.id,
+      termsAcceptedAt: new Date(),
+    },
+    select: { id: true, name: true, email: true },
+  });
+  return NextResponse.json({ ...created, plan: plan.name });
 }
