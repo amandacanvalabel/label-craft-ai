@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import Script from "next/script";
 import { getSiteSettings } from "@/lib/site-settings";
+import CookieConsent from "@/components/legal/CookieConsent";
 import "./globals.css";
 
 const GA_ID = "G-W7WFJ9XER5";
@@ -70,14 +71,29 @@ const RootLayout = async ({ children }: Readonly<{ children: React.ReactNode }>)
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
         <Toaster position="top-right" richColors />
-        {/* Google Analytics */}
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">{`
+        <CookieConsent />
+        {/* Google Analytics com Consent Mode v2 (LGPD): tudo começa NEGADO e só
+            libera a medição depois que a pessoa aceita no banner de cookies.
+            Quem já aceitou antes (localStorage) é liberado aqui mesmo. */}
+        <Script id="google-consent" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
+          window.gtag = gtag;
+          gtag('consent', 'default', {
+            analytics_storage: 'denied', ad_storage: 'denied',
+            ad_user_data: 'denied', ad_personalization: 'denied',
+            wait_for_update: 500
+          });
+          try {
+            var c = JSON.parse(localStorage.getItem('cl_cookie_consent') || 'null');
+            if (c && c.analytics === true && Date.now() - (c.ts || 0) < 31536000000) {
+              gtag('consent', 'update', { analytics_storage: 'granted' });
+            }
+          } catch (e) {}
           gtag('js', new Date());
           gtag('config', '${GA_ID}');
         `}</Script>
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
       </body>
     </html>
   );
