@@ -19,6 +19,12 @@ export default async function proxy(req: NextRequest) {
     pathname === "/planos" ||
     // Funil "prévia com IA sem login" (substitui o canvalabel-alimentos.html).
     pathname === "/criar" ||
+    // Documentos legais (LGPD): precisam abrir para qualquer visitante — o
+    // banner de cookies e o cadastro apontam para eles.
+    pathname === "/privacidade" ||
+    pathname === "/termos" ||
+    pathname === "/cookies" ||
+    pathname === "/exclusao-de-dados" ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
