@@ -126,6 +126,7 @@ model Subscriber {
   email        String   @unique
   password     String
   googleId     String?  @unique // login com Google
+  facebookId   String?  @unique // login com Facebook
   termsAcceptedAt DateTime?     // aceite dos Termos de Uso / Política de Privacidade
   avatar       String?
   phone        String?
