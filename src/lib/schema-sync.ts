@@ -7,6 +7,7 @@
 //   payments.months            — meses pagos naquela cobrança (1 mensal, 12 anual)
 //   subscribers.termsAcceptedAt — aceite dos Termos/Privacidade (LGPD)
 //   subscribers.googleId       — login com Google
+//   subscribers.facebookId     — login com Facebook
 //   subscribers.cpfOrCnpj      — passa a ser opcional (conta via Google nasce sem CPF)
 import type { PrismaClient } from "@/generated/prisma/client";
 
@@ -15,6 +16,8 @@ const STATEMENTS = [
   `ALTER TABLE "subscribers" ADD COLUMN IF NOT EXISTS "termsAcceptedAt" TIMESTAMP(3)`,
   `ALTER TABLE "subscribers" ADD COLUMN IF NOT EXISTS "googleId" TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "subscribers_googleId_key" ON "subscribers"("googleId")`,
+  `ALTER TABLE "subscribers" ADD COLUMN IF NOT EXISTS "facebookId" TEXT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "subscribers_facebookId_key" ON "subscribers"("facebookId")`,
   `ALTER TABLE "subscribers" ALTER COLUMN "cpfOrCnpj" DROP NOT NULL`,
 ];
 
