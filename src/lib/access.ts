@@ -14,6 +14,12 @@ export const PLAN_DURATION_DAYS: Record<string, number> = {
 
 export type PlanStatus = "none" | "active" | "pending" | "expired";
 
+// Plano interno das contas de teste da equipe (criadas em Admin → Assinantes →
+// "Nova conta de teste"): grátis, ilimitado, escondido dos clientes e com
+// exportação liberada.
+export const INTERNAL_PLAN_NAME = "Interno — ilimitado (teste)";
+export const isInternalPlan = (plan: { name: string } | null | undefined) => plan?.name === INTERNAL_PLAN_NAME;
+
 export interface PlanAccess {
   status: PlanStatus;
   active: boolean; // pode usar os limites do plano / exportar
