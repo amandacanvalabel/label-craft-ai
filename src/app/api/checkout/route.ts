@@ -28,7 +28,8 @@ const cardSchema = z.object({
 const schema = z.object({
   name: z.string().trim().min(3, "Informe seu nome completo").max(120),
   email: z.string().trim().email("E-mail inválido").max(160),
-  cpfOrCnpj: z.string().min(11, "Informe um CPF ou CNPJ válido"),
+  // CPF agora é pedido na etapa de pagamento (depois da conta criada).
+  cpfOrCnpj: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres").max(72),
   planName: z.string().min(1),
@@ -37,6 +38,9 @@ const schema = z.object({
   creditCard: cardSchema.optional(),
   couponCode: z.string().optional(),
   acceptTerms: z.boolean().optional(),
+  // true = só cria a conta (etapa 1 do modal). O pagamento vem depois, em
+  // /api/subscriber/subscribe, já com a pessoa logada.
+  createOnly: z.boolean().optional(),
 });
 
 function sessionCookie(res: NextResponse, token: string) {
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
   const cpf = onlyDigits(d.cpfOrCnpj);
   const phone = onlyDigits(d.phone || "");
 
-  if (!isValidCpfCnpj(cpf)) return NextResponse.json({ error: "CPF ou CNPJ inválido. Confira os números.", field: "cpfOrCnpj" }, { status: 400 });
+  if (cpf && !isValidCpfCnpj(cpf)) return NextResponse.json({ error: "CPF ou CNPJ inválido. Confira os números.", field: "cpfOrCnpj" }, { status: 400 });
   if (!isValidPhone(phone)) return NextResponse.json({ error: "Telefone inválido. Use DDD + número.", field: "phone" }, { status: 400 });
   const pwIssue = passwordIssue(d.password);
   if (pwIssue) return NextResponse.json({ error: pwIssue, field: "password" }, { status: 400 });
@@ -79,12 +83,12 @@ export async function POST(req: NextRequest) {
     const period: BillingPeriod = d.billingPeriod;
     const { amount } = priceFor(plan, period);
     const isFree = amount <= 0;
-    if (!isFree && !d.paymentMethod) return NextResponse.json({ error: "Escolha a forma de pagamento." }, { status: 400 });
+    if (!isFree && !d.createOnly && !d.paymentMethod) return NextResponse.json({ error: "Escolha a forma de pagamento." }, { status: 400 });
 
     // Conta já existe? Não revelamos nada além do necessário, mas orientamos.
     const [byEmail, byCpf] = await Promise.all([
       prisma.subscriber.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
-      prisma.subscriber.findFirst({ where: { cpfOrCnpj: cpf }, select: { id: true } }),
+      cpf ? prisma.subscriber.findFirst({ where: { cpfOrCnpj: cpf }, select: { id: true } }) : Promise.resolve(null),
     ]);
     if (byEmail) {
       return NextResponse.json(
@@ -107,7 +111,7 @@ export async function POST(req: NextRequest) {
       data: {
         name: d.name,
         email,
-        cpfOrCnpj: cpf,
+        cpfOrCnpj: cpf || null,
         phone: phone || null,
         password: hashed,
         planId: plan.id,
@@ -126,6 +130,20 @@ export async function POST(req: NextRequest) {
       });
       return sessionCookie(
         NextResponse.json({ accountCreated: true, paymentId: null, status: "CONFIRMED", method: "free", confirmed: true, authenticated: true, redirectTo: "/dashboard" }),
+        token,
+      );
+    }
+
+    // 3b) Só cadastro: a pessoa escolhe a forma de pagamento na etapa seguinte.
+    if (d.createOnly) {
+      return sessionCookie(
+        NextResponse.json({
+          accountCreated: true,
+          authenticated: true,
+          user: { id: subscriber.id, name: subscriber.name, email: subscriber.email },
+          needsCpf: !subscriber.cpfOrCnpj,
+          redirectTo: "/dashboard/meu-plano",
+        }),
         token,
       );
     }
