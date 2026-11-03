@@ -1,10 +1,11 @@
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPlanAccess } from "@/lib/access";
 import { NextResponse } from "next/server";
 
 // Permissão de exportação do estúdio.
-// Regra: só quem está em um plano PAGO (preço > 0) pode exportar (PDF/PNG).
-// Plano gratuito (preço 0) ou sem plano → exportação bloqueada.
+// Regra: só quem está em um plano PAGO (preço > 0) com pagamento confirmado e
+// dentro do prazo pode exportar (PDF/PNG). Conta sem pagar, plano gratuito ou
+// vencido → exportação bloqueada (o estúdio mostra "regularize para exportar").
 // Admin/staff → liberado.
 export async function GET() {
   const session = await getSession();
@@ -18,12 +19,8 @@ export async function GET() {
     return NextResponse.json({ canExport: true });
   }
 
-  const subscriber = await prisma.subscriber.findUnique({
-    where: { id: session.id },
-    select: { plan: { select: { price: true } } },
-  });
+  const access = await getPlanAccess(session.id);
+  const canExport = access.active && !!access.plan && access.plan.price > 0;
 
-  const canExport = !!subscriber?.plan && subscriber.plan.price > 0;
-
-  return NextResponse.json({ canExport });
+  return NextResponse.json({ canExport, planStatus: access.status });
 }
