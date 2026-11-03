@@ -100,7 +100,10 @@ export async function finishSocialLogin(req: NextRequest, profile: SocialProfile
   }
 
   const token = await signToken({ id: subscriber.id, email: subscriber.email, name: subscriber.name, role: "SUBSCRIBER" });
-  const dest = isNew || !subscriber.planId ? "/planos?bemvindo=1" : next || "/dashboard";
+  // Conta nova (ou sem plano) volta para os planos. Se veio do modal de um
+  // plano (/planos?plano=…), volta direto para a etapa de pagamento dele.
+  const voltaPlanos = next && next.startsWith("/planos") ? next + (next.includes("?") ? "&" : "?") + "bemvindo=1" : "/planos?bemvindo=1";
+  const dest = isNew || !subscriber.planId ? voltaPlanos : next || "/dashboard";
   const res = NextResponse.redirect(new URL(dest, req.url));
   res.cookies.set("token", token, {
     httpOnly: true,
