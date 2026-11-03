@@ -1,15 +1,8 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUsage } from "@/lib/usage";
+import { getPlanAccess } from "@/lib/access";
 import { NextResponse } from "next/server";
-
-const PLAN_DURATION_DAYS: Record<string, number> = {
-  MONTHLY: 30,
-  QUARTERLY: 90,
-  SEMIANNUAL: 180,
-  ANNUAL: 365,
-  LIFETIME: 0,
-};
 
 const METHOD_LABEL: Record<string, string> = {
   PIX: "PIX",
@@ -61,22 +54,12 @@ export async function GET() {
 
   if (!subscriber) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
 
-  // Build current plan info
+  // Situação real do plano (pago e no prazo / pendente / vencido).
+  const access = await getPlanAccess(session.id);
   let currentPlan = null;
   if (subscriber.plan) {
     const confirmedPayments = subscriber.payments.filter((p) => p.status === "CONFIRMED");
     const latestConfirmed = confirmedPayments[0] ?? null;
-    const earliestConfirmed = confirmedPayments[confirmedPayments.length - 1] ?? null;
-
-    const activatedAt = earliestConfirmed?.createdAt ?? subscriber.createdAt;
-    const duration = PLAN_DURATION_DAYS[subscriber.plan.type] ?? 30;
-    const isLifetime = subscriber.plan.type === "LIFETIME";
-    const expiresAt = isLifetime
-      ? null
-      : latestConfirmed
-      ? new Date(latestConfirmed.createdAt.getTime() + duration * 86_400_000)
-      : new Date(activatedAt.getTime() + duration * 86_400_000);
-
     currentPlan = {
       id: subscriber.plan.id,
       name: subscriber.plan.name,
@@ -84,9 +67,12 @@ export async function GET() {
       price: subscriber.plan.price,
       promotionalPrice: subscriber.plan.promotionalPrice,
       benefits: subscriber.plan.benefits,
-      activatedAt: activatedAt.toISOString(),
-      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+      status: access.status,
+      active: access.active,
+      activatedAt: (access.activatedAt ?? subscriber.createdAt).toISOString(),
+      expiresAt: access.expiresAt ? access.expiresAt.toISOString() : null,
       lastPaymentMethod: latestConfirmed ? (METHOD_LABEL[latestConfirmed.method] ?? latestConfirmed.method) : null,
+      pendingPaymentId: access.pendingPayment?.id ?? null,
     };
   }
 
