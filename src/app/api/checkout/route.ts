@@ -1,46 +1,172 @@
+// Cadastro + assinatura (modal de planos da landing / página /planos).
+//
+// Ordem de prioridade: a CONTA É CRIADA E SALVA PRIMEIRO, antes de falar com
+// o Asaas. Se o pagamento falhar (ou a pessoa fechar o PIX sem pagar), ela
+// continua com a conta, entra no painel e paga depois em "Meu plano".
+// A sessão (cookie) é criada aqui mesmo — não dependemos da confirmação.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { makeResetToken } from "@/lib/reset-token";
-import { sendPasswordResetEmail } from "@/lib/email";
+import { signToken } from "@/lib/auth";
+import { sendWelcomeEmail } from "@/lib/email";
+import { createSubscriptionPayment, friendlyPaymentError, priceFor, type BillingPeriod, type CheckoutMethod } from "@/lib/billing";
+import { isValidCpfCnpj, isValidPhone, normalizeEmail, onlyDigits, passwordIssue } from "@/lib/validation";
 
-const schema = z.object({ email: z.string().email() });
+export const runtime = "nodejs";
+
+const cardSchema = z.object({
+  holderName: z.string().min(2, "Nome no cartão obrigatório"),
+  number: z.string().min(13, "Número do cartão inválido"),
+  expiryMonth: z.string().min(1),
+  expiryYear: z.string().min(2),
+  ccv: z.string().min(3, "CVV inválido"),
+  postalCode: z.string().optional(),
+  addressNumber: z.string().optional(),
+});
+
+const schema = z.object({
+  name: z.string().trim().min(3, "Informe seu nome completo").max(120),
+  email: z.string().trim().email("E-mail inválido").max(160),
+  cpfOrCnpj: z.string().min(11, "Informe um CPF ou CNPJ válido"),
+  phone: z.string().optional().default(""),
+  password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres").max(72),
+  planName: z.string().min(1),
+  billingPeriod: z.enum(["monthly", "annual"]).default("monthly"),
+  paymentMethod: z.enum(["pix", "card", "boleto"]).nullable().optional(),
+  creditCard: cardSchema.optional(),
+  couponCode: z.string().optional(),
+  acceptTerms: z.boolean().optional(),
+});
+
+function sessionCookie(res: NextResponse, token: string) {
+  res.cookies.set("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60,
+    path: "/",
+  });
+  return res;
+}
 
 export async function POST(req: NextRequest) {
+  let body: unknown;
   try {
-    const body = await req.json();
-    const parsed = schema.safeParse(body);
-    // Sempre respondemos "ok" para não revelar se o e-mail existe (segurança).
-    if (!parsed.success) return NextResponse.json({ ok: true });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
+  }
+  const d = parsed.data;
+  const email = normalizeEmail(d.email);
+  const cpf = onlyDigits(d.cpfOrCnpj);
+  const phone = onlyDigits(d.phone || "");
 
-    const email = parsed.data.email.trim().toLowerCase();
+  if (!isValidCpfCnpj(cpf)) return NextResponse.json({ error: "CPF ou CNPJ inválido. Confira os números.", field: "cpfOrCnpj" }, { status: 400 });
+  if (!isValidPhone(phone)) return NextResponse.json({ error: "Telefone inválido. Use DDD + número.", field: "phone" }, { status: 400 });
+  const pwIssue = passwordIssue(d.password);
+  if (pwIssue) return NextResponse.json({ error: pwIssue, field: "password" }, { status: 400 });
+  if (!d.acceptTerms) return NextResponse.json({ error: "Para continuar, aceite os Termos de Uso e a Política de Privacidade.", field: "acceptTerms" }, { status: 400 });
 
-    // Procura no subscriber e, se não achar, no admin.
-    // Busca sem diferenciar maiúsculas/minúsculas: contas antigas foram gravadas
-    // com o e-mail em outro formato e não eram encontradas aqui.
-    const subscriber = await prisma.subscriber.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
+  try {
+    const plan = await prisma.plan.findFirst({ where: { name: d.planName, isActive: true } });
+    if (!plan) return NextResponse.json({ error: "Plano não encontrado. Recarregue a página e tente de novo." }, { status: 400 });
+
+    const period: BillingPeriod = d.billingPeriod;
+    const { amount } = priceFor(plan, period);
+    const isFree = amount <= 0;
+    if (!isFree && !d.paymentMethod) return NextResponse.json({ error: "Escolha a forma de pagamento." }, { status: 400 });
+
+    // Conta já existe? Não revelamos nada além do necessário, mas orientamos.
+    const [byEmail, byCpf] = await Promise.all([
+      prisma.subscriber.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+      prisma.subscriber.findFirst({ where: { cpfOrCnpj: cpf }, select: { id: true } }),
+    ]);
+    if (byEmail) {
+      return NextResponse.json(
+        { error: "Já existe uma conta com este e-mail. Entre com sua senha para continuar (ou use “Esqueci minha senha”).", field: "email", code: "EMAIL_EXISTS" },
+        { status: 409 },
+      );
+    }
+    if (byCpf) {
+      return NextResponse.json(
+        { error: "Este CPF/CNPJ já está cadastrado em outra conta. Entre com o e-mail usado no cadastro.", field: "cpfOrCnpj", code: "CPF_EXISTS" },
+        { status: 409 },
+      );
+    }
+    const admin = await prisma.admin.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } });
+    if (admin) return NextResponse.json({ error: "Este e-mail já está em uso.", field: "email" }, { status: 409 });
+
+    // 1) Cria a conta (salva mesmo que o pagamento não aconteça).
+    const hashed = await bcrypt.hash(d.password, 12);
+    const subscriber = await prisma.subscriber.create({
+      data: {
+        name: d.name,
+        email,
+        cpfOrCnpj: cpf,
+        phone: phone || null,
+        password: hashed,
+        planId: plan.id,
+        termsAcceptedAt: new Date(),
+      },
     });
-    let account: { id: string; name: string; password: string; kind: "subscriber" | "admin" } | null = null;
-    if (subscriber) {
-      account = { id: subscriber.id, name: subscriber.name, password: subscriber.password, kind: "subscriber" };
-    } else {
-      const admin = await prisma.admin.findFirst({
-        where: { email: { equals: email, mode: "insensitive" } },
+
+    // 2) Sessão imediata.
+    const token = await signToken({ id: subscriber.id, email: subscriber.email, name: subscriber.name, role: "SUBSCRIBER" });
+    sendWelcomeEmail(subscriber.email, subscriber.name, plan.name).catch(() => {});
+
+    // 3) Plano gratuito (ou valor zero): ativa sem cobrança.
+    if (isFree) {
+      await prisma.payment.create({
+        data: { amount: 0, method: "PIX", kind: "SUBSCRIPTION", status: "CONFIRMED", months: period === "annual" ? 12 : 1, subscriberId: subscriber.id, planId: plan.id },
       });
-      if (admin) account = { id: admin.id, name: admin.name, password: admin.password, kind: "admin" };
+      return sessionCookie(
+        NextResponse.json({ accountCreated: true, paymentId: null, status: "CONFIRMED", method: "free", confirmed: true, authenticated: true, redirectTo: "/dashboard" }),
+        token,
+      );
     }
 
-    if (account) {
-      const token = await makeResetToken({ id: account.id, kind: account.kind, passwordHash: account.password });
-      const resetUrl = `${req.nextUrl.origin}/reset-password?token=${encodeURIComponent(token)}`;
-      await sendPasswordResetEmail(email, account.name, resetUrl);
+    // 4) Cobrança no Asaas. Se falhar, a conta fica — e avisamos como pagar depois.
+    try {
+      const outcome = await createSubscriptionPayment({
+        subscriber,
+        plan,
+        period,
+        method: d.paymentMethod as CheckoutMethod,
+        creditCard: d.creditCard,
+        couponCode: d.couponCode,
+      });
+      return sessionCookie(
+        NextResponse.json({
+          accountCreated: true,
+          authenticated: true,
+          redirectTo: "/dashboard",
+          ...outcome,
+        }),
+        token,
+      );
+    } catch (err) {
+      console.error("[CHECKOUT PAYMENT ERROR]", err);
+      return sessionCookie(
+        NextResponse.json(
+          {
+            accountCreated: true,
+            authenticated: true,
+            redirectTo: "/dashboard/meu-plano",
+            paymentFailed: true,
+            error: friendlyPaymentError(err),
+          },
+          { status: 502 },
+        ),
+        token,
+      );
     }
-
-    return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[FORGOT PASSWORD ERROR]", err);
-    // Mesmo em erro, não vazamos detalhes.
-    return NextResponse.json({ ok: true });
+    console.error("[CHECKOUT ERROR]", err);
+    return NextResponse.json({ error: "Não foi possível concluir o cadastro agora. Tente novamente em instantes." }, { status: 500 });
   }
 }
