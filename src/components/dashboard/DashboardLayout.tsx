@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import AnnouncementBanner from "./AnnouncementBanner";
+import PlanStatusBanner from "./PlanStatusBanner";
 import SupportWidget from "./SupportWidget";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -93,6 +94,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       >
         <div className="p-6">
+          {role === "SUBSCRIBER" && <PlanStatusBanner />}
           {role === "SUBSCRIBER" && <AnnouncementBanner />}
           {children}
         </div>
