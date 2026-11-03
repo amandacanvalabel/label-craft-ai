@@ -5,12 +5,16 @@
 // mês quando a pessoa paga o ano de uma vez (12 meses). O valor cobrado no
 // anual é promotionalPrice × 12 (ou price × 12 se não houver promoção).
 import { prisma } from "./prisma";
-import { createCustomer, createPayment, findCustomerByEmail, getPixQrCode, type AsaasBillingType } from "./asaas";
+import { AsaasError, createCustomer, createPayment, findCustomerByEmail, getPixQrCode, type AsaasBillingType } from "./asaas";
 import { redeemCoupon, validateCoupon } from "./coupon";
 import { sendPlanConfirmationEmail } from "./email";
 import { onlyDigits } from "./validation";
 
 export type BillingPeriod = "monthly" | "annual";
+
+// Erro de dado informado pela pessoa (cupom, CPF, cartão): a mensagem é clara
+// e pode ser mostrada como está.
+export class BillingInputError extends Error {}
 export type CheckoutMethod = "pix" | "card" | "boleto";
 
 export interface CardInput {
@@ -75,7 +79,7 @@ export async function createSubscriptionPayment(opts: {
   let appliedCoupon: string | null = null;
   if (opts.couponCode?.trim()) {
     const v = await validateCoupon(opts.couponCode, baseAmount);
-    if (!v.valid) throw new Error(v.error || "Cupom inválido");
+    if (!v.valid) throw new BillingInputError(v.error || "Cupom inválido");
     amount = v.finalAmount ?? baseAmount;
     appliedCoupon = v.code ?? null;
   }
@@ -89,7 +93,7 @@ export async function createSubscriptionPayment(opts: {
     return { paymentId: payment.id, asaasPaymentId: null, status: "CONFIRMED", method: "free", confirmed: true, amount: 0 };
   }
 
-  if (!subscriber.cpfOrCnpj) throw new Error("Informe seu CPF ou CNPJ para gerar o pagamento");
+  if (!subscriber.cpfOrCnpj) throw new BillingInputError("Informe seu CPF ou CNPJ para gerar o pagamento");
 
   // Cliente Asaas
   let customer = subscriber.asaasCustomerId ? { id: subscriber.asaasCustomerId } : await findCustomerByEmail(subscriber.email);
@@ -97,7 +101,11 @@ export async function createSubscriptionPayment(opts: {
     customer = await createCustomer({ name: subscriber.name, email: subscriber.email, cpfCnpj: subscriber.cpfOrCnpj, phone: subscriber.phone ?? undefined });
   }
   if (customer.id !== subscriber.asaasCustomerId) {
-    await prisma.subscriber.update({ where: { id: subscriber.id }, data: { asaasCustomerId: customer.id } });
+    // Guardar o id do cliente é só um atalho para a próxima cobrança: se não
+    // der (ex.: id já vinculado a outra conta), segue sem travar o pagamento.
+    await prisma.subscriber
+      .update({ where: { id: subscriber.id }, data: { asaasCustomerId: customer.id } })
+      .catch((err) => console.error("[BILLING] não salvou asaasCustomerId", err));
   }
 
   const billingTypeMap: Record<CheckoutMethod, AsaasBillingType> = { pix: "PIX", card: "CREDIT_CARD", boleto: "BOLETO" };
@@ -114,7 +122,7 @@ export async function createSubscriptionPayment(opts: {
   }
   if (method === "card") {
     const cc = opts.creditCard;
-    if (!cc) throw new Error("Preencha os dados do cartão");
+    if (!cc) throw new BillingInputError("Preencha os dados do cartão");
     paymentData.creditCard = {
       holderName: cc.holderName,
       number: onlyDigits(cc.number),
@@ -177,11 +185,20 @@ export async function createSubscriptionPayment(opts: {
   return out;
 }
 
-// Mensagens do Asaas em português claro para o cliente.
+// Mensagens do Asaas em português claro para o cliente. Erros internos
+// (banco, código) nunca aparecem crus: viram uma mensagem genérica.
 export function friendlyPaymentError(err: unknown): string {
-  const m = err instanceof Error ? err.message : String(err);
-  if (/cpf|cnpj/i.test(m)) return "CPF/CNPJ não aceito pela instituição de pagamento. Confira os números e tente de novo.";
-  if (/cart[aã]o|card/i.test(m)) return "O cartão foi recusado. Confira os dados ou tente PIX.";
-  if (/access_token|unauthorized|401/i.test(m)) return "Serviço de pagamento indisponível no momento. Sua conta foi criada — você pode pagar depois em “Meu plano”.";
-  return m || "Não foi possível gerar o pagamento agora. Sua conta foi criada — tente de novo em “Meu plano”.";
+  const later = "Sua conta está salva — você pode pagar depois em “Meu plano”.";
+  if (err instanceof AsaasError) {
+    const m = err.message || "";
+    if (err.status === 401 || err.status === 403 || /access_token|chave de api|api key/i.test(m)) {
+      return `O serviço de pagamento está indisponível no momento. ${later}`;
+    }
+    if (err.status >= 500 || err.code === "network") return `A instituição de pagamento não respondeu. Tente de novo em instantes. ${later}`;
+    if (/cpf|cnpj/i.test(m)) return "CPF/CNPJ não aceito pela instituição de pagamento. Confira os números e tente de novo.";
+    if (/cart[aã]o|card|transa[cç][aã]o n[aã]o autorizada/i.test(m)) return "O cartão foi recusado. Confira os dados ou tente PIX.";
+    return m;
+  }
+  if (err instanceof BillingInputError) return err.message;
+  return `Não foi possível gerar o pagamento agora. ${later}`;
 }
