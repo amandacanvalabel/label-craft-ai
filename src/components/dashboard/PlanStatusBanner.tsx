@@ -84,8 +84,8 @@ export default function PlanStatusBanner() {
       : `Seu plano ${info.plan?.name ?? ""} aguarda o pagamento${pending ? ` de ${fmt(pending.amount)}` : ""}.`;
   const sub =
     info.status === "none"
-      ? "Enquanto isso você pode montar rótulos à vontade no modo gratuito."
-      : "Seus rótulos continuam salvos. Até regularizar, valem os limites do modo gratuito e a exportação fica bloqueada.";
+      ? "Enquanto isso você já pode explorar o estúdio e montar rótulos (com limites reduzidos)."
+      : "Seus rótulos continuam salvos. Até o pagamento ser confirmado, o estúdio funciona com limites reduzidos e a exportação fica bloqueada.";
 
   const copy = async () => {
     if (!pending?.pix) return;
