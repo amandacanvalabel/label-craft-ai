@@ -2,7 +2,14 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+// Seed de desenvolvimento. Em produção só roda com o segredo SEED_SECRET
+// (?secret=...), para ninguém criar um admin com senha conhecida.
+export async function GET(req: Request) {
+  const secret = process.env.SEED_SECRET;
+  const given = new URL(req.url).searchParams.get("secret");
+  if (process.env.NODE_ENV === "production" && (!secret || given !== secret)) {
+    return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+  }
   try {
     const hashedPassword = await bcrypt.hash("Admin@123", 12);
 
