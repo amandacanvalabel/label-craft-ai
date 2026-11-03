@@ -26,6 +26,12 @@ const footerLinks = {
     { label: "Gerar prévia com IA", href: "/criar" },
     { label: "Dúvidas frequentes", href: "#faq" },
   ],
+  legal: [
+    { label: "Política de Privacidade", href: "/privacidade" },
+    { label: "Termos de Uso", href: "/termos" },
+    { label: "Política de Cookies", href: "/cookies" },
+    { label: "Garantia de 7 dias", href: "/termos#garantia" },
+  ],
 };
 
 // Redes sociais: preencha os links reais no admin / aqui quando existirem.
@@ -46,7 +52,7 @@ const Footer = async () => {
       <div className="absolute top-0 left-0 right-0 h-1 gradient-primary" />
 
       <div className="max-w-[1440px] mx-auto px-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-10 mb-16">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2.5 mb-5">
@@ -138,8 +144,14 @@ const Footer = async () => {
             </div>
           )}
 
-          <p className="text-xs text-white/30">
-            Referências: IN 75/2020 · RDC 429/2020 · RDC 26/2015 (ANVISA)
+          <p className="text-xs text-white/30 flex flex-wrap items-center gap-x-3 gap-y-1 justify-center">
+            <Link href="/privacidade" className="hover:text-white">Privacidade</Link>
+            <span>·</span>
+            <Link href="/termos" className="hover:text-white">Termos</Link>
+            <span>·</span>
+            <Link href="/cookies" className="hover:text-white">Cookies</Link>
+            <span>·</span>
+            <span>IN 75/2020 · RDC 429/2020 · RDC 26/2015 (ANVISA)</span>
           </p>
         </div>
       </div>
