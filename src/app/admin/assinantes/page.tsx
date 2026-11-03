@@ -110,6 +110,36 @@ export default function AssinantesPage() {
   const [editState, setEditState] = useState("");
   const [editPlanId, setEditPlanId] = useState("");
   const [saving, setSaving] = useState(false);
+  // Nova conta de teste (plano interno ilimitado)
+  const [testOpen, setTestOpen] = useState(false);
+  const [testName, setTestName] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testPassword, setTestPassword] = useState("");
+  const [testSaving, setTestSaving] = useState(false);
+
+  async function createTestAccount() {
+    setTestSaving(true);
+    try {
+      const res = await fetch("/api/admin/subscribers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: testName, email: testEmail, password: testPassword }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(d.error || "Não foi possível criar a conta");
+        return;
+      }
+      toast.success(`Conta de teste criada: ${d.email}. Entre com esse e-mail e a senha escolhida.`);
+      setTestOpen(false);
+      setTestName("");
+      setTestEmail("");
+      setTestPassword("");
+      load();
+    } finally {
+      setTestSaving(false);
+    }
+  }
   const [deleting, setDeleting] = useState(false);
 
   const load = () => {
@@ -341,10 +371,16 @@ export default function AssinantesPage() {
         title="Assinantes"
         subtitle="Gerencie todos os assinantes da plataforma"
         actions={
-          <Button variant="secondary" size="sm" onClick={load}>
-            <HiOutlineArrowPath className={cn("w-4 h-4", loading && "animate-spin")} />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={load}>
+              <HiOutlineArrowPath className={cn("w-4 h-4", loading && "animate-spin")} />
+              Atualizar
+            </Button>
+            <Button size="sm" onClick={() => setTestOpen(true)}>
+              <HiOutlineUserPlus className="w-4 h-4" />
+              Nova conta de teste
+            </Button>
+          </div>
         }
       />
 
@@ -383,6 +419,41 @@ export default function AssinantesPage() {
           />
         )}
       </div>
+
+      {/* Nova conta de teste */}
+      <Modal
+        isOpen={testOpen}
+        onClose={() => setTestOpen(false)}
+        title="Nova conta de teste"
+        subtitle="Plano interno ilimitado, sem cobrança. Não aparece para clientes."
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setTestOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={createTestAccount} disabled={testSaving}>
+              <HiOutlineUserPlus className="w-4 h-4" />
+              {testSaving ? "Criando…" : "Criar conta"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FormField label="Nome" required>
+            <Input value={testName} onChange={(e) => setTestName(e.target.value)} placeholder="Ex.: Amanda — teste" />
+          </FormField>
+          <FormField label="E-mail" required>
+            <Input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="teste@seudominio.com.br" />
+          </FormField>
+          <FormField label="Senha" required>
+            <Input type="password" value={testPassword} onChange={(e) => setTestPassword(e.target.value)} placeholder="6+ caracteres, letras e números" />
+          </FormField>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Use um e-mail diferente do seu e-mail de administrador (pode ser um alias, como <b>voce+teste@gmail.com</b>).
+            Depois é só sair do painel admin e entrar em <b>/login</b> com esse e-mail e senha. A conta fica com IA, imagens,
+            rótulos e armazenamento ilimitados e exportação liberada.
+          </p>
+        </div>
+      </Modal>
 
       {/* Subscriber Modal */}
       <Modal
