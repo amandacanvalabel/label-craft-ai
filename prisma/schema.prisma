@@ -121,10 +121,12 @@ model SiteSettings {
 
 model Subscriber {
   id           String   @id @default(cuid())
-  cpfOrCnpj    String   @unique
+  cpfOrCnpj    String?  @unique // opcional: conta via Google nasce sem CPF (pedido antes de pagar)
   name         String
   email        String   @unique
   password     String
+  googleId     String?  @unique // login com Google
+  termsAcceptedAt DateTime?     // aceite dos Termos de Uso / Política de Privacidade
   avatar       String?
   phone        String?
   street       String?
@@ -268,6 +270,7 @@ model Payment {
   kind            PaymentKind   @default(SUBSCRIPTION)
   asaasPaymentId  String?       @unique
   asaasInvoiceUrl String?
+  months          Int           @default(1) // meses cobertos (1 = mensal, 12 = anual)
 
   couponCode     String?
   creditsApplied Boolean @default(false) // pacote: créditos já lançados ao subscriber?
