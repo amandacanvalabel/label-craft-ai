@@ -52,9 +52,22 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Só o painel do assinante e o admin exigem login. Qualquer outro endereço
+  // segue normal: se não existir, o Next mostra a página 404 (antes caía no
+  // /login, o que confundia visitantes e buscadores).
+  const isPrivate =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
+  if (!isPrivate) return NextResponse.next();
+
   // Protected routes
   if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    // Volta para a página pedida depois do login.
+    const login = new URL("/login", req.url);
+    login.searchParams.set("next", pathname);
+    return NextResponse.redirect(login);
   }
 
   try {
