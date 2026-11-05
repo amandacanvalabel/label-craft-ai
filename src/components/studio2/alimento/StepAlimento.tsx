@@ -244,7 +244,7 @@ export default function StepAlimento() {
       {a.modo === "receita" ? <Receita /> : <Direto />}
 
       <div className="section-h">§ 3 — Alérgenos, glúten e lactose</div>
-      <Campo label="ALÉRGICOS: CONTÉM…" desc="RDC 26/2015. Marque todos os presentes na formulação.">
+      <Campo label="ALÉRGICOS: CONTÉM…" desc="RDC 727/2022. Marque todos os presentes na formulação.">
         <div className="chips">
           {ALERGENOS.map((al) => (
             <button key={al.id} type="button" className={`chip ${a.alergenos.includes(al.id) ? "sel" : ""}`} onClick={() => toggleList("alergenos", al.id)}>
