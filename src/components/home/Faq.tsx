@@ -16,7 +16,7 @@ const faqs = [
   },
   {
     q: "O rótulo sai mesmo dentro das normas da ANVISA?",
-    a: "O revisor confere 32 regras da IN 75/2020, da RDC 429/2020 e da RDC 26/2015 antes de você exportar: tamanho mínimo de letra, campos obrigatórios, tabela nutricional no padrão do Anexo IX, lupa “ALTO EM”, alérgenos e glúten. Ele lista o que está faltando para você corrigir ali mesmo. A responsabilidade pelo produto continua sendo do fabricante, mas você exporta sabendo exatamente o que foi verificado.",
+    a: "O revisor confere 32 regras da IN 75/2020, da RDC 429/2020 e da RDC 727/2022 antes de você exportar: tamanho mínimo de letra, campos obrigatórios, tabela nutricional no padrão do Anexo IX, lupa “ALTO EM”, alérgenos e glúten. Ele lista o que está faltando para você corrigir ali mesmo. A responsabilidade pelo produto continua sendo do fabricante, mas você exporta sabendo exatamente o que foi verificado.",
   },
   {
     q: "Como funciona a tabela nutricional?",
