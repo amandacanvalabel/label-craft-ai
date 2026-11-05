@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Gere uma prévia do seu rótulo com IA | CanvaLabel",
   description:
     "Descreva seu alimento ou cosmético e veja em segundos como o rótulo pode ficar. Depois, finalize com tudo que a ANVISA exige.",
+  alternates: { canonical: "/criar" },
 };
 
 export default function CriarPage() {
