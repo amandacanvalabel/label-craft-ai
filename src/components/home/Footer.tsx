@@ -26,6 +26,13 @@ const footerLinks = {
     { label: "Gerar prévia com IA", href: "/criar" },
     { label: "Dúvidas frequentes", href: "#faq" },
   ],
+  guias: [
+    { label: "Rótulo de alimentos", href: "/guias/rotulo-de-alimentos-o-que-e-obrigatorio" },
+    { label: "Tabela nutricional", href: "/guias/tabela-nutricional-como-fazer" },
+    { label: "Lupa “ALTO EM”", href: "/guias/lupa-alto-em-quando-usar" },
+    { label: "Rótulo de cosméticos", href: "/guias/rotulo-de-cosmeticos-o-que-e-obrigatorio" },
+    { label: "Todos os guias", href: "/guias" },
+  ],
   legal: [
     { label: "Política de Privacidade", href: "/privacidade" },
     { label: "Termos de Uso", href: "/termos" },
@@ -151,7 +158,7 @@ const Footer = async () => {
             <span>·</span>
             <Link href="/cookies" className="hover:text-white">Cookies</Link>
             <span>·</span>
-            <span>IN 75/2020 · RDC 429/2020 · RDC 26/2015 (ANVISA)</span>
+            <span>RDC 727/2022 · RDC 429/2020 · IN 75/2020 · RDC 907/2024 (ANVISA)</span>
           </p>
         </div>
       </div>
