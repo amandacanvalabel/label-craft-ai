@@ -31,6 +31,10 @@ Indicado para pequenos e médios produtores de alimentos (confeitaria, padaria, 
 
 ${blocos}
 
+## Texto completo
+
+- [Todos os guias em um só arquivo](${SITE_URL}/llms-full.txt)
+
 ## Contato
 
 - E-mail: contato@canvalabel.com.br
