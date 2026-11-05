@@ -30,6 +30,8 @@ import { getSession } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
 import { getGalleryImages } from "@/lib/gallery";
 
+export const metadata = { alternates: { canonical: "/" } };
+
 const HomePage = async () => {
   const [settings, session, galleryImages] = await Promise.all([
     getSiteSettings(),
