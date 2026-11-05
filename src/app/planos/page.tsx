@@ -10,6 +10,7 @@ export const metadata = {
   title: "Planos e cadastro | CanvaLabel",
   description:
     "Crie sua conta no CanvaLabel — a partir de R$ 9,90/mês — e finalize seu rótulo com tudo que a ANVISA exige.",
+  alternates: { canonical: "/planos" },
 };
 
 export default async function PlanosPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
