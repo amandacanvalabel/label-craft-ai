@@ -25,6 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: g.descricao,
     alternates: { canonical: url },
     openGraph: { type: "article", title: g.metaTitulo, description: g.descricao, url, locale: "pt_BR", siteName: "CanvaLabel" },
+    twitter: { card: "summary_large_image", title: g.metaTitulo, description: g.descricao },
   };
 }
 
@@ -124,7 +125,7 @@ export default async function GuiaPage({ params }: { params: Promise<{ slug: str
         </div>
       </article>
 
-      {g.slug === "lupa-alto-em-quando-usar" && <LupaCalculadora ctaHref="/criar" />}
+      {g.slug === "lupa-alto-em-quando-usar" && <LupaCalculadora ctaHref="/criar" mostrarGuia={false} />}
 
       <div className="max-w-[760px] mx-auto px-4 sm:px-6">
         <section className="mt-12 rounded-2xl gradient-primary text-white p-6 sm:p-8">
