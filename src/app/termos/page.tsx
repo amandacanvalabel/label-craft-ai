@@ -4,6 +4,7 @@ import LegalPage from "@/components/legal/LegalPage";
 export const metadata: Metadata = {
   title: "Termos de Uso | CanvaLabel",
   description: "Condições para uso da plataforma CanvaLabel: conta, planos, pagamentos, garantia, responsabilidades e cancelamento.",
+  alternates: { canonical: "/termos" },
 };
 
 export default function TermosPage() {
