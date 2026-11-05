@@ -4,6 +4,7 @@ import LegalPage from "@/components/legal/LegalPage";
 export const metadata: Metadata = {
   title: "Política de Privacidade | CanvaLabel",
   description: "Como o CanvaLabel coleta, usa, armazena e protege seus dados pessoais, em conformidade com a LGPD.",
+  alternates: { canonical: "/privacidade" },
 };
 
 export default function PrivacidadePage() {
