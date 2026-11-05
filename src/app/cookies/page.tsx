@@ -5,6 +5,7 @@ import CookiePreferencesButton from "@/components/legal/CookiePreferencesButton"
 export const metadata: Metadata = {
   title: "Política de Cookies | CanvaLabel",
   description: "Quais cookies o CanvaLabel usa, para quê, e como gerenciar suas preferências.",
+  alternates: { canonical: "/cookies" },
 };
 
 export default function CookiesPage() {
