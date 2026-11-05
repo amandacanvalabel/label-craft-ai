@@ -3,14 +3,14 @@
 //   RESEND_API_KEY   — chave da API do Resend (obrigatória para enviar)
 //   EMAIL_FROM       — remetente, ex.: "CanvaLabel <no-reply@canvalabel.com>"
 //                      (precisa de domínio verificado no Resend)
-//   NEXT_PUBLIC_BASE_URL — ex.: "https://www.canvalabel.com" (links dos e-mails)
+//   NEXT_PUBLIC_BASE_URL — ex.: "https://www.canvalabel.com.br" (links dos e-mails)
 //
 // Se RESEND_API_KEY não estiver definida, os envios são apenas logados (no-op),
 // então nada quebra em ambiente sem e-mail configurado.
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const EMAIL_FROM = process.env.EMAIL_FROM || "CanvaLabel <onboarding@resend.dev>";
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://www.canvalabel.com";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://www.canvalabel.com.br";
 
 const BRAND = "#2563eb";
 
