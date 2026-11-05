@@ -4,6 +4,7 @@ import LegalPage from "@/components/legal/LegalPage";
 export const metadata: Metadata = {
   title: "Exclusão de dados | CanvaLabel",
   description: "Como pedir a exclusão da sua conta e dos seus dados pessoais no CanvaLabel, inclusive se você entrou com Google ou Facebook.",
+  alternates: { canonical: "/exclusao-de-dados" },
 };
 
 // Página exigida pelo Facebook ("URL de instruções de exclusão de dados") e
