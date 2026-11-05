@@ -32,7 +32,7 @@ const benefits = [
     title: "Revisor de normas da ANVISA",
     ganho: "Chega de descobrir o erro depois de imprimir",
     description:
-      "32 regras da IN 75/2020, RDC 429/2020 e RDC 26/2015 conferidas antes de exportar: tamanho de letra, campos obrigatórios, advertências. Ele aponta exatamente o que falta.",
+      "32 regras da IN 75/2020, RDC 429/2020 e RDC 727/2022 conferidas antes de exportar: tamanho de letra, campos obrigatórios, advertências. Ele aponta exatamente o que falta.",
     color: "from-emerald-500 to-teal-400",
     bg: "bg-emerald-50",
   },
