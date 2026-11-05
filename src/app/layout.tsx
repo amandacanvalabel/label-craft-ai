@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import Script from "next/script";
 import { getSiteSettings } from "@/lib/site-settings";
+import { canonicalBase } from "@/lib/site";
 import CookieConsent from "@/components/legal/CookieConsent";
 import "./globals.css";
 
@@ -22,18 +23,27 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
+  const base = canonicalBase(settings.canonicalUrl);
 
   return {
     title: settings.metaTitle,
     description: settings.metaDescription,
     keywords: settings.keywords,
-    metadataBase: new URL(settings.canonicalUrl),
-    alternates: { canonical: settings.canonicalUrl },
+    metadataBase: new URL(base),
+    // Sem canonical aqui: no layout ele valia para TODAS as páginas e dizia ao
+    // Google que /planos, /termos etc. eram cópias da home. Cada página
+    // pública declara o seu (home "/", planos "/planos", guias "/guias/…").
     icons: { icon: "/favicon.png", shortcut: "/favicon.png", apple: "/favicon.png" },
+    // Códigos de verificação do Google Search Console e do Bing Webmaster
+    // Tools: basta colar nas variáveis de ambiente da Vercel.
+    verification: {
+      google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+      other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+    },
     openGraph: {
       title: settings.metaTitle,
       description: settings.metaDescription,
-      url: settings.canonicalUrl,
+      url: base,
       siteName: settings.siteName,
       images: settings.openGraphImageUrl ? [{ url: settings.openGraphImageUrl }] : undefined,
       locale: "pt_BR",
