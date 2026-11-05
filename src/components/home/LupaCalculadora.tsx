@@ -31,7 +31,7 @@ const toNum = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const LupaCalculadora = () => {
+const LupaCalculadora = ({ ctaHref = "#planos" }: { ctaHref?: string }) => {
   const [tipo, setTipo] = useState<Tipo>("solido");
   const [acucar, setAcucar] = useState("");
   const [saturada, setSaturada] = useState("");
@@ -156,7 +156,7 @@ const LupaCalculadora = () => {
             <p className="mt-5 flex items-start gap-2 text-xs text-muted-foreground leading-relaxed">
               <HiOutlineInformationCircle className="w-4 h-4 shrink-0 mt-0.5" />
               Vale para alimentos embalados na ausência do consumidor. Há exceções
-              (por exemplo, alguns produtos com face principal menor que 40 cm²), que
+              (por exemplo, produtos com painel principal menor que 35 cm², em que a lupa é opcional), que
               o revisor completo do CanvaLabel considera.
             </p>
           </div>
@@ -199,7 +199,7 @@ const LupaCalculadora = () => {
 
             <div className="mt-6 pt-6 border-t border-border/50">
               <a
-                href="#planos"
+                href={ctaHref}
                 onClick={() => track("cta_click", { local: "calculadora", lupas: lupas.length })}
                 className="group inline-flex w-full items-center justify-center gap-2 gradient-primary text-white font-semibold rounded-xl px-6 py-3.5 shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all"
               >
