@@ -41,6 +41,7 @@ const navLinks = [
   { label: "Como funciona", href: "#demonstracao" },
   { label: "Planos", href: "#planos" },
   { label: "Avaliações", href: "#avaliacoes" },
+  { label: "Guias", href: "/guias" },
 ];
 
 const adminItems = [
