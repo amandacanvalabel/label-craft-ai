@@ -25,6 +25,9 @@ export default async function proxy(req: NextRequest) {
     pathname === "/termos" ||
     pathname === "/cookies" ||
     pathname === "/exclusao-de-dados" ||
+    // Guias de rotulagem: conteúdo público para leitores, buscadores e IAs.
+    pathname === "/guias" ||
+    pathname.startsWith("/guias/") ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
