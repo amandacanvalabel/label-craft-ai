@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { HiOutlineMagnifyingGlass, HiOutlineArrowRight, HiOutlineInformationCircle } from "react-icons/hi2";
 import { track } from "@/lib/track";
@@ -31,7 +32,7 @@ const toNum = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const LupaCalculadora = ({ ctaHref = "#planos" }: { ctaHref?: string }) => {
+const LupaCalculadora = ({ ctaHref = "#planos", mostrarGuia = true }: { ctaHref?: string; mostrarGuia?: boolean }) => {
   const [tipo, setTipo] = useState<Tipo>("solido");
   const [acucar, setAcucar] = useState("");
   const [saturada, setSaturada] = useState("");
@@ -159,6 +160,11 @@ const LupaCalculadora = ({ ctaHref = "#planos" }: { ctaHref?: string }) => {
               (por exemplo, produtos com painel principal menor que 35 cm², em que a lupa é opcional), que
               o revisor completo do CanvaLabel considera.
             </p>
+            {mostrarGuia && (
+              <Link href="/guias/lupa-alto-em-quando-usar" className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">
+                Entenda as regras da lupa: tamanho, posição e exceções →
+              </Link>
+            )}
           </div>
 
           {/* Resultado */}
