@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `Você é especialista em rotulagem cosmética no Brasil, com profundo conhecimento da RDC 21/2022, RDC 07/2015 e demais normativas ANVISA.
+            content: `Você é especialista em rotulagem cosmética no Brasil, com profundo conhecimento da RDC 907/2024 (rotulagem de higiene pessoal, cosméticos e perfumes, alterada pela RDC 949/2024), da RDC 898/2024 (ingredientes em INCI com tradução para o português) e demais normativas ANVISA.
 Ao receber a descrição de um produto cosmético, gere os textos obrigatórios do rótulo em português brasileiro.${contextNote}
 
 Responda SEMPRE com JSON válido nesta estrutura exata:
